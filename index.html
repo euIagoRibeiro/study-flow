@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Flow | Intelligent Revision</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <main class="container">
+
+        <header class="header">
+            <h1>Study Flow</h1>
+            <p>Manage your learning cycles efficiently.</p>
+        </header>
+
+        <section class="form-section">
+
+            <form id="study-form" class="study-form">
+                <input type="text" id="topic-input" placeholder="What did you study?" required>
+                
+                <select id="difficulty-select">
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+
+                <button type="submit" id="save-button">Save Topic</button>
+            </form>
+
+        </section>
+
+        <section id="studies-list" class="studies-list">
+
+        </section>
+
+    </main>
+    <script src="js/logic.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
