@@ -1,4 +1,4 @@
-/* 1. Variáveis para facilitar a manutenção */
+
 :root {
     --bg-base: #181825;    /* Cor de fundo profunda */
     --bg-surface: #1e1e2e; /* Cor dos cards/formulário */
@@ -13,7 +13,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace; /* Fonte com cara de dev */
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 body {
@@ -21,20 +21,19 @@ body {
     color: var(--text);
     display: flex;
     justify-content: center;
-    padding: 40px 20px;
+    padding: 2.5rem 1.25rem;
     min-height: 100vh;
 }
 
 .container {
     width: 100%;
-    max-width: 550px;
+    max-width: 34.375rem;
 }
 
-/* 2. Header mais minimalista e moderno */
 .header {
-    margin-bottom: 40px;
-    border-left: 4px solid var(--accent); /* Um detalhe lateral simples */
-    padding-left: 20px;
+    margin-bottom: 2.5rem;
+    border-left: 4px solid var(--accent);
+    padding-left: 1.25rem;
 }
 
 .header h1 {
@@ -48,24 +47,22 @@ body {
     font-size: 0.9rem;
 }
 
-/* 3. Formulário com cara de "App" e não de "Site" */
 .study-form {
     background: var(--bg-surface);
-    padding: 30px;
-    border-radius: 8px;
+    padding: 1.8rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--border-color);
     display: grid;
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 1.25rem;
 }
 
-/* Estilo para os inputs fugindo do padrão arredondado demais */
 input, select {
     background: var(--input-bg);
     border: 1px solid var(--border-color);
-    padding: 12px 16px;
+    padding: 0.75rem 1rem;
     color: var(--text);
-    border-radius: 4px;
+    border-radius: 0.25rem;
     outline: none;
     transition: border-color 0.3s ease;
 }
@@ -74,22 +71,21 @@ input:focus, select:focus {
     border-color: var(--accent);
 }
 
-/* Botão com efeito de elevação */
 button {
     background: var(--accent);
     color: var(--bg-base);
     border: none;
-    padding: 15px;
+    padding: 1rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 1px;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     cursor: pointer;
-    box-shadow: 0 4px 0 #9575cd; /* Sombra sólida (retrô-moderno) */
+    box-shadow: 0 0.25rem 0 #9575cd;
     transition: all 0.1s ease;
 }
 
 button:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 #9575cd;
+    transform: translateY(0.125rem);
+    box-shadow: 0 0.125rem 0 #9575cd;
 }
