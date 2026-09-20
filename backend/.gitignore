@@ -1,0 +1,7 @@
+# Redundante com o .gitignore da raiz de propósito: protege segredos
+# mesmo se o git add for rodado de dentro de backend/.
+node_modules
+.env
+.env.*
+!.env.example
+*.log

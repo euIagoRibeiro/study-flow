@@ -1,24 +1,31 @@
+# Regras que valem pro monorepo inteiro.
+# Regras específicas de cada pasta ficam em frontend/.gitignore e backend/.gitignore.
+
+# Dependências
+node_modules
+
+# Variáveis de ambiente (segredos: string do Supabase, hash da senha, segredo do token)
+# Só o .env.example (nomes das variáveis, sem valores) vai pro git
+.env
+.env.*
+!.env.example
+
 # Logs
 logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Sistema operacional
+.DS_Store
+Thumbs.db
 
-# Editor directories and files
+# Editor
+.idea
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Contexto e configuração do Claude Code: ficam só na máquina local,
+# o GitHub mostra apenas o projeto (README + frontend + backend)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+docs/progresso.md
