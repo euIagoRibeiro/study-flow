@@ -1,9 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { frequencyLabels } from '../frequency'
+import { fieldClass, primaryButtonClass } from '../styles'
 import type { Frequency, NewTask } from '../types'
-
-const fieldClass =
-  'h-11 rounded-md border border-tinta-suave bg-papel px-3 text-base text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta aria-invalid:border-2 aria-invalid:border-tinta'
 
 function TaskForm(props: { onAdd: (task: NewTask) => void }) {
   const [title, setTitle] = useState('')
@@ -55,10 +53,7 @@ function TaskForm(props: { onAdd: (task: NewTask) => void }) {
             ))}
           </select>
         </label>
-        <button
-          type="submit"
-          className="h-11 rounded-md bg-marca-texto px-4 font-semibold text-sobre-marca hover:brightness-95 active:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta"
-        >
+        <button type="submit" className={primaryButtonClass}>
           Adicionar
         </button>
       </div>

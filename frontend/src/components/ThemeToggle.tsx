@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { secondaryButtonClass } from '../styles'
 
 type Theme = 'light' | 'dark'
 
@@ -16,11 +17,7 @@ function ThemeToggle() {
   }
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      className="min-h-11 rounded-md border border-tinta-suave px-3 text-sm text-tinta-suave hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta"
-    >
+    <button type="button" onClick={toggle} className={secondaryButtonClass}>
       {theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
     </button>
   )

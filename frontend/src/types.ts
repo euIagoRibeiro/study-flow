@@ -16,3 +16,6 @@ export type TaskExecution = {
   description: string | null
   completedAt: string | null
 }
+
+// Execução que já foi concluída: completedAt deixa de aceitar null
+export type CompletedExecution = TaskExecution & { completedAt: string }

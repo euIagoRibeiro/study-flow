@@ -2,7 +2,7 @@ import { useState } from 'react'
 import TaskForm from './components/TaskForm'
 import Tasks from './components/Tasks'
 import ThemeToggle from './components/ThemeToggle'
-import type { NewTask, Task } from './types'
+import type { NewTask, Task, TaskExecution } from './types'
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([
@@ -10,6 +10,8 @@ function App() {
     { id: '2', title: 'estudar js', frequency: 'weekly', active: true },
     { id: '3', title: 'estudar sql', frequency: 'none', active: true },
   ])
+
+  const [executions, setExecutions] = useState<TaskExecution[]>([])
 
   function addTask(newTask: NewTask) {
     const task: Task = {
@@ -20,6 +22,17 @@ function App() {
     setTasks([...tasks, task])
   }
 
+  function addExecution(taskId: string, description: string) {
+    const trimmedDescription = description.trim()
+    const execution: TaskExecution = {
+      id: crypto.randomUUID(),
+      taskId,
+      description: trimmedDescription === '' ? null : trimmedDescription,
+      completedAt: new Date().toISOString(),
+    }
+    setExecutions([...executions, execution])
+  }
+
   return (
     <main className="mx-auto max-w-xl px-4 py-6">
       <header className="mb-8 flex items-center justify-between">
@@ -27,7 +40,7 @@ function App() {
         <ThemeToggle />
       </header>
       <TaskForm onAdd={addTask} />
-      <Tasks tasks={tasks} />
+      <Tasks tasks={tasks} executions={executions} onExecute={addExecution} />
     </main>
   )
 }
