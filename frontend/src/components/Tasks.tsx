@@ -3,11 +3,11 @@ import Task from './Task'
 
 function Tasks(props: { tasks: TaskModel[] }) {
   return (
-    <div>
+    <ul className="mt-8 border-t border-linha">
       {props.tasks.map((task) => (
         <Task key={task.id} task={task} />
       ))}
-    </div>
+    </ul>
   )
 }
 

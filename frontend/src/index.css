@@ -1,1 +1,40 @@
 @import 'tailwindcss';
+
+/* Cada tom é definido uma vez, com os dois valores: light-dark(claro, escuro).
+   Qual dos dois vale depende do color-scheme do elemento. */
+:root {
+  color-scheme: light dark;
+
+  --papel: light-dark(#fafaf7, #23262d);
+  --linha: light-dark(#bcd0e3, #383c45);
+  --tinta: light-dark(#1b2a41, #e3e5e8);
+  --tinta-suave: light-dark(#55606f, #a4aab4);
+  --marca-texto: light-dark(#ffd84a, #e8c547);
+  --sobre-marca: light-dark(#1b2a41, #23262d);
+}
+
+/* O botão de tema força um dos dois; sem atributo, segue o sistema. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* inline: as classes (bg-papel, text-tinta...) apontam direto para var(--papel),
+   que muda com o tema, em vez de congelar o valor na hora do build. */
+@theme inline {
+  --color-papel: var(--papel);
+  --color-linha: var(--linha);
+  --color-tinta: var(--tinta);
+  --color-tinta-suave: var(--tinta-suave);
+  --color-marca-texto: var(--marca-texto);
+  --color-sobre-marca: var(--sobre-marca);
+}
+
+@layer base {
+  body {
+    @apply min-h-dvh bg-papel text-tinta;
+  }
+}
