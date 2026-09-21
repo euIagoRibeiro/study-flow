@@ -1,7 +1,9 @@
-function Task(props: { title: string; completed?: boolean }) {
+import type { Task as TaskModel } from '../types'
+
+function Task(props: { task: TaskModel }) {
   return (
     <p>
-      Tarefa: {props.title} | {props.completed ? 'ok' : 'não'}
+      Tarefa: {props.task.title} | {props.task.frequency}
     </p>
   )
 }

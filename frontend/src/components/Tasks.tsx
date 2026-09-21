@@ -1,16 +1,11 @@
+import type { Task as TaskModel } from '../types'
 import Task from './Task'
 
-function Tasks() {
-  const tasks = [
-    { title: 'estudar react', completed: true },
-    { title: 'estudar js', completed: true },
-    { title: 'estudar sql', completed: false },
-  ]
-
+function Tasks(props: { tasks: TaskModel[] }) {
   return (
     <div>
-      {tasks.map((task, index) => (
-        <Task key={index} title={task.title} completed={task.completed} />
+      {props.tasks.map((task) => (
+        <Task key={task.id} task={task} />
       ))}
     </div>
   )
