@@ -1,36 +1,30 @@
 import { useState } from 'react'
+import TaskForm from './components/TaskForm'
 import Tasks from './components/Tasks'
-import type { Task } from './types'
+import type { NewTask, Task } from './types'
 
 function App() {
-  const [tasks] = useState<Task[]>([
-    {
-      id: '1',
-      title: 'estudar react',
-      categoryId: null,
-      defaultDescription: null,
-      frequency: 'daily',
-      active: true,
-    },
-    {
-      id: '2',
-      title: 'estudar js',
-      categoryId: null,
-      defaultDescription: null,
-      frequency: 'weekly',
-      active: true,
-    },
-    {
-      id: '3',
-      title: 'estudar sql',
-      categoryId: null,
-      defaultDescription: null,
-      frequency: 'none',
-      active: true,
-    },
+  const [tasks, setTasks] = useState<Task[]>([
+    { id: '1', title: 'estudar react', frequency: 'daily', active: true },
+    { id: '2', title: 'estudar js', frequency: 'weekly', active: true },
+    { id: '3', title: 'estudar sql', frequency: 'none', active: true },
   ])
 
-  return <Tasks tasks={tasks} />
+  function addTask(newTask: NewTask) {
+    const task: Task = {
+      id: crypto.randomUUID(),
+      ...newTask,
+      active: true,
+    }
+    setTasks([...tasks, task])
+  }
+
+  return (
+    <div>
+      <TaskForm onAdd={addTask} />
+      <Tasks tasks={tasks} />
+    </div>
+  )
 }
 
 export default App

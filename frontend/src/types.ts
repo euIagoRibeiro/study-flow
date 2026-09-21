@@ -3,11 +3,12 @@ export type Frequency = 'none' | 'daily' | 'weekly' | 'monthly'
 export type Task = {
   id: string
   title: string
-  categoryId: string | null
-  defaultDescription: string | null
   frequency: Frequency
   active: boolean
 }
+
+// O que o usuário preenche ao criar; o resto (id, active) é definido pelo App
+export type NewTask = Pick<Task, 'title' | 'frequency'>
 
 export type TaskExecution = {
   id: string
