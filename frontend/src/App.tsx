@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import TaskForm from './components/TaskForm'
-import Tasks from './components/Tasks'
-import ThemeToggle from './components/ThemeToggle'
+import { Route, Routes } from 'react-router'
+import ExecutePage from './pages/ExecutePage'
+import Layout from './pages/Layout'
+import TaskListPage from './pages/TaskListPage'
 import type { NewTask, Task, TaskExecution } from './types'
 
 function App() {
@@ -13,13 +14,16 @@ function App() {
 
   const [executions, setExecutions] = useState<TaskExecution[]>([])
 
-  function addTask(newTask: NewTask) {
+  // Devolve o id da tarefa criada: a ExecutePage usa isso pra já ir direto
+  // pro passo de registrar, sem precisar escolher a tarefa de novo
+  function addTask(newTask: NewTask): string {
     const task: Task = {
       id: crypto.randomUUID(),
       ...newTask,
       active: true,
     }
     setTasks([...tasks, task])
+    return task.id
   }
 
   function addExecution(taskId: string, description: string) {
@@ -46,20 +50,32 @@ function App() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-6">
-      <header className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">StudyFlow</h1>
-        <ThemeToggle />
-      </header>
-      <TaskForm onSubmit={addTask} />
-      <Tasks
-        tasks={tasks.filter((task) => task.active)}
-        executions={executions}
-        onExecute={addExecution}
-        onEdit={editTask}
-        onArchive={archiveTask}
-      />
-    </main>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route
+          index
+          element={
+            <TaskListPage
+              tasks={tasks}
+              executions={executions}
+              onCreate={addTask}
+              onEdit={editTask}
+              onArchive={archiveTask}
+            />
+          }
+        />
+        <Route
+          path="/executar"
+          element={
+            <ExecutePage
+              tasks={tasks}
+              onCreate={addTask}
+              onExecute={addExecution}
+            />
+          }
+        />
+      </Route>
+    </Routes>
   )
 }
 

@@ -4,7 +4,6 @@ import Task from './Task'
 function Tasks(props: {
   tasks: TaskModel[]
   executions: TaskExecution[]
-  onExecute: (taskId: string, description: string) => void
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
 }) {
@@ -17,7 +16,6 @@ function Tasks(props: {
           executions={props.executions.filter(
             (execution) => execution.taskId === task.id,
           )}
-          onExecute={props.onExecute}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
         />

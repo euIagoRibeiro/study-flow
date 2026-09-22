@@ -8,7 +8,6 @@ import type {
   Task as TaskModel,
   TaskExecution,
 } from '../types'
-import ExecutionForm from './ExecutionForm'
 import TaskForm from './TaskForm'
 
 // Type guard: dentro do filter, o TypeScript passa a saber que sobrou só
@@ -19,12 +18,11 @@ function isCompleted(
   return execution.completedAt !== null
 }
 
-type OpenForm = 'execute' | 'edit' | null
+type OpenForm = 'edit' | null
 
 function Task(props: {
   task: TaskModel
   executions: TaskExecution[]
-  onExecute: (taskId: string, description: string) => void
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
 }) {
@@ -99,15 +97,6 @@ function Task(props: {
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            onClick={() => toggle('execute')}
-            aria-expanded={openForm === 'execute'}
-            aria-label={`${openForm === 'execute' ? 'Cancelar' : 'Efetuar'} ${title}`}
-            className={secondaryButtonClass}
-          >
-            {openForm === 'execute' ? 'Cancelar' : 'Efetuar'}
-          </button>
-          <button
-            type="button"
             onClick={() => toggle('edit')}
             aria-expanded={openForm === 'edit'}
             aria-label={`${openForm === 'edit' ? 'Cancelar' : 'Editar'} ${title}`}
@@ -125,14 +114,6 @@ function Task(props: {
           </button>
         </div>
       </div>
-      {openForm === 'execute' && (
-        <ExecutionForm
-          onSubmit={(description) => {
-            props.onExecute(id, description)
-            setOpenForm(null)
-          }}
-        />
-      )}
       {openForm === 'edit' && (
         <TaskForm
           task={props.task}
