@@ -4,10 +4,12 @@ import { frequencyLabels } from '../frequency'
 import { secondaryButtonClass } from '../styles'
 import type {
   CompletedExecution,
+  NewTask,
   Task as TaskModel,
   TaskExecution,
 } from '../types'
 import ExecutionForm from './ExecutionForm'
+import TaskForm from './TaskForm'
 
 // Type guard: dentro do filter, o TypeScript passa a saber que sobrou só
 // execução com completedAt preenchido
@@ -17,19 +19,23 @@ function isCompleted(
   return execution.completedAt !== null
 }
 
+type OpenForm = 'execute' | 'edit' | null
+
 function Task(props: {
   task: TaskModel
   executions: TaskExecution[]
   onExecute: (taskId: string, description: string) => void
+  onEdit: (taskId: string, changes: NewTask) => void
+  onArchive: (taskId: string) => void
 }) {
   const { id, title, frequency } = props.task
-  const [isOpen, setIsOpen] = useState(false)
+  // Só um formulário aberto por vez: abrir um substitui o outro, em vez de
+  // precisar lembrar de fechar o anterior manualmente
+  const [openForm, setOpenForm] = useState<OpenForm>(null)
 
   // Tudo abaixo é derivado de executions: nada disso é guardado em estado
   const completed = props.executions.filter(isCompleted)
 
-  // A ISO em UTC tem sempre o mesmo formato, então comparar como string
-  // equivale a comparar as datas
   const last = completed.reduce<CompletedExecution | null>(
     (latest, execution) =>
       latest === null || execution.completedAt > latest.completedAt
@@ -43,10 +49,21 @@ function Task(props: {
     isSameLocalDay(new Date(execution.completedAt), now),
   )
 
+  function toggle(form: Exclude<OpenForm, null>) {
+    setOpenForm(openForm === form ? null : form)
+  }
+
+  function handleArchive() {
+    const confirmed = window.confirm(
+      `Arquivar "${title}"? A tarefa some da lista, mas o histórico de execuções continua guardado.`,
+    )
+    if (confirmed) props.onArchive(id)
+  }
+
   return (
     <li className="border-b border-linha py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 sm:flex-1">
           <p className="font-semibold break-words">
             <span
               className={
@@ -79,21 +96,49 @@ function Task(props: {
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-expanded={isOpen}
-          aria-label={`${isOpen ? 'Cancelar' : 'Efetuar'} ${title}`}
-          className={secondaryButtonClass}
-        >
-          {isOpen ? 'Cancelar' : 'Efetuar'}
-        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => toggle('execute')}
+            aria-expanded={openForm === 'execute'}
+            aria-label={`${openForm === 'execute' ? 'Cancelar' : 'Efetuar'} ${title}`}
+            className={secondaryButtonClass}
+          >
+            {openForm === 'execute' ? 'Cancelar' : 'Efetuar'}
+          </button>
+          <button
+            type="button"
+            onClick={() => toggle('edit')}
+            aria-expanded={openForm === 'edit'}
+            aria-label={`${openForm === 'edit' ? 'Cancelar' : 'Editar'} ${title}`}
+            className={secondaryButtonClass}
+          >
+            {openForm === 'edit' ? 'Cancelar' : 'Editar'}
+          </button>
+          <button
+            type="button"
+            onClick={handleArchive}
+            aria-label={`Arquivar ${title}`}
+            className={secondaryButtonClass}
+          >
+            Arquivar
+          </button>
+        </div>
       </div>
-      {isOpen && (
+      {openForm === 'execute' && (
         <ExecutionForm
           onSubmit={(description) => {
             props.onExecute(id, description)
-            setIsOpen(false)
+            setOpenForm(null)
+          }}
+        />
+      )}
+      {openForm === 'edit' && (
+        <TaskForm
+          task={props.task}
+          onSubmit={(changes) => {
+            props.onEdit(id, changes)
+            setOpenForm(null)
           }}
         />
       )}

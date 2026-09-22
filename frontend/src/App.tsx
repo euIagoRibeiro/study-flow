@@ -33,14 +33,32 @@ function App() {
     setExecutions([...executions, execution])
   }
 
+  function editTask(id: string, changes: NewTask) {
+    setTasks(
+      tasks.map((task) => (task.id === id ? { ...task, ...changes } : task)),
+    )
+  }
+
+  function archiveTask(id: string) {
+    setTasks(
+      tasks.map((task) => (task.id === id ? { ...task, active: false } : task)),
+    )
+  }
+
   return (
     <main className="mx-auto max-w-xl px-4 py-6">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">StudyFlow</h1>
         <ThemeToggle />
       </header>
-      <TaskForm onAdd={addTask} />
-      <Tasks tasks={tasks} executions={executions} onExecute={addExecution} />
+      <TaskForm onSubmit={addTask} />
+      <Tasks
+        tasks={tasks.filter((task) => task.active)}
+        executions={executions}
+        onExecute={addExecution}
+        onEdit={editTask}
+        onArchive={archiveTask}
+      />
     </main>
   )
 }

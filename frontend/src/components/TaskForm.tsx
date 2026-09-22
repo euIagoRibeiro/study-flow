@@ -1,12 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { frequencyLabels } from '../frequency'
 import { fieldClass, primaryButtonClass } from '../styles'
-import type { Frequency, NewTask } from '../types'
+import type { Frequency, NewTask, Task } from '../types'
 
-function TaskForm(props: { onAdd: (task: NewTask) => void }) {
-  const [title, setTitle] = useState('')
-  const [frequency, setFrequency] = useState<Frequency>('none')
+function TaskForm(props: { task?: Task; onSubmit: (task: NewTask) => void }) {
+  const [title, setTitle] = useState(props.task?.title ?? '')
+  const [frequency, setFrequency] = useState<Frequency>(
+    props.task?.frequency ?? 'none',
+  )
   const [error, setError] = useState('')
+
+  // Com task: formulário de edição, preenchido e sem limpar ao salvar.
+  // Sem task: formulário de criação, o de sempre.
+  const isEditing = props.task !== undefined
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -17,17 +23,21 @@ function TaskForm(props: { onAdd: (task: NewTask) => void }) {
       return
     }
 
-    props.onAdd({ title: trimmedTitle, frequency })
-    setTitle('')
-    setFrequency('none')
+    props.onSubmit({ title: trimmedTitle, frequency })
     setError('')
+    if (!isEditing) {
+      setTitle('')
+      setFrequency('none')
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="flex flex-col gap-1 sm:flex-1">
-          <span className="text-sm text-tinta-suave">Nova tarefa</span>
+          <span className="text-sm text-tinta-suave">
+            {isEditing ? 'Título' : 'Nova tarefa'}
+          </span>
           <input
             type="text"
             value={title}
@@ -54,7 +64,7 @@ function TaskForm(props: { onAdd: (task: NewTask) => void }) {
           </select>
         </label>
         <button type="submit" className={primaryButtonClass}>
-          Adicionar
+          {isEditing ? 'Salvar' : 'Adicionar'}
         </button>
       </div>
       {error && (

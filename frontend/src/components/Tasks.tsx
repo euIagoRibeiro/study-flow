@@ -1,10 +1,12 @@
-import type { Task as TaskModel, TaskExecution } from '../types'
+import type { NewTask, Task as TaskModel, TaskExecution } from '../types'
 import Task from './Task'
 
 function Tasks(props: {
   tasks: TaskModel[]
   executions: TaskExecution[]
   onExecute: (taskId: string, description: string) => void
+  onEdit: (taskId: string, changes: NewTask) => void
+  onArchive: (taskId: string) => void
 }) {
   return (
     <ul className="mt-8 border-t border-linha">
@@ -16,6 +18,8 @@ function Tasks(props: {
             (execution) => execution.taskId === task.id,
           )}
           onExecute={props.onExecute}
+          onEdit={props.onEdit}
+          onArchive={props.onArchive}
         />
       ))}
     </ul>
