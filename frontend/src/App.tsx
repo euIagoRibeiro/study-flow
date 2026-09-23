@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Route, Routes } from 'react-router'
 import ExecutePage from './pages/ExecutePage'
+import HistoricoPage from './pages/HistoricoPage'
 import Layout from './pages/Layout'
 import TaskListPage from './pages/TaskListPage'
 import type { NewTask, Task, TaskExecution } from './types'
@@ -102,6 +103,15 @@ function App() {
               tasks={tasks}
               onCreate={addTask}
               onExecute={addExecution}
+            />
+          }
+        />
+        <Route
+          path="/historico"
+          element={
+            <HistoricoPage
+              executions={executions}
+              onEditExecution={editExecution}
             />
           }
         />

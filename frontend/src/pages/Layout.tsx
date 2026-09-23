@@ -22,6 +22,9 @@ function Layout() {
         <NavLink to="/executar" className={navLinkClass}>
           Executar
         </NavLink>
+        <NavLink to="/historico" className={navLinkClass}>
+          Histórico
+        </NavLink>
       </nav>
       {/* A rota filha atual (TaskListPage ou ExecutePage) é desenhada aqui */}
       <Outlet />

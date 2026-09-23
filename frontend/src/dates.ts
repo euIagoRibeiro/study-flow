@@ -20,3 +20,31 @@ export function toDatetimeLocalValue(iso: string): string {
 export function fromDatetimeLocalValue(value: string): string {
   return new Date(value).toISOString()
 }
+
+export type PeriodFilter = 'all' | 'today' | '7d' | 'month' | 'year'
+
+// Compara por data local, mesmo princípio do isSameLocalDay
+export function matchesPeriod(iso: string, period: PeriodFilter): boolean {
+  if (period === 'all') return true
+
+  const date = new Date(iso)
+  const now = new Date()
+
+  if (period === 'today') return isSameLocalDay(date, now)
+
+  if (period === '7d') {
+    const cutoff = new Date(now)
+    cutoff.setHours(0, 0, 0, 0)
+    cutoff.setDate(cutoff.getDate() - 6) // hoje + 6 dias atrás = 7 dias
+    return date >= cutoff
+  }
+
+  if (period === 'month') {
+    return (
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth()
+    )
+  }
+
+  return date.getFullYear() === now.getFullYear() // 'year'
+}
