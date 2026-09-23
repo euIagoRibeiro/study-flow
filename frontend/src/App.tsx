@@ -14,8 +14,7 @@ function App() {
 
   const [executions, setExecutions] = useState<TaskExecution[]>([])
 
-  // Devolve o id da tarefa criada: a ExecutePage usa isso pra já ir direto
-  // pro passo de registrar, sem precisar escolher a tarefa de novo
+  // Devolve o id: a ExecutePage usa isso pra ir direto ao passo de registrar
   function addTask(newTask: NewTask): string {
     const task: Task = {
       id: crypto.randomUUID(),
@@ -36,12 +35,29 @@ function App() {
       taskId,
       description: trimmedDescription === '' ? null : trimmedDescription,
       completedAt: new Date().toISOString(),
-      // Copiado agora, não referenciado: se a tarefa mudar de título ou
-      // frequência depois, essa execução continua mostrando como era
+      // Snapshot: copiado agora, não referenciado — edições futuras da tarefa não afetam
       taskTitleAtTime: task.title,
       taskFrequencyAtTime: task.frequency,
     }
     setExecutions([...executions, execution])
+  }
+
+  function editExecution(
+    id: string,
+    changes: { description: string; completedAt: string },
+  ) {
+    setExecutions(
+      executions.map((execution) =>
+        execution.id === id
+          ? {
+              ...execution,
+              description:
+                changes.description === '' ? null : changes.description,
+              completedAt: changes.completedAt,
+            }
+          : execution,
+      ),
+    )
   }
 
   function editTask(id: string, changes: NewTask) {
@@ -68,6 +84,7 @@ function App() {
               onCreate={addTask}
               onEdit={editTask}
               onArchive={archiveTask}
+              onEditExecution={editExecution}
             />
           }
         />

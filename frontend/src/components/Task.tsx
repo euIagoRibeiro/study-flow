@@ -1,6 +1,6 @@
 import { isSameLocalDay } from '../dates'
 import { frequencyLabels } from '../frequency'
-import { iconButtonClass } from '../styles'
+import { iconButtonClass, inlineButtonClass } from '../styles'
 import type {
   CompletedExecution,
   NewTask,
@@ -8,19 +8,18 @@ import type {
   TaskExecution,
 } from '../types'
 import { ArchiveIcon, PencilIcon } from './icons'
+import ExecutionEditForm from './ExecutionEditForm'
 import TaskForm from './TaskForm'
 
-// Type guard: dentro do filter, o TypeScript passa a saber que sobrou só
-// execução com completedAt preenchido
+// Type guard: garante completedAt não-nulo pro TypeScript
 function isCompleted(
   execution: TaskExecution,
 ): execution is CompletedExecution {
   return execution.completedAt !== null
 }
 
-// Exportado: Tasks.tsx precisa do mesmo tipo pra guardar "qual formulário,
-// de qual tarefa" está aberto — um nível acima, coordenando todas as linhas
-export type OpenForm = 'edit' | null
+// Exportado pro Tasks.tsx coordenar entre linhas
+export type OpenForm = 'edit' | 'edit-execution' | null
 
 function Task(props: {
   task: TaskModel
@@ -29,6 +28,10 @@ function Task(props: {
   onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
+  onEditExecution: (
+    executionId: string,
+    changes: { description: string; completedAt: string },
+  ) => void
 }) {
   const { id, title, frequency } = props.task
   const { openForm, onToggle } = props
@@ -62,11 +65,12 @@ function Task(props: {
         <div className="min-w-0 sm:flex-1">
           <p className="font-semibold break-words">
             <span
-              className={
+              // transition-colors fixo aqui, não junto do grifo — senão não há o que animar
+              className={`transition-colors duration-300 ${
                 doneToday
                   ? '-mx-1 box-decoration-clone bg-marca-texto px-1 text-sobre-marca'
                   : ''
-              }
+              }`}
             >
               {title}
             </span>
@@ -84,6 +88,16 @@ function Task(props: {
                 day: '2-digit',
                 month: '2-digit',
               })}
+              {' · '}
+              <button
+                type="button"
+                onClick={() => onToggle('edit-execution')}
+                aria-expanded={openForm === 'edit-execution'}
+                aria-label={`${openForm === 'edit-execution' ? 'Cancelar edição do' : 'Editar'} último registro de ${title}`}
+                className={inlineButtonClass}
+              >
+                {openForm === 'edit-execution' ? 'cancelar' : 'editar'}
+              </button>
             </p>
           )}
           {last?.description && (
@@ -120,6 +134,15 @@ function Task(props: {
           onSubmit={(changes) => {
             props.onEdit(id, changes)
             onToggle('edit')
+          }}
+        />
+      )}
+      {openForm === 'edit-execution' && last !== null && (
+        <ExecutionEditForm
+          execution={last}
+          onSubmit={(changes) => {
+            props.onEditExecution(last.id, changes)
+            onToggle('edit-execution')
           }}
         />
       )}

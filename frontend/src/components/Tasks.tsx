@@ -7,10 +7,12 @@ function Tasks(props: {
   executions: TaskExecution[]
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
+  onEditExecution: (
+    executionId: string,
+    changes: { description: string; completedAt: string },
+  ) => void
 }) {
-  // Qual tarefa (e qual formulário dela) está aberta — um valor só pra lista
-  // inteira, não um por linha, senão cada Task decide sozinha e duas linhas
-  // podem ficar abertas ao mesmo tempo
+  // Um valor só pra lista inteira, não por linha (senão duas linhas abrem juntas)
   const [openTask, setOpenTask] = useState<{
     taskId: string
     form: NonNullable<OpenForm>
@@ -37,6 +39,7 @@ function Tasks(props: {
           onToggle={(form) => toggle(task.id, form)}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
+          onEditExecution={props.onEditExecution}
         />
       ))}
     </ul>

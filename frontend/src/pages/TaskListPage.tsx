@@ -8,6 +8,10 @@ function TaskListPage(props: {
   onCreate: (task: NewTask) => string
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
+  onEditExecution: (
+    executionId: string,
+    changes: { description: string; completedAt: string },
+  ) => void
 }) {
   return (
     <>
@@ -17,6 +21,7 @@ function TaskListPage(props: {
         executions={props.executions}
         onEdit={props.onEdit}
         onArchive={props.onArchive}
+        onEditExecution={props.onEditExecution}
       />
     </>
   )
