@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { isSameLocalDay } from '../dates'
 import { frequencyLabels } from '../frequency'
-import { secondaryButtonClass } from '../styles'
+import { iconButtonClass } from '../styles'
 import type {
   CompletedExecution,
   NewTask,
   Task as TaskModel,
   TaskExecution,
 } from '../types'
+import { ArchiveIcon, PencilIcon } from './icons'
 import TaskForm from './TaskForm'
 
 // Type guard: dentro do filter, o TypeScript passa a saber que sobrou só
@@ -99,18 +100,20 @@ function Task(props: {
             type="button"
             onClick={() => toggle('edit')}
             aria-expanded={openForm === 'edit'}
-            aria-label={`${openForm === 'edit' ? 'Cancelar' : 'Editar'} ${title}`}
-            className={secondaryButtonClass}
+            aria-label={`${openForm === 'edit' ? 'Cancelar edição de' : 'Editar'} ${title}`}
+            title={openForm === 'edit' ? 'Cancelar' : 'Editar'}
+            className={iconButtonClass}
           >
-            {openForm === 'edit' ? 'Cancelar' : 'Editar'}
+            <PencilIcon />
           </button>
           <button
             type="button"
             onClick={handleArchive}
             aria-label={`Arquivar ${title}`}
-            className={secondaryButtonClass}
+            title="Arquivar"
+            className={iconButtonClass}
           >
-            Arquivar
+            <ArchiveIcon />
           </button>
         </div>
       </div>
