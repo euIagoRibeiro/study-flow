@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { isSameLocalDay } from '../dates'
 import { frequencyLabels } from '../frequency'
 import { iconButtonClass } from '../styles'
@@ -19,18 +18,20 @@ function isCompleted(
   return execution.completedAt !== null
 }
 
-type OpenForm = 'edit' | null
+// Exportado: Tasks.tsx precisa do mesmo tipo pra guardar "qual formulário,
+// de qual tarefa" está aberto — um nível acima, coordenando todas as linhas
+export type OpenForm = 'edit' | null
 
 function Task(props: {
   task: TaskModel
   executions: TaskExecution[]
+  openForm: OpenForm
+  onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
 }) {
   const { id, title, frequency } = props.task
-  // Só um formulário aberto por vez: abrir um substitui o outro, em vez de
-  // precisar lembrar de fechar o anterior manualmente
-  const [openForm, setOpenForm] = useState<OpenForm>(null)
+  const { openForm, onToggle } = props
 
   // Tudo abaixo é derivado de executions: nada disso é guardado em estado
   const completed = props.executions.filter(isCompleted)
@@ -47,10 +48,6 @@ function Task(props: {
   const doneToday = completed.some((execution) =>
     isSameLocalDay(new Date(execution.completedAt), now),
   )
-
-  function toggle(form: Exclude<OpenForm, null>) {
-    setOpenForm(openForm === form ? null : form)
-  }
 
   function handleArchive() {
     const confirmed = window.confirm(
@@ -98,7 +95,7 @@ function Task(props: {
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            onClick={() => toggle('edit')}
+            onClick={() => onToggle('edit')}
             aria-expanded={openForm === 'edit'}
             aria-label={`${openForm === 'edit' ? 'Cancelar edição de' : 'Editar'} ${title}`}
             title={openForm === 'edit' ? 'Cancelar' : 'Editar'}
@@ -122,7 +119,7 @@ function Task(props: {
           task={props.task}
           onSubmit={(changes) => {
             props.onEdit(id, changes)
-            setOpenForm(null)
+            onToggle('edit')
           }}
         />
       )}
