@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Route, Routes } from 'react-router'
 import * as executionsApi from './api/executions'
 import * as tasksApi from './api/tasks'
@@ -127,34 +127,6 @@ function App() {
     )
   }
 
-  // TEMP — Fase 2 etapa 2: sem UI ainda, isso só existe pra poder testar
-  // pelo console. Sai quando a etapa 3 ligar essas funções na ExecutePage.
-  // Fica num useEffect (não solto no corpo do componente) porque mutar
-  // window durante o render é efeito colateral, não é permitido ali.
-  useEffect(() => {
-    ;(
-      window as unknown as {
-        __fase2: {
-          tasks: Task[]
-          executions: TaskExecution[]
-          timeEntries: TimeEntry[]
-          startTimer: typeof startTimer
-          stopTimer: typeof stopTimer
-          resumeTimer: typeof resumeTimer
-          finishExecution: typeof finishExecution
-        }
-      }
-    ).__fase2 = {
-      tasks,
-      executions,
-      timeEntries,
-      startTimer,
-      stopTimer,
-      resumeTimer,
-      finishExecution,
-    }
-  })
-
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -177,8 +149,14 @@ function App() {
           element={
             <ExecutePage
               tasks={tasks}
+              executions={executions}
+              timeEntries={timeEntries}
               onCreate={addTask}
               onExecute={addExecution}
+              onStartTimer={startTimer}
+              onStopTimer={stopTimer}
+              onResumeTimer={resumeTimer}
+              onFinishExecution={finishExecution}
             />
           }
         />
