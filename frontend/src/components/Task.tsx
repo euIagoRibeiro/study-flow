@@ -7,7 +7,7 @@ import type {
   Task as TaskModel,
   TaskExecution,
 } from '../types'
-import { ArchiveIcon, HistoryIcon, PencilIcon } from './icons'
+import { ArchiveIcon, HistoryIcon, PencilIcon, UnarchiveIcon } from './icons'
 import ExecutionEditForm from './ExecutionEditForm'
 import ExecutionHistory from './ExecutionHistory'
 import TaskForm from './TaskForm'
@@ -29,6 +29,7 @@ function Task(props: {
   onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
+  onReactivate: (taskId: string) => void
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
@@ -135,6 +136,17 @@ function Task(props: {
               className={iconButtonClass}
             >
               <HistoryIcon />
+            </button>
+          )}
+          {!active && (
+            <button
+              type="button"
+              onClick={() => props.onReactivate(id)}
+              aria-label={`Reativar ${title}`}
+              title="Reativar"
+              className={iconButtonClass}
+            >
+              <UnarchiveIcon />
             </button>
           )}
           {active && (

@@ -72,6 +72,12 @@ function App() {
     )
   }
 
+  function reactivateTask(id: string) {
+    setTasks(
+      tasks.map((task) => (task.id === id ? { ...task, active: true } : task)),
+    )
+  }
+
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -84,6 +90,7 @@ function App() {
               onCreate={addTask}
               onEdit={editTask}
               onArchive={archiveTask}
+              onReactivate={reactivateTask}
               onEditExecution={editExecution}
             />
           }

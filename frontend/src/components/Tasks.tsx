@@ -7,6 +7,7 @@ function Tasks(props: {
   executions: TaskExecution[]
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
+  onReactivate: (taskId: string) => void
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
@@ -39,6 +40,7 @@ function Tasks(props: {
           onToggle={(form) => toggle(task.id, form)}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
+          onReactivate={props.onReactivate}
           onEditExecution={props.onEditExecution}
         />
       ))}

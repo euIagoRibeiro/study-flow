@@ -33,6 +33,17 @@ export function ArchiveIcon() {
   )
 }
 
+export function UnarchiveIcon() {
+  return (
+    <svg {...commonProps}>
+      <rect x="3.5" y="4.5" width="17" height="4" rx="1" />
+      <path d="M5 8.5v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9" />
+      <path d="M12 17v-5" />
+      <path d="M9.5 14.5L12 12l2.5 2.5" />
+    </svg>
+  )
+}
+
 export function HistoryIcon() {
   return (
     <svg {...commonProps}>
