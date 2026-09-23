@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import ExecutionForm from '../components/ExecutionForm'
 import TaskForm from '../components/TaskForm'
 import { frequencyLabels } from '../frequency'
-import { secondaryButtonClass } from '../styles'
+import { pickerButtonClass, secondaryButtonClass } from '../styles'
 import type { NewTask, Task } from '../types'
 
 function ExecutePage(props: {
@@ -33,14 +33,14 @@ function ExecutePage(props: {
     return (
       <div className="flex flex-col gap-6">
         <div>
-          <h2 className="mb-2 text-sm text-tinta-suave">Escolha uma tarefa</h2>
+          <h2 className="mb-2 text-base font-semibold">Escolha uma tarefa</h2>
           <ul className="flex flex-col gap-2">
             {activeTasks.map((task) => (
               <li key={task.id}>
                 <button
                   type="button"
                   onClick={() => setSelectedTaskId(task.id)}
-                  className="h-11 w-full rounded-md border border-tinta-suave px-3 text-left text-base text-tinta hover:bg-linha/30"
+                  className={pickerButtonClass}
                 >
                   {task.title}
                   {task.frequency !== 'none' && (
@@ -54,7 +54,7 @@ function ExecutePage(props: {
           </ul>
         </div>
         <div>
-          <h2 className="mb-2 text-sm text-tinta-suave">ou crie uma nova</h2>
+          <h2 className="mb-2 text-base font-semibold">ou crie uma nova</h2>
           <TaskForm onSubmit={handleCreate} />
         </div>
       </div>

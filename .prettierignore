@@ -1,2 +1,4 @@
 dist
 package-lock.json
+# Prettier não tem parser pra SVG por padrão
+*.svg
