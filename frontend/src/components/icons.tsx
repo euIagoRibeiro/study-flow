@@ -33,7 +33,6 @@ export function ArchiveIcon() {
   )
 }
 
-// Ainda sem botão que use este — reservado pro "Histórico" da F5a
 export function HistoryIcon() {
   return (
     <svg {...commonProps}>

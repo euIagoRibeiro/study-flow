@@ -7,8 +7,9 @@ import type {
   Task as TaskModel,
   TaskExecution,
 } from '../types'
-import { ArchiveIcon, PencilIcon } from './icons'
+import { ArchiveIcon, HistoryIcon, PencilIcon } from './icons'
 import ExecutionEditForm from './ExecutionEditForm'
+import ExecutionHistory from './ExecutionHistory'
 import TaskForm from './TaskForm'
 
 // Type guard: garante completedAt não-nulo pro TypeScript
@@ -19,7 +20,7 @@ function isCompleted(
 }
 
 // Exportado pro Tasks.tsx coordenar entre linhas
-export type OpenForm = 'edit' | 'edit-execution' | null
+export type OpenForm = 'edit' | 'edit-execution' | 'history' | null
 
 function Task(props: {
   task: TaskModel
@@ -117,6 +118,18 @@ function Task(props: {
           >
             <PencilIcon />
           </button>
+          {completed.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onToggle('history')}
+              aria-expanded={openForm === 'history'}
+              aria-label={`${openForm === 'history' ? 'Fechar' : 'Ver'} histórico de ${title}`}
+              title={openForm === 'history' ? 'Fechar' : 'Histórico'}
+              className={iconButtonClass}
+            >
+              <HistoryIcon />
+            </button>
+          )}
           <button
             type="button"
             onClick={handleArchive}
@@ -144,6 +157,12 @@ function Task(props: {
             props.onEditExecution(last.id, changes)
             onToggle('edit-execution')
           }}
+        />
+      )}
+      {openForm === 'history' && (
+        <ExecutionHistory
+          executions={completed}
+          onEdit={props.onEditExecution}
         />
       )}
     </li>
