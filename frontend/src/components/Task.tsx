@@ -34,7 +34,7 @@ function Task(props: {
     changes: { description: string; completedAt: string },
   ) => void
 }) {
-  const { id, title, frequency } = props.task
+  const { id, title, frequency, active } = props.task
   const { openForm, onToggle } = props
 
   // Tudo abaixo é derivado de executions: nada disso é guardado em estado
@@ -55,7 +55,7 @@ function Task(props: {
 
   function handleArchive() {
     const confirmed = window.confirm(
-      `Arquivar "${title}"? A tarefa some da lista, mas o histórico de execuções continua guardado.`,
+      `Arquivar "${title}"? A tarefa some da lista, mas pode ser vista de novo ligando "Mostrar arquivadas" — o histórico de execuções continua guardado.`,
     )
     if (confirmed) props.onArchive(id)
   }
@@ -75,6 +75,11 @@ function Task(props: {
             >
               {title}
             </span>
+            {!active && (
+              <span className="ml-2 text-sm font-normal text-tinta-suave">
+                (arquivada)
+              </span>
+            )}
           </p>
           {frequency !== 'none' && (
             <p className="text-sm text-tinta-suave">
@@ -108,16 +113,18 @@ function Task(props: {
           )}
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => onToggle('edit')}
-            aria-expanded={openForm === 'edit'}
-            aria-label={`${openForm === 'edit' ? 'Cancelar edição de' : 'Editar'} ${title}`}
-            title={openForm === 'edit' ? 'Cancelar' : 'Editar'}
-            className={iconButtonClass}
-          >
-            <PencilIcon />
-          </button>
+          {active && (
+            <button
+              type="button"
+              onClick={() => onToggle('edit')}
+              aria-expanded={openForm === 'edit'}
+              aria-label={`${openForm === 'edit' ? 'Cancelar edição de' : 'Editar'} ${title}`}
+              title={openForm === 'edit' ? 'Cancelar' : 'Editar'}
+              className={iconButtonClass}
+            >
+              <PencilIcon />
+            </button>
+          )}
           {completed.length > 0 && (
             <button
               type="button"
@@ -130,18 +137,20 @@ function Task(props: {
               <HistoryIcon />
             </button>
           )}
-          <button
-            type="button"
-            onClick={handleArchive}
-            aria-label={`Arquivar ${title}`}
-            title="Arquivar"
-            className={iconButtonClass}
-          >
-            <ArchiveIcon />
-          </button>
+          {active && (
+            <button
+              type="button"
+              onClick={handleArchive}
+              aria-label={`Arquivar ${title}`}
+              title="Arquivar"
+              className={iconButtonClass}
+            >
+              <ArchiveIcon />
+            </button>
+          )}
         </div>
       </div>
-      {openForm === 'edit' && (
+      {active && openForm === 'edit' && (
         <TaskForm
           task={props.task}
           onSubmit={(changes) => {

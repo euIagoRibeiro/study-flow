@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import TaskForm from '../components/TaskForm'
 import Tasks from '../components/Tasks'
 import type { NewTask, Task, TaskExecution } from '../types'
@@ -13,11 +14,26 @@ function TaskListPage(props: {
     changes: { description: string; completedAt: string },
   ) => void
 }) {
+  const [showArchived, setShowArchived] = useState(false)
+
+  const visibleTasks = props.tasks
+    .filter((task) => showArchived || task.active)
+    // ativas primeiro, sem mudar a ordem de criação dentro de cada grupo
+    .sort((a, b) => Number(b.active) - Number(a.active))
+
   return (
     <>
       <TaskForm onSubmit={props.onCreate} />
+      <label className="mt-4 flex items-center gap-2 text-sm text-tinta-suave">
+        <input
+          type="checkbox"
+          checked={showArchived}
+          onChange={(event) => setShowArchived(event.target.checked)}
+        />
+        Mostrar arquivadas
+      </label>
       <Tasks
-        tasks={props.tasks.filter((task) => task.active)}
+        tasks={visibleTasks}
         executions={props.executions}
         onEdit={props.onEdit}
         onArchive={props.onArchive}
