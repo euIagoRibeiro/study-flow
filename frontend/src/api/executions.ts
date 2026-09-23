@@ -20,6 +20,29 @@ export function createExecution(
   }
 }
 
+export function startExecution(task: Task): TaskExecution {
+  return {
+    id: crypto.randomUUID(),
+    taskId: task.id,
+    description: null,
+    completedAt: null, // ainda rodando
+    taskTitleAtTime: task.title,
+    taskFrequencyAtTime: task.frequency,
+  }
+}
+
+export function finishExecution(
+  execution: TaskExecution,
+  description: string,
+): TaskExecution {
+  const trimmedDescription = description.trim()
+  return {
+    ...execution,
+    description: trimmedDescription === '' ? null : trimmedDescription,
+    completedAt: new Date().toISOString(),
+  }
+}
+
 export function editExecution(
   execution: TaskExecution,
   changes: { description: string; completedAt: string },

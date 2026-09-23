@@ -24,3 +24,10 @@ export type TaskExecution = {
 
 // Execução que já foi concluída: completedAt deixa de aceitar null
 export type CompletedExecution = TaskExecution & { completedAt: string }
+
+export type TimeEntry = {
+  id: string
+  taskExecutionId: string
+  startedAt: string
+  endedAt: string | null // null enquanto está rodando
+}
