@@ -27,12 +27,19 @@ function App() {
   }
 
   function addExecution(taskId: string, description: string) {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return // tarefa não existe — não deveria acontecer
+
     const trimmedDescription = description.trim()
     const execution: TaskExecution = {
       id: crypto.randomUUID(),
       taskId,
       description: trimmedDescription === '' ? null : trimmedDescription,
       completedAt: new Date().toISOString(),
+      // Copiado agora, não referenciado: se a tarefa mudar de título ou
+      // frequência depois, essa execução continua mostrando como era
+      taskTitleAtTime: task.title,
+      taskFrequencyAtTime: task.frequency,
     }
     setExecutions([...executions, execution])
   }

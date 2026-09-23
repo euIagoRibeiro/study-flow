@@ -15,6 +15,11 @@ export type TaskExecution = {
   taskId: string
   description: string | null
   completedAt: string | null
+  // Snapshot da tarefa no momento em que a execução foi criada — nunca
+  // reescrito depois. O histórico mostra esses campos, nunca os da tarefa
+  // atual: editar o molde não pode reescrever como o passado aparece.
+  taskTitleAtTime: string
+  taskFrequencyAtTime: Frequency
 }
 
 // Execução que já foi concluída: completedAt deixa de aceitar null
