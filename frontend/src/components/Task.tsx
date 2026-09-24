@@ -7,6 +7,7 @@ import type {
   NewTask,
   Task as TaskModel,
   TaskExecution,
+  TimeEntry,
 } from '../types'
 import { ArchiveIcon, HistoryIcon, PencilIcon, UnarchiveIcon } from './icons'
 import ExecutionEditForm from './ExecutionEditForm'
@@ -26,6 +27,7 @@ export type OpenForm = 'edit' | 'edit-execution' | 'history' | null
 function Task(props: {
   task: TaskModel
   executions: TaskExecution[]
+  timeEntries: TimeEntry[]
   openForm: OpenForm
   onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => void
@@ -34,6 +36,10 @@ function Task(props: {
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
+  ) => void
+  onEditTimeEntry: (
+    entryId: string,
+    changes: { startedAt: string; endedAt: string },
   ) => void
 }) {
   const { id, title, frequency, active } = props.task
@@ -196,7 +202,9 @@ function Task(props: {
       {openForm === 'history' && (
         <ExecutionHistory
           executions={completed}
+          timeEntries={props.timeEntries}
           onEdit={props.onEditExecution}
+          onEditTimeEntry={props.onEditTimeEntry}
         />
       )}
     </li>

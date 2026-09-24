@@ -128,6 +128,17 @@ function App() {
     }
   }
 
+  function editTimeEntry(
+    id: string,
+    changes: { startedAt: string; endedAt: string },
+  ) {
+    setTimeEntries(
+      timeEntries.map((entry) =>
+        entry.id === id ? timeEntriesApi.editTimeEntry(entry, changes) : entry,
+      ),
+    )
+  }
+
   function editTask(id: string, changes: NewTask) {
     setTasks(
       tasks.map((task) =>
@@ -159,11 +170,13 @@ function App() {
             <TaskListPage
               tasks={tasks}
               executions={executions}
+              timeEntries={timeEntries}
               onCreate={addTask}
               onEdit={editTask}
               onArchive={archiveTask}
               onReactivate={reactivateTask}
               onEditExecution={editExecution}
+              onEditTimeEntry={editTimeEntry}
             />
           }
         />
@@ -189,7 +202,9 @@ function App() {
           element={
             <HistoricoPage
               executions={executions}
+              timeEntries={timeEntries}
               onEditExecution={editExecution}
+              onEditTimeEntry={editTimeEntry}
             />
           }
         />

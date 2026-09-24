@@ -3,7 +3,12 @@ import ExecutionHistory from '../components/ExecutionHistory'
 import { matchesPeriod, type PeriodFilter } from '../dates'
 import { frequencyLabels } from '../frequency'
 import { fieldClass } from '../styles'
-import type { CompletedExecution, Frequency, TaskExecution } from '../types'
+import type {
+  CompletedExecution,
+  Frequency,
+  TaskExecution,
+  TimeEntry,
+} from '../types'
 
 const periodLabels: Record<PeriodFilter, string> = {
   all: 'Tudo',
@@ -21,9 +26,14 @@ function isCompleted(
 
 function HistoricoPage(props: {
   executions: TaskExecution[]
+  timeEntries: TimeEntry[]
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
+  ) => void
+  onEditTimeEntry: (
+    entryId: string,
+    changes: { startedAt: string; endedAt: string },
   ) => void
 }) {
   const [period, setPeriod] = useState<PeriodFilter>('all')
@@ -79,7 +89,9 @@ function HistoricoPage(props: {
       ) : (
         <ExecutionHistory
           executions={filtered}
+          timeEntries={props.timeEntries}
           onEdit={props.onEditExecution}
+          onEditTimeEntry={props.onEditTimeEntry}
         />
       )}
     </div>

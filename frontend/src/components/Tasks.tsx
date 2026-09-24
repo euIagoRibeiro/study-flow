@@ -1,16 +1,26 @@
 import { useState } from 'react'
-import type { NewTask, Task as TaskModel, TaskExecution } from '../types'
+import type {
+  NewTask,
+  Task as TaskModel,
+  TaskExecution,
+  TimeEntry,
+} from '../types'
 import Task, { type OpenForm } from './Task'
 
 function Tasks(props: {
   tasks: TaskModel[]
   executions: TaskExecution[]
+  timeEntries: TimeEntry[]
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
   onReactivate: (taskId: string) => void
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
+  ) => void
+  onEditTimeEntry: (
+    entryId: string,
+    changes: { startedAt: string; endedAt: string },
   ) => void
 }) {
   // Um valor só pra lista inteira, não por linha (senão duas linhas abrem juntas)
@@ -38,10 +48,12 @@ function Tasks(props: {
           )}
           openForm={openTask?.taskId === task.id ? openTask.form : null}
           onToggle={(form) => toggle(task.id, form)}
+          timeEntries={props.timeEntries}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
           onReactivate={props.onReactivate}
           onEditExecution={props.onEditExecution}
+          onEditTimeEntry={props.onEditTimeEntry}
         />
       ))}
     </ul>

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import TaskForm from '../components/TaskForm'
 import Tasks from '../components/Tasks'
-import type { NewTask, Task, TaskExecution } from '../types'
+import type { NewTask, Task, TaskExecution, TimeEntry } from '../types'
 
 function TaskListPage(props: {
   tasks: Task[]
   executions: TaskExecution[]
+  timeEntries: TimeEntry[]
   onCreate: (task: NewTask) => string
   onEdit: (taskId: string, changes: NewTask) => void
   onArchive: (taskId: string) => void
@@ -13,6 +14,10 @@ function TaskListPage(props: {
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
+  ) => void
+  onEditTimeEntry: (
+    entryId: string,
+    changes: { startedAt: string; endedAt: string },
   ) => void
 }) {
   const [showArchived, setShowArchived] = useState(false)
@@ -36,10 +41,12 @@ function TaskListPage(props: {
       <Tasks
         tasks={visibleTasks}
         executions={props.executions}
+        timeEntries={props.timeEntries}
         onEdit={props.onEdit}
         onArchive={props.onArchive}
         onReactivate={props.onReactivate}
         onEditExecution={props.onEditExecution}
+        onEditTimeEntry={props.onEditTimeEntry}
       />
     </>
   )
