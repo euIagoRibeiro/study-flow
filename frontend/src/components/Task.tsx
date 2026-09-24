@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { isSameLocalDay } from '../dates'
 import { frequencyLabels } from '../frequency'
 import { iconButtonClass, inlineButtonClass } from '../styles'
@@ -54,6 +55,10 @@ function Task(props: {
     isSameLocalDay(new Date(execution.completedAt), now),
   )
 
+  const openExecution = props.executions.find(
+    (execution) => execution.completedAt === null,
+  )
+
   function handleArchive() {
     const confirmed = window.confirm(
       `Arquivar "${title}"? A tarefa some da lista, mas pode ser vista de novo ligando "Mostrar arquivadas" — o histórico de execuções continua guardado.`,
@@ -85,6 +90,14 @@ function Task(props: {
           {frequency !== 'none' && (
             <p className="text-sm text-tinta-suave">
               {frequencyLabels[frequency]}
+            </p>
+          )}
+          {openExecution && (
+            <p className="text-sm text-tinta-suave">
+              Em andamento{' · '}
+              <Link to={`/executar?tarefa=${id}`} className={inlineButtonClass}>
+                retomar
+              </Link>
             </p>
           )}
           {last !== null && (

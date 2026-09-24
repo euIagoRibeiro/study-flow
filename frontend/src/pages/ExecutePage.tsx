@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import ExecutionForm from '../components/ExecutionForm'
 import TaskForm from '../components/TaskForm'
 import TimerPanel from '../components/TimerPanel'
@@ -22,7 +22,11 @@ function ExecutePage(props: {
   onResumeTimer: (executionId: string) => string | null
   onFinishExecution: (executionId: string, description: string) => void
 }) {
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
+  // Lido só na 1ª renderização: "retomar" na Lista chega com ?tarefa=<id>
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() =>
+    searchParams.get('tarefa'),
+  )
   const navigate = useNavigate()
 
   const activeTasks = props.tasks.filter((task) => task.active)
