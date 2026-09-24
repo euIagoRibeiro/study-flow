@@ -105,6 +105,29 @@ function App() {
     )
   }
 
+  function undoFinishExecution(
+    executionId: string,
+    previousDescription: string | null,
+    resumeEntryId: string | null,
+  ) {
+    setExecutions(
+      executions.map((execution) =>
+        execution.id === executionId
+          ? executionsApi.reopenExecution(execution, previousDescription)
+          : execution,
+      ),
+    )
+    if (resumeEntryId) {
+      setTimeEntries(
+        timeEntries.map((entry) =>
+          entry.id === resumeEntryId
+            ? timeEntriesApi.resumeTimeEntry(entry)
+            : entry,
+        ),
+      )
+    }
+  }
+
   function editTask(id: string, changes: NewTask) {
     setTasks(
       tasks.map((task) =>
@@ -157,6 +180,7 @@ function App() {
               onStopTimer={stopTimer}
               onResumeTimer={resumeTimer}
               onFinishExecution={finishExecution}
+              onUndoFinishExecution={undoFinishExecution}
             />
           }
         />

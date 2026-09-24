@@ -3,13 +3,16 @@ import { useNavigate, useSearchParams } from 'react-router'
 import ExecutionForm from '../components/ExecutionForm'
 import TaskForm from '../components/TaskForm'
 import TimerPanel from '../components/TimerPanel'
+import UndoNotice from '../components/UndoNotice'
 import { frequencyLabels } from '../frequency'
 import {
+  inlineButtonClass,
   pickerButtonClass,
   primaryButtonClass,
-  secondaryButtonClass,
 } from '../styles'
 import type { NewTask, Task, TaskExecution, TimeEntry } from '../types'
+
+const UNDO_SECONDS = 6
 
 function ExecutePage(props: {
   tasks: Task[]
@@ -21,20 +24,39 @@ function ExecutePage(props: {
   onStopTimer: (timeEntryId: string) => void
   onResumeTimer: (executionId: string) => string | null
   onFinishExecution: (executionId: string, description: string) => void
+  onUndoFinishExecution: (
+    executionId: string,
+    previousDescription: string | null,
+    resumeEntryId: string | null,
+  ) => void
 }) {
   const [searchParams] = useSearchParams()
   // Lido só na 1ª renderização: "retomar" na Lista chega com ?tarefa=<id>
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() =>
     searchParams.get('tarefa'),
   )
+  // Janela de desfazer depois de finalizar — só existe enquanto essa
+  // mesma tela continua montada, nunca sobrevive a trocar de tarefa
+  const [pendingUndo, setPendingUndo] = useState<{
+    executionId: string
+    previousDescription: string | null
+    resumeEntryId: string | null
+  } | null>(null)
   const navigate = useNavigate()
 
   const activeTasks = props.tasks.filter((task) => task.active)
   const selectedTask = activeTasks.find((task) => task.id === selectedTaskId)
 
+  // Troca de tarefa sempre limpa uma janela de desfazer pendente — senão,
+  // reabrir a mesma tarefa depois mostraria o aviso de uma finalização antiga
+  function selectTask(taskId: string | null) {
+    setSelectedTaskId(taskId)
+    setPendingUndo(null)
+  }
+
   function handleCreate(newTask: NewTask) {
     const id = props.onCreate(newTask)
-    setSelectedTaskId(id)
+    selectTask(id)
   }
 
   function handleExecute(description: string) {
@@ -44,8 +66,27 @@ function ExecutePage(props: {
   }
 
   function handleFinish(executionId: string, description: string) {
+    const execution = props.executions.find((e) => e.id === executionId)
+    const resumeEntry = props.timeEntries.find(
+      (entry) =>
+        entry.taskExecutionId === executionId && entry.endedAt === null,
+    )
     props.onFinishExecution(executionId, description)
-    navigate('/')
+    setPendingUndo({
+      executionId,
+      previousDescription: execution?.description ?? null,
+      resumeEntryId: resumeEntry?.id ?? null,
+    })
+  }
+
+  function handleUndo() {
+    if (!pendingUndo) return
+    props.onUndoFinishExecution(
+      pendingUndo.executionId,
+      pendingUndo.previousDescription,
+      pendingUndo.resumeEntryId,
+    )
+    setPendingUndo(null)
   }
 
   if (selectedTask === undefined) {
@@ -64,7 +105,7 @@ function ExecutePage(props: {
                 <li key={task.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedTaskId(task.id)}
+                    onClick={() => selectTask(task.id)}
                     className={pickerButtonClass}
                   >
                     {task.title}
@@ -109,18 +150,41 @@ function ExecutePage(props: {
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <h2 className="text-lg font-semibold">
-          Executar: {selectedTask.title}
-        </h2>
-        {selectedTask.frequency !== 'none' && (
-          <p className="text-sm text-tinta-suave">
-            {frequencyLabels[selectedTask.frequency]}
-          </p>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">
+            Executar: {selectedTask.title}
+          </h2>
+          {selectedTask.frequency !== 'none' && (
+            <p className="text-sm text-tinta-suave">
+              {frequencyLabels[selectedTask.frequency]}
+            </p>
+          )}
+          {openExecution && !pendingUndo && (
+            <p className="text-sm text-tinta-suave">
+              Seu progresso continua salvo.
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => selectTask(null)}
+          className={inlineButtonClass}
+        >
+          trocar tarefa
+        </button>
       </div>
 
-      {openExecution ? (
+      {pendingUndo ? (
+        <UndoNotice
+          seconds={UNDO_SECONDS}
+          onExpire={() => {
+            setPendingUndo(null)
+            navigate('/')
+          }}
+          onUndo={handleUndo}
+        />
+      ) : openExecution ? (
         <TimerPanel
           execution={openExecution}
           runningEntry={runningEntry}
@@ -150,14 +214,6 @@ function ExecutePage(props: {
           <ExecutionForm onSubmit={handleExecute} />
         </>
       )}
-
-      <button
-        type="button"
-        onClick={() => setSelectedTaskId(null)}
-        className={`${secondaryButtonClass} self-start`}
-      >
-        Trocar tarefa
-      </button>
     </div>
   )
 }

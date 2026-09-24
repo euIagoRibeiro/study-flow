@@ -43,6 +43,13 @@ export function finishExecution(
   }
 }
 
+export function reopenExecution(
+  execution: TaskExecution,
+  previousDescription: string | null,
+): TaskExecution {
+  return { ...execution, completedAt: null, description: previousDescription }
+}
+
 export function editExecution(
   execution: TaskExecution,
   changes: { description: string; completedAt: string },
