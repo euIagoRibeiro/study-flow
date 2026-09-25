@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: studyflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: studyflow
+    ports:
+      - '5432:5432'
+    volumes:
+      - studyflow-db:/var/lib/postgresql/data
+
+volumes:
+  studyflow-db:
