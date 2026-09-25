@@ -1,18 +1,19 @@
 import express from 'express'
-import { pool } from './db.js'
+import { tasksRouter } from './routes/tasks.js'
 
 const app = express()
 
-app.get('/tasks', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, title, frequency, active FROM tasks ORDER BY created_at',
-    )
-    res.json(result.rows)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Erro ao buscar tarefas' })
-  }
+app.use(express.json())
+app.use('/tasks', tasksRouter)
+
+// Os 4 parâmetros são obrigatórios: é pela contagem que o Express
+// reconhece um middleware de erro
+app.use((err, req, res, next) => {
+  const status = err.status ?? 500
+  if (status >= 500) console.error(err)
+  res
+    .status(status)
+    .json({ error: status >= 500 ? 'Erro interno' : 'Requisição inválida' })
 })
 
 const port = process.env.PORT ?? 3333
