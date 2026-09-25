@@ -5,18 +5,31 @@ export function listTasks(): Promise<Task[]> {
   return request<Task[]>('/tasks')
 }
 
-export function createTask(newTask: NewTask): Task {
-  return { id: crypto.randomUUID(), ...newTask, active: true }
+export function createTask(newTask: NewTask): Promise<Task> {
+  return request<Task>('/tasks', {
+    method: 'POST',
+    body: JSON.stringify(newTask),
+  })
 }
 
-export function editTask(task: Task, changes: NewTask): Task {
-  return { ...task, ...changes }
+function updateTask(
+  id: string,
+  changes: Partial<NewTask> & { active?: boolean },
+): Promise<Task> {
+  return request<Task>(`/tasks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  })
 }
 
-export function archiveTask(task: Task): Task {
-  return { ...task, active: false }
+export function editTask(id: string, changes: NewTask): Promise<Task> {
+  return updateTask(id, changes)
 }
 
-export function reactivateTask(task: Task): Task {
-  return { ...task, active: true }
+export function archiveTask(id: string): Promise<Task> {
+  return updateTask(id, { active: false })
+}
+
+export function reactivateTask(id: string): Promise<Task> {
+  return updateTask(id, { active: true })
 }

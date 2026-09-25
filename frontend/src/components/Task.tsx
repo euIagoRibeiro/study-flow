@@ -30,7 +30,7 @@ function Task(props: {
   timeEntries: TimeEntry[]
   openForm: OpenForm
   onToggle: (form: NonNullable<OpenForm>) => void
-  onEdit: (taskId: string, changes: NewTask) => void
+  onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
   onReactivate: (taskId: string) => void
   onEditExecution: (
@@ -184,8 +184,8 @@ function Task(props: {
       {active && openForm === 'edit' && (
         <TaskForm
           task={props.task}
-          onSubmit={(changes) => {
-            props.onEdit(id, changes)
+          onSubmit={async (changes) => {
+            await props.onEdit(id, changes)
             onToggle('edit')
           }}
         />

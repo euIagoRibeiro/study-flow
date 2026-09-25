@@ -20,6 +20,7 @@ function App() {
   const [status, setStatus] = useState<LoadStatus>('loading')
   // Mudar esse número faz o useEffect rodar de novo (botão "Tentar de novo")
   const [loadAttempt, setLoadAttempt] = useState(0)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [executions, setExecutions] = useState<TaskExecution[]>(() =>
     executionsApi.listExecutions(),
   )
@@ -51,11 +52,18 @@ function App() {
     setLoadAttempt((attempt) => attempt + 1)
   }
 
-  // Devolve o id: a ExecutePage usa isso pra ir direto ao passo de registrar
-  function addTask(newTask: NewTask): string {
-    const task = tasksApi.createTask(newTask)
-    setTasks([...tasks, task])
+  // Devolve o id: a ExecutePage usa isso pra ir direto ao passo de registrar.
+  // Se o servidor recusar, o erro sobe pro TaskForm, que mostra a mensagem.
+  async function addTask(newTask: NewTask): Promise<string> {
+    const task = await tasksApi.createTask(newTask)
+    setTasks((current) => [...current, task])
     return task.id
+  }
+
+  function replaceTask(updated: Task) {
+    setTasks((current) =>
+      current.map((task) => (task.id === updated.id ? updated : task)),
+    )
   }
 
   function addExecution(taskId: string, description: string) {
@@ -172,31 +180,43 @@ function App() {
     )
   }
 
-  function editTask(id: string, changes: NewTask) {
-    setTasks(
-      tasks.map((task) =>
-        task.id === id ? tasksApi.editTask(task, changes) : task,
-      ),
-    )
+  // Mesmo caminho do addTask: o erro sobe pro TaskForm de edição
+  async function editTask(id: string, changes: NewTask) {
+    replaceTask(await tasksApi.editTask(id, changes))
   }
 
-  function archiveTask(id: string) {
-    setTasks(
-      tasks.map((task) => (task.id === id ? tasksApi.archiveTask(task) : task)),
-    )
+  // Arquivar/Reativar são botões, sem formulário pra mostrar erro — o aviso
+  // fica no Layout
+  async function archiveTask(id: string) {
+    try {
+      replaceTask(await tasksApi.archiveTask(id))
+    } catch (error) {
+      console.error(error)
+      setSaveError('Não foi possível arquivar a tarefa. Tente de novo.')
+    }
   }
 
-  function reactivateTask(id: string) {
-    setTasks(
-      tasks.map((task) =>
-        task.id === id ? tasksApi.reactivateTask(task) : task,
-      ),
-    )
+  async function reactivateTask(id: string) {
+    try {
+      replaceTask(await tasksApi.reactivateTask(id))
+    } catch (error) {
+      console.error(error)
+      setSaveError('Não foi possível reativar a tarefa. Tente de novo.')
+    }
   }
 
   return (
     <Routes>
-      <Route element={<Layout status={status} onRetry={retryLoad} />}>
+      <Route
+        element={
+          <Layout
+            status={status}
+            onRetry={retryLoad}
+            saveError={saveError}
+            onDismissSaveError={() => setSaveError(null)}
+          />
+        }
+      >
         <Route
           index
           element={

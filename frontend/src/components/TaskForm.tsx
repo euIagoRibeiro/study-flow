@@ -3,18 +3,22 @@ import { frequencyLabels } from '../frequency'
 import { fieldClass, primaryButtonClass } from '../styles'
 import type { Frequency, NewTask, Task } from '../types'
 
-function TaskForm(props: { task?: Task; onSubmit: (task: NewTask) => void }) {
+function TaskForm(props: {
+  task?: Task
+  onSubmit: (task: NewTask) => Promise<unknown>
+}) {
   const [title, setTitle] = useState(props.task?.title ?? '')
   const [frequency, setFrequency] = useState<Frequency>(
     props.task?.frequency ?? 'none',
   )
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   // Com task: formulário de edição, preenchido e sem limpar ao salvar.
   // Sem task: formulário de criação, o de sempre.
   const isEditing = props.task !== undefined
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const trimmedTitle = title.trim()
@@ -23,7 +27,16 @@ function TaskForm(props: { task?: Task; onSubmit: (task: NewTask) => void }) {
       return
     }
 
-    props.onSubmit({ title: trimmedTitle, frequency })
+    setSubmitting(true)
+    try {
+      await props.onSubmit({ title: trimmedTitle, frequency })
+    } catch {
+      // Campos continuam preenchidos: nada do que foi digitado se perde
+      setError('Não foi possível salvar. Tente de novo.')
+      return
+    } finally {
+      setSubmitting(false)
+    }
     setError('')
     if (!isEditing) {
       setTitle('')
@@ -63,7 +76,11 @@ function TaskForm(props: { task?: Task; onSubmit: (task: NewTask) => void }) {
             ))}
           </select>
         </label>
-        <button type="submit" className={primaryButtonClass}>
+        <button
+          type="submit"
+          disabled={submitting}
+          className={primaryButtonClass}
+        >
           {isEditing ? 'Salvar' : 'Adicionar'}
         </button>
       </div>

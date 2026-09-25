@@ -18,7 +18,7 @@ function ExecutePage(props: {
   tasks: Task[]
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
-  onCreate: (task: NewTask) => string
+  onCreate: (task: NewTask) => Promise<string>
   onExecute: (taskId: string, description: string) => void
   onStartTimer: (taskId: string) => string | null
   onStopTimer: (timeEntryId: string) => void
@@ -54,8 +54,8 @@ function ExecutePage(props: {
     setPendingUndo(null)
   }
 
-  function handleCreate(newTask: NewTask) {
-    const id = props.onCreate(newTask)
+  async function handleCreate(newTask: NewTask) {
+    const id = await props.onCreate(newTask)
     selectTask(id)
   }
 

@@ -1,6 +1,10 @@
 import { NavLink, Outlet } from 'react-router'
 import ThemeToggle from '../components/ThemeToggle'
-import { activeNavLinkClass, secondaryButtonClass } from '../styles'
+import {
+  activeNavLinkClass,
+  inlineButtonClass,
+  secondaryButtonClass,
+} from '../styles'
 import type { LoadStatus } from '../types'
 
 // NavLink é o Link que sabe se aponta pra rota atual, via isActive
@@ -8,7 +12,12 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
   return isActive ? activeNavLinkClass : secondaryButtonClass
 }
 
-function Layout(props: { status: LoadStatus; onRetry: () => void }) {
+function Layout(props: {
+  status: LoadStatus
+  onRetry: () => void
+  saveError: string | null
+  onDismissSaveError: () => void
+}) {
   return (
     <main className="mx-auto max-w-xl px-4 py-6">
       <header className="mb-8 flex items-center justify-between">
@@ -27,6 +36,18 @@ function Layout(props: { status: LoadStatus; onRetry: () => void }) {
           Histórico
         </NavLink>
       </nav>
+      {props.saveError && (
+        <p role="alert" className="mb-6 font-semibold">
+          {props.saveError}{' '}
+          <button
+            type="button"
+            onClick={props.onDismissSaveError}
+            className={`font-normal ${inlineButtonClass}`}
+          >
+            fechar
+          </button>
+        </p>
+      )}
       {/* A página só monta com os dados já carregados: a ExecutePage lê
           ?tarefa= da URL uma vez só, na primeira renderização */}
       {props.status === 'loading' && (

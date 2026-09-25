@@ -7,8 +7,8 @@ function TaskListPage(props: {
   tasks: Task[]
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
-  onCreate: (task: NewTask) => string
-  onEdit: (taskId: string, changes: NewTask) => void
+  onCreate: (task: NewTask) => Promise<string>
+  onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
   onReactivate: (taskId: string) => void
   onEditExecution: (

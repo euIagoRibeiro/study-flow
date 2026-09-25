@@ -11,7 +11,7 @@ function Tasks(props: {
   tasks: TaskModel[]
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
-  onEdit: (taskId: string, changes: NewTask) => void
+  onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
   onReactivate: (taskId: string) => void
   onEditExecution: (
