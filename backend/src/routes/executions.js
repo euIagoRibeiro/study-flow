@@ -1,5 +1,7 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { pool } from '../db.js'
+import { isUuid, validate } from '../validation.js'
 
 export const executionsRouter = Router()
 
@@ -9,68 +11,29 @@ const COLUMNS = `id,
   completed_at AS "completedAt",
   task_title_at_time AS "taskTitleAtTime",
   task_frequency_at_time AS "taskFrequencyAtTime"`
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-function parseDescription(value) {
-  if (value === null) return { value: null }
-  if (typeof value !== 'string') {
-    return { error: 'description precisa ser um texto ou null' }
-  }
-  const trimmed = value.trim()
-  return { value: trimmed === '' ? null : trimmed }
-}
+const description = z
+  .string('description precisa ser um texto ou null')
+  .trim()
+  .transform((text) => (text === '' ? null : text))
+  .nullable()
 
-function parseCompletedAt(value) {
-  if (value === null) return { value: null }
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
-    return { error: 'completedAt precisa ser uma data ISO ou null' }
-  }
-  return { value: new Date(value).toISOString() }
-}
+const completedAt = z.iso
+  .datetime({
+    offset: true,
+    error: 'completedAt precisa ser uma data ISO ou null',
+  })
+  .transform((iso) => new Date(iso).toISOString())
+  .nullable()
 
-function validateNewExecution(body) {
-  const { taskId, description = null, completedAt } = body ?? {}
-  if (typeof taskId !== 'string' || !UUID.test(taskId)) {
-    return { error: 'taskId precisa ser um uuid' }
-  }
-  if (completedAt === undefined) {
-    return {
-      error: 'completedAt é obrigatório (data ISO, ou null pra iniciar aberta)',
-    }
-  }
-  const parsedDescription = parseDescription(description)
-  if (parsedDescription.error) return parsedDescription
-  const parsedCompletedAt = parseCompletedAt(completedAt)
-  if (parsedCompletedAt.error) return parsedCompletedAt
+// completedAt sem .optional(): pra iniciar aberta, o null tem que vir explícito
+const newExecutionSchema = z.object({
+  taskId: z.uuid('taskId precisa ser um uuid'),
+  description: description.default(null),
+  completedAt,
+})
 
-  return {
-    execution: {
-      taskId,
-      description: parsedDescription.value,
-      completedAt: parsedCompletedAt.value,
-    },
-  }
-}
-
-function validateExecutionChanges(body) {
-  const { description, completedAt } = body ?? {}
-  if (description === undefined || completedAt === undefined) {
-    return {
-      error: 'description e completedAt são obrigatórios (podem ser null)',
-    }
-  }
-  const parsedDescription = parseDescription(description)
-  if (parsedDescription.error) return parsedDescription
-  const parsedCompletedAt = parseCompletedAt(completedAt)
-  if (parsedCompletedAt.error) return parsedCompletedAt
-
-  return {
-    changes: {
-      description: parsedDescription.value,
-      completedAt: parsedCompletedAt.value,
-    },
-  }
-}
+const executionChangesSchema = z.object({ description, completedAt })
 
 function isOpenExecutionConflict(err) {
   return (
@@ -89,7 +52,7 @@ executionsRouter.get('/', async (req, res) => {
 })
 
 executionsRouter.post('/', async (req, res) => {
-  const { error, execution } = validateNewExecution(req.body)
+  const { error, data: execution } = validate(newExecutionSchema, req.body)
   if (error) return res.status(400).json({ error })
 
   try {
@@ -118,10 +81,10 @@ executionsRouter.post('/', async (req, res) => {
 })
 
 executionsRouter.put('/:id', async (req, res) => {
-  if (!UUID.test(req.params.id)) {
+  if (!isUuid(req.params.id)) {
     return res.status(404).json({ error: 'Execução não encontrada' })
   }
-  const { error, changes } = validateExecutionChanges(req.body)
+  const { error, data: changes } = validate(executionChangesSchema, req.body)
   if (error) return res.status(400).json({ error })
 
   try {

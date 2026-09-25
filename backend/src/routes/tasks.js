@@ -1,42 +1,37 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { pool } from '../db.js'
+import { isUuid, validate } from '../validation.js'
 
 export const tasksRouter = Router()
 
 const COLUMNS = 'id, title, frequency, active'
 const FREQUENCIES = ['none', 'daily', 'weekly', 'monthly']
-const FREQUENCY_ERROR = `frequency precisa ser um de: ${FREQUENCIES.join(', ')}`
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-function isNonEmptyString(value) {
-  return typeof value === 'string' && value.trim() !== ''
+const frequency = z.enum(
+  FREQUENCIES,
+  `frequency precisa ser um de: ${FREQUENCIES.join(', ')}`,
+)
+
+function title(message) {
+  return z.string(message).trim().min(1, message)
 }
 
-function validateNewTask(body) {
-  const { title, frequency = 'none' } = body ?? {}
-  if (!isNonEmptyString(title)) {
-    return { error: 'title é obrigatório e não pode ser vazio' }
-  }
-  if (!FREQUENCIES.includes(frequency)) return { error: FREQUENCY_ERROR }
-  return { task: { title: title.trim(), frequency } }
-}
+const newTaskSchema = z.object({
+  title: title('title é obrigatório e não pode ser vazio'),
+  frequency: frequency.default('none'),
+})
 
-function validateTaskChanges(body) {
-  const { title, frequency, active } = body ?? {}
-  if (title === undefined && frequency === undefined && active === undefined) {
-    return { error: 'Nenhum campo pra atualizar (title, frequency, active)' }
-  }
-  if (title !== undefined && !isNonEmptyString(title)) {
-    return { error: 'title não pode ser vazio' }
-  }
-  if (frequency !== undefined && !FREQUENCIES.includes(frequency)) {
-    return { error: FREQUENCY_ERROR }
-  }
-  if (active !== undefined && typeof active !== 'boolean') {
-    return { error: 'active precisa ser true ou false' }
-  }
-  return { changes: { title: title?.trim(), frequency, active } }
-}
+const taskChangesSchema = z
+  .object({
+    title: title('title não pode ser vazio').optional(),
+    frequency: frequency.optional(),
+    active: z.boolean('active precisa ser true ou false').optional(),
+  })
+  .refine(
+    (changes) => Object.keys(changes).length > 0,
+    'Nenhum campo pra atualizar (title, frequency, active)',
+  )
 
 tasksRouter.get('/', async (req, res) => {
   const result = await pool.query(
@@ -46,7 +41,7 @@ tasksRouter.get('/', async (req, res) => {
 })
 
 tasksRouter.post('/', async (req, res) => {
-  const { error, task } = validateNewTask(req.body)
+  const { error, data: task } = validate(newTaskSchema, req.body)
   if (error) return res.status(400).json({ error })
 
   const result = await pool.query(
@@ -57,10 +52,10 @@ tasksRouter.post('/', async (req, res) => {
 })
 
 tasksRouter.patch('/:id', async (req, res) => {
-  if (!UUID.test(req.params.id)) {
+  if (!isUuid(req.params.id)) {
     return res.status(404).json({ error: 'Tarefa não encontrada' })
   }
-  const { error, changes } = validateTaskChanges(req.body)
+  const { error, data: changes } = validate(taskChangesSchema, req.body)
   if (error) return res.status(400).json({ error })
 
   const result = await pool.query(
