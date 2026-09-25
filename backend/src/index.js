@@ -1,8 +1,15 @@
+import cors from 'cors'
 import express from 'express'
 import { tasksRouter } from './routes/tasks.js'
 
+// Sem origem configurada, o cors() liberaria qualquer site ('*')
+if (!process.env.CORS_ORIGIN) {
+  throw new Error('CORS_ORIGIN não definida no .env')
+}
+
 const app = express()
 
+app.use(cors({ origin: process.env.CORS_ORIGIN }))
 app.use(express.json())
 app.use('/tasks', tasksRouter)
 
