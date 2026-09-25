@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import * as executionsApi from './api/executions'
 import * as tasksApi from './api/tasks'
@@ -7,16 +7,49 @@ import ExecutePage from './pages/ExecutePage'
 import HistoricoPage from './pages/HistoricoPage'
 import Layout from './pages/Layout'
 import TaskListPage from './pages/TaskListPage'
-import type { NewTask, Task, TaskExecution, TimeEntry } from './types'
+import type {
+  LoadStatus,
+  NewTask,
+  Task,
+  TaskExecution,
+  TimeEntry,
+} from './types'
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(() => tasksApi.listTasks())
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [status, setStatus] = useState<LoadStatus>('loading')
+  // Mudar esse número faz o useEffect rodar de novo (botão "Tentar de novo")
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [executions, setExecutions] = useState<TaskExecution[]>(() =>
     executionsApi.listExecutions(),
   )
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(() =>
     timeEntriesApi.listTimeEntries(),
   )
+
+  useEffect(() => {
+    let ignore = false
+    tasksApi
+      .listTasks()
+      .then((list) => {
+        if (ignore) return
+        setTasks(list)
+        setStatus('ready')
+      })
+      .catch((error) => {
+        if (ignore) return
+        console.error(error)
+        setStatus('error')
+      })
+    return () => {
+      ignore = true
+    }
+  }, [loadAttempt])
+
+  function retryLoad() {
+    setStatus('loading')
+    setLoadAttempt((attempt) => attempt + 1)
+  }
 
   // Devolve o id: a ExecutePage usa isso pra ir direto ao passo de registrar
   function addTask(newTask: NewTask): string {
@@ -163,7 +196,7 @@ function App() {
 
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route element={<Layout status={status} onRetry={retryLoad} />}>
         <Route
           index
           element={

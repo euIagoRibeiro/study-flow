@@ -1,11 +1,8 @@
 import type { NewTask, Task } from '../types'
+import { request } from './client'
 
-export function listTasks(): Task[] {
-  return [
-    { id: '1', title: 'estudar react', frequency: 'daily', active: true },
-    { id: '2', title: 'estudar js', frequency: 'weekly', active: true },
-    { id: '3', title: 'estudar sql', frequency: 'none', active: true },
-  ]
+export function listTasks(): Promise<Task[]> {
+  return request<Task[]>('/tasks')
 }
 
 export function createTask(newTask: NewTask): Task {

@@ -31,3 +31,5 @@ export type TimeEntry = {
   startedAt: string
   endedAt: string | null // null enquanto está rodando
 }
+
+export type LoadStatus = 'loading' | 'error' | 'ready'
