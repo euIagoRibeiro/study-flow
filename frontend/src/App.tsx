@@ -21,20 +21,19 @@ function App() {
   // Mudar esse número faz o useEffect rodar de novo (botão "Tentar de novo")
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [executions, setExecutions] = useState<TaskExecution[]>(() =>
-    executionsApi.listExecutions(),
-  )
+  const [executions, setExecutions] = useState<TaskExecution[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(() =>
     timeEntriesApi.listTimeEntries(),
   )
 
   useEffect(() => {
     let ignore = false
-    tasksApi
-      .listTasks()
-      .then((list) => {
+    // As duas saem juntas; se qualquer uma falhar, o carregamento todo falha
+    Promise.all([tasksApi.listTasks(), executionsApi.listExecutions()])
+      .then(([taskList, executionList]) => {
         if (ignore) return
-        setTasks(list)
+        setTasks(taskList)
+        setExecutions(executionList)
         setStatus('ready')
       })
       .catch((error) => {

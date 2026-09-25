@@ -4,6 +4,17 @@ if (!API_URL) {
   throw new Error('VITE_API_URL não definida no frontend/.env')
 }
 
+// Carrega o status HTTP, pra quem chamou distinguir, por exemplo, um 409
+// (conflito com o estado atual) de uma falha qualquer
+export class ApiError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
 export async function request<T>(
   path: string,
   options?: RequestInit,
@@ -16,7 +27,10 @@ export async function request<T>(
 
   if (!response.ok) {
     const method = options?.method ?? 'GET'
-    throw new Error(`${method} ${path} falhou com status ${response.status}`)
+    throw new ApiError(
+      response.status,
+      `${method} ${path} falhou com status ${response.status}`,
+    )
   }
   return response.json()
 }

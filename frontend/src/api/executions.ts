@@ -1,7 +1,8 @@
 import type { Task, TaskExecution } from '../types'
+import { request } from './client'
 
-export function listExecutions(): TaskExecution[] {
-  return []
+export function listExecutions(): Promise<TaskExecution[]> {
+  return request<TaskExecution[]>('/executions')
 }
 
 export function createExecution(
