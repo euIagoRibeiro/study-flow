@@ -1,5 +1,6 @@
 import cors from 'cors'
 import express from 'express'
+import { executionsRouter } from './routes/executions.js'
 import { tasksRouter } from './routes/tasks.js'
 
 // Sem origem configurada, o cors() liberaria qualquer site ('*')
@@ -12,6 +13,7 @@ const app = express()
 app.use(cors({ origin: process.env.CORS_ORIGIN }))
 app.use(express.json())
 app.use('/tasks', tasksRouter)
+app.use('/executions', executionsRouter)
 
 // Os 4 parâmetros são obrigatórios: é pela contagem que o Express
 // reconhece um middleware de erro
