@@ -8,16 +8,28 @@ function TimerPanel(props: {
   runningEntry: TimeEntry | undefined // undefined = pausado
   onStop: (entryId: string) => void
   onResume: (executionId: string) => void
-  onFinish: (executionId: string, description: string) => void
+  onFinish: (executionId: string, description: string) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
   // estreitar o tipo dentro dos closures dos botões, sem precisar de "!"
   const { execution, runningEntry, onStop, onResume, onFinish } = props
   const [description, setDescription] = useState(execution.description ?? '')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleFinish(event: FormEvent<HTMLFormElement>) {
+  // Se falhar, o cronômetro continua rodando: nada parou ainda
+  async function handleFinish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    onFinish(execution.id, description)
+    setSubmitting(true)
+    try {
+      await onFinish(execution.id, description)
+    } catch {
+      setError('Não foi possível finalizar. Tente de novo.')
+      return
+    } finally {
+      setSubmitting(false)
+    }
+    setError('')
   }
 
   return (
@@ -47,24 +59,32 @@ function TimerPanel(props: {
           </button>
         </div>
       )}
-      <form
-        onSubmit={handleFinish}
-        className="flex flex-col gap-3 sm:flex-row sm:items-end"
-      >
-        <label className="flex flex-col gap-1 sm:flex-1">
-          <span className="text-sm text-tinta-suave">
-            O que foi feito (opcional)
-          </span>
-          <input
-            type="text"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className={fieldClass}
-          />
-        </label>
-        <button type="submit" className={primaryButtonClass}>
-          Finalizar
-        </button>
+      <form onSubmit={handleFinish} className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex flex-col gap-1 sm:flex-1">
+            <span className="text-sm text-tinta-suave">
+              O que foi feito (opcional)
+            </span>
+            <input
+              type="text"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={submitting}
+            className={primaryButtonClass}
+          >
+            Finalizar
+          </button>
+        </div>
+        {error && (
+          <p role="alert" className="text-sm font-semibold">
+            {error}
+          </p>
+        )}
       </form>
     </div>
   )

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
+import { ApiError } from './api/client'
 import * as executionsApi from './api/executions'
 import * as tasksApi from './api/tasks'
 import * as timeEntriesApi from './api/timeEntries'
@@ -65,12 +66,18 @@ function App() {
     )
   }
 
-  function addExecution(taskId: string, description: string) {
-    const task = tasks.find((t) => t.id === taskId)
-    if (!task) return // tarefa não existe — não deveria acontecer
+  function replaceExecution(updated: TaskExecution) {
+    setExecutions((current) =>
+      current.map((execution) =>
+        execution.id === updated.id ? updated : execution,
+      ),
+    )
+  }
 
-    const execution = executionsApi.createExecution(task, description)
-    setExecutions([...executions, execution])
+  // Erro sobe pro ExecutionForm, que mostra a mensagem
+  async function addExecution(taskId: string, description: string) {
+    const execution = await executionsApi.createExecution(taskId, description)
+    setExecutions((current) => [...current, execution])
   }
 
   function editExecution(
@@ -89,7 +96,7 @@ function App() {
   // Devolve o id da execução criada, ou null se recusar (nenhum caso deveria
   // acontecer se a UI usar "Retomar" no lugar certo, mas a função não confia
   // só nisso — protege as duas invariantes sozinha)
-  function startTimer(taskId: string): string | null {
+  async function startTimer(taskId: string): Promise<string | null> {
     const anyRunning = timeEntries.some((entry) => entry.endedAt === null)
     if (anyRunning) return null // só um cronômetro por vez (pendência do CLAUDE.md)
 
@@ -99,13 +106,23 @@ function App() {
     )
     if (alreadyOpenForTask) return null // já tem execução aberta — usar resumeTimer
 
-    const task = tasks.find((t) => t.id === taskId)
-    if (!task) return null
-
-    const execution = executionsApi.startExecution(task)
+    let execution: TaskExecution
+    try {
+      execution = await executionsApi.startExecution(taskId)
+    } catch (error) {
+      console.error(error)
+      // 409: o banco já tem uma aberta que essa página não conhece (ex.:
+      // iniciada em outro aparelho depois que essa página carregou)
+      setSaveError(
+        error instanceof ApiError && error.status === 409
+          ? 'Essa tarefa já está em andamento em outro lugar. Recarregue a página.'
+          : 'Não foi possível iniciar o cronômetro. Tente de novo.',
+      )
+      return null
+    }
     const entry = timeEntriesApi.startTimeEntry(execution.id)
-    setExecutions([...executions, execution])
-    setTimeEntries([...timeEntries, entry])
+    setExecutions((current) => [...current, execution])
+    setTimeEntries((current) => [...current, entry])
     return execution.id
   }
 
@@ -128,38 +145,41 @@ function App() {
     return entry.id
   }
 
-  function finishExecution(executionId: string, description: string) {
-    setTimeEntries(
-      timeEntries.map((entry) =>
+  // Servidor primeiro: se falhar, o erro sobe pro TimerPanel e o cronômetro
+  // continua rodando — só para depois de confirmado
+  async function finishExecution(executionId: string, description: string) {
+    const execution = await executionsApi.finishExecution(
+      executionId,
+      description,
+    )
+    setTimeEntries((current) =>
+      current.map((entry) =>
         entry.taskExecutionId === executionId && entry.endedAt === null
           ? timeEntriesApi.stopTimeEntry(entry)
           : entry,
       ),
     )
-    setExecutions(
-      executions.map((execution) =>
-        execution.id === executionId
-          ? executionsApi.finishExecution(execution, description)
-          : execution,
-      ),
-    )
+    replaceExecution(execution)
   }
 
-  function undoFinishExecution(
+  // "Desfazer" é um botão solto, sem formulário: o erro vai pro Layout
+  async function undoFinishExecution(
     executionId: string,
     previousDescription: string | null,
     resumeEntryId: string | null,
   ) {
-    setExecutions(
-      executions.map((execution) =>
-        execution.id === executionId
-          ? executionsApi.reopenExecution(execution, previousDescription)
-          : execution,
-      ),
-    )
+    try {
+      replaceExecution(
+        await executionsApi.reopenExecution(executionId, previousDescription),
+      )
+    } catch (error) {
+      console.error(error)
+      setSaveError('Não foi possível desfazer. A execução continua finalizada.')
+      return
+    }
     if (resumeEntryId) {
-      setTimeEntries(
-        timeEntries.map((entry) =>
+      setTimeEntries((current) =>
+        current.map((entry) =>
           entry.id === resumeEntryId
             ? timeEntriesApi.resumeTimeEntry(entry)
             : entry,

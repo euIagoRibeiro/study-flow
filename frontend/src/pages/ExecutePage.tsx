@@ -19,16 +19,16 @@ function ExecutePage(props: {
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
   onCreate: (task: NewTask) => Promise<string>
-  onExecute: (taskId: string, description: string) => void
-  onStartTimer: (taskId: string) => string | null
+  onExecute: (taskId: string, description: string) => Promise<void>
+  onStartTimer: (taskId: string) => Promise<string | null>
   onStopTimer: (timeEntryId: string) => void
   onResumeTimer: (executionId: string) => string | null
-  onFinishExecution: (executionId: string, description: string) => void
+  onFinishExecution: (executionId: string, description: string) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,
     previousDescription: string | null,
     resumeEntryId: string | null,
-  ) => void
+  ) => Promise<void>
 }) {
   const [searchParams] = useSearchParams()
   // Lido só na 1ª renderização: "retomar" na Lista chega com ?tarefa=<id>
@@ -42,6 +42,10 @@ function ExecutePage(props: {
     previousDescription: string | null
     resumeEntryId: string | null
   } | null>(null)
+  const [starting, setStarting] = useState(false)
+  // Enquanto o servidor confirma o desfazer: tira a contagem da tela (senão
+  // ela poderia expirar e navegar no meio da requisição)
+  const [undoing, setUndoing] = useState(false)
   const navigate = useNavigate()
 
   const activeTasks = props.tasks.filter((task) => task.active)
@@ -59,19 +63,28 @@ function ExecutePage(props: {
     selectTask(id)
   }
 
-  function handleExecute(description: string) {
+  // Se o servidor recusar, o erro sobe pro ExecutionForm e não navega
+  async function handleExecute(description: string) {
     if (selectedTask === undefined) return
-    props.onExecute(selectedTask.id, description)
+    await props.onExecute(selectedTask.id, description)
     navigate('/')
   }
 
-  function handleFinish(executionId: string, description: string) {
+  async function handleStart() {
+    if (selectedTask === undefined) return
+    setStarting(true)
+    await props.onStartTimer(selectedTask.id)
+    setStarting(false)
+  }
+
+  // Capturado antes do await: depois dele, a execução já está finalizada
+  async function handleFinish(executionId: string, description: string) {
     const execution = props.executions.find((e) => e.id === executionId)
     const resumeEntry = props.timeEntries.find(
       (entry) =>
         entry.taskExecutionId === executionId && entry.endedAt === null,
     )
-    props.onFinishExecution(executionId, description)
+    await props.onFinishExecution(executionId, description)
     setPendingUndo({
       executionId,
       previousDescription: execution?.description ?? null,
@@ -79,13 +92,15 @@ function ExecutePage(props: {
     })
   }
 
-  function handleUndo() {
+  async function handleUndo() {
     if (!pendingUndo) return
-    props.onUndoFinishExecution(
+    setUndoing(true)
+    await props.onUndoFinishExecution(
       pendingUndo.executionId,
       pendingUndo.previousDescription,
       pendingUndo.resumeEntryId,
     )
+    setUndoing(false)
     setPendingUndo(null)
   }
 
@@ -175,7 +190,9 @@ function ExecutePage(props: {
         </button>
       </div>
 
-      {pendingUndo ? (
+      {undoing ? (
+        <p className="text-sm text-tinta-suave">Desfazendo…</p>
+      ) : pendingUndo ? (
         <UndoNotice
           seconds={UNDO_SECONDS}
           onExpire={() => {
@@ -202,7 +219,8 @@ function ExecutePage(props: {
           ) : (
             <button
               type="button"
-              onClick={() => props.onStartTimer(selectedTask.id)}
+              onClick={handleStart}
+              disabled={starting}
               className={primaryButtonClass}
             >
               Iniciar cronômetro

@@ -1,54 +1,61 @@
-import type { Task, TaskExecution } from '../types'
+import type { TaskExecution } from '../types'
 import { request } from './client'
 
 export function listExecutions(): Promise<TaskExecution[]> {
   return request<TaskExecution[]>('/executions')
 }
 
-export function createExecution(
-  task: Task,
-  description: string,
-): TaskExecution {
-  const trimmedDescription = description.trim()
-  return {
-    id: crypto.randomUUID(),
-    taskId: task.id,
-    description: trimmedDescription === '' ? null : trimmedDescription,
-    completedAt: new Date().toISOString(),
-    // Snapshot: copiado agora, não referenciado — edições futuras da tarefa não afetam
-    taskTitleAtTime: task.title,
-    taskFrequencyAtTime: task.frequency,
-  }
+// O snapshot (título/frequência) é copiado pelo servidor — não vai no corpo
+function postExecution(
+  taskId: string,
+  description: string | null,
+  completedAt: string | null,
+): Promise<TaskExecution> {
+  return request<TaskExecution>('/executions', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, description, completedAt }),
+  })
 }
 
-export function startExecution(task: Task): TaskExecution {
-  return {
-    id: crypto.randomUUID(),
-    taskId: task.id,
-    description: null,
-    completedAt: null, // ainda rodando
-    taskTitleAtTime: task.title,
-    taskFrequencyAtTime: task.frequency,
-  }
+function putExecution(
+  id: string,
+  changes: { description: string | null; completedAt: string | null },
+): Promise<TaskExecution> {
+  return request<TaskExecution>(`/executions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(changes),
+  })
+}
+
+export function createExecution(
+  taskId: string,
+  description: string,
+): Promise<TaskExecution> {
+  return postExecution(taskId, description, new Date().toISOString())
+}
+
+export function startExecution(taskId: string): Promise<TaskExecution> {
+  return postExecution(taskId, null, null) // aberta: cronômetro rodando
 }
 
 export function finishExecution(
-  execution: TaskExecution,
+  id: string,
   description: string,
-): TaskExecution {
-  const trimmedDescription = description.trim()
-  return {
-    ...execution,
-    description: trimmedDescription === '' ? null : trimmedDescription,
+): Promise<TaskExecution> {
+  return putExecution(id, {
+    description,
     completedAt: new Date().toISOString(),
-  }
+  })
 }
 
 export function reopenExecution(
-  execution: TaskExecution,
+  id: string,
   previousDescription: string | null,
-): TaskExecution {
-  return { ...execution, completedAt: null, description: previousDescription }
+): Promise<TaskExecution> {
+  return putExecution(id, {
+    description: previousDescription,
+    completedAt: null,
+  })
 }
 
 export function editExecution(
