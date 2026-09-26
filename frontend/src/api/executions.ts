@@ -59,12 +59,8 @@ export function reopenExecution(
 }
 
 export function editExecution(
-  execution: TaskExecution,
+  id: string,
   changes: { description: string; completedAt: string },
-): TaskExecution {
-  return {
-    ...execution,
-    description: changes.description === '' ? null : changes.description,
-    completedAt: changes.completedAt,
-  }
+): Promise<TaskExecution> {
+  return putExecution(id, changes)
 }

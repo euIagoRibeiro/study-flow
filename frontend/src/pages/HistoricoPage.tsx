@@ -30,7 +30,7 @@ function HistoricoPage(props: {
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
-  ) => void
+  ) => Promise<void>
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },

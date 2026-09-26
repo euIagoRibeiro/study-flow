@@ -12,7 +12,7 @@ function ExecutionHistory(props: {
   onEdit: (
     executionId: string,
     changes: { description: string; completedAt: string },
-  ) => void
+  ) => Promise<void>
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
@@ -74,8 +74,8 @@ function ExecutionHistory(props: {
             {editingId === execution.id && (
               <ExecutionEditForm
                 execution={execution}
-                onSubmit={(changes) => {
-                  props.onEdit(execution.id, changes)
+                onSubmit={async (changes) => {
+                  await props.onEdit(execution.id, changes)
                   setEditingId(null)
                 }}
               />

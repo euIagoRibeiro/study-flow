@@ -36,7 +36,7 @@ function Task(props: {
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
-  ) => void
+  ) => Promise<void>
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
@@ -193,8 +193,8 @@ function Task(props: {
       {openForm === 'edit-execution' && last !== null && (
         <ExecutionEditForm
           execution={last}
-          onSubmit={(changes) => {
-            props.onEditExecution(last.id, changes)
+          onSubmit={async (changes) => {
+            await props.onEditExecution(last.id, changes)
             onToggle('edit-execution')
           }}
         />

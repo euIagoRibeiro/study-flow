@@ -80,17 +80,12 @@ function App() {
     setExecutions((current) => [...current, execution])
   }
 
-  function editExecution(
+  // Erro sobe pro ExecutionEditForm, que mostra a mensagem
+  async function editExecution(
     id: string,
     changes: { description: string; completedAt: string },
   ) {
-    setExecutions(
-      executions.map((execution) =>
-        execution.id === id
-          ? executionsApi.editExecution(execution, changes)
-          : execution,
-      ),
-    )
+    replaceExecution(await executionsApi.editExecution(id, changes))
   }
 
   // Devolve o id da execução criada, ou null se recusar (nenhum caso deveria
