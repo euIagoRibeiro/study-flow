@@ -21,8 +21,8 @@ function ExecutePage(props: {
   onCreate: (task: NewTask) => Promise<string>
   onExecute: (taskId: string, description: string) => Promise<void>
   onStartTimer: (taskId: string) => Promise<string | null>
-  onStopTimer: (timeEntryId: string) => void
-  onResumeTimer: (executionId: string) => string | null
+  onStopTimer: (timeEntryId: string) => Promise<void>
+  onResumeTimer: (executionId: string) => Promise<string | null>
   onFinishExecution: (executionId: string, description: string) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,

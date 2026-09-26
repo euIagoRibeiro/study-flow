@@ -6,8 +6,8 @@ import ElapsedTime from './ElapsedTime'
 function TimerPanel(props: {
   execution: TaskExecution
   runningEntry: TimeEntry | undefined // undefined = pausado
-  onStop: (entryId: string) => void
-  onResume: (executionId: string) => void
+  onStop: (entryId: string) => Promise<unknown>
+  onResume: (executionId: string) => Promise<unknown>
   onFinish: (executionId: string, description: string) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
@@ -16,6 +16,18 @@ function TimerPanel(props: {
   const [description, setDescription] = useState(execution.description ?? '')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Pausar/Retomar esperando o servidor: sem isso, clique duplo mandaria
+  // duas requisições. Os erros deles o App já trata (aviso no Layout)
+  const [busy, setBusy] = useState(false)
+
+  async function runTimerAction(action: () => Promise<unknown>) {
+    setBusy(true)
+    try {
+      await action()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // Se falhar, o cronômetro continua rodando: nada parou ainda
   async function handleFinish(event: FormEvent<HTMLFormElement>) {
@@ -41,7 +53,8 @@ function TimerPanel(props: {
           </p>
           <button
             type="button"
-            onClick={() => onStop(runningEntry.id)}
+            onClick={() => runTimerAction(() => onStop(runningEntry.id))}
+            disabled={busy}
             className={secondaryButtonClass}
           >
             Pausar
@@ -52,7 +65,8 @@ function TimerPanel(props: {
           <p className="text-sm text-tinta-suave">Pausado</p>
           <button
             type="button"
-            onClick={() => onResume(execution.id)}
+            onClick={() => runTimerAction(() => onResume(execution.id))}
+            disabled={busy}
             className={secondaryButtonClass}
           >
             Retomar

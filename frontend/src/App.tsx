@@ -16,6 +16,12 @@ import type {
   TimeEntry,
 } from './types'
 
+// 409: o banco recusou por conflito com um estado que essa página não
+// conhece (ex.: algo iniciado em outro aparelho depois que ela carregou)
+function isConflict(error: unknown) {
+  return error instanceof ApiError && error.status === 409
+}
+
 function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -69,6 +75,12 @@ function App() {
     )
   }
 
+  function replaceTimeEntry(updated: TimeEntry) {
+    setTimeEntries((current) =>
+      current.map((entry) => (entry.id === updated.id ? updated : entry)),
+    )
+  }
+
   function replaceExecution(updated: TaskExecution) {
     setExecutions((current) =>
       current.map((execution) =>
@@ -96,7 +108,8 @@ function App() {
   // só nisso — protege as duas invariantes sozinha)
   async function startTimer(taskId: string): Promise<string | null> {
     const anyRunning = timeEntries.some((entry) => entry.endedAt === null)
-    if (anyRunning) return null // só um cronômetro por vez (pendência do CLAUDE.md)
+    // Resposta instantânea; quem garante de verdade é o índice do banco (409)
+    if (anyRunning) return null // só um cronômetro por vez
 
     const alreadyOpenForTask = executions.some(
       (execution) =>
@@ -109,42 +122,65 @@ function App() {
       execution = await executionsApi.startExecution(taskId)
     } catch (error) {
       console.error(error)
-      // 409: o banco já tem uma aberta que essa página não conhece (ex.:
-      // iniciada em outro aparelho depois que essa página carregou)
       setSaveError(
-        error instanceof ApiError && error.status === 409
+        isConflict(error)
           ? 'Essa tarefa já está em andamento em outro lugar. Recarregue a página.'
           : 'Não foi possível iniciar o cronômetro. Tente de novo.',
       )
       return null
     }
-    const entry = timeEntriesApi.startTimeEntry(execution.id)
+    // A execução já existe no servidor: entra no estado mesmo se a sessão
+    // falhar abaixo (fica aberta como "Pausado", com "Retomar" disponível)
     setExecutions((current) => [...current, execution])
-    setTimeEntries((current) => [...current, entry])
+    try {
+      const entry = await timeEntriesApi.startTimeEntry(execution.id)
+      setTimeEntries((current) => [...current, entry])
+    } catch (error) {
+      console.error(error)
+      setSaveError(
+        isConflict(error)
+          ? 'Já existe um cronômetro rodando (talvez em outro aparelho). A execução ficou aberta como pausada. Recarregue a página.'
+          : 'O cronômetro não iniciou. A execução ficou aberta como pausada: use "Retomar".',
+      )
+    }
     return execution.id
   }
 
-  function stopTimer(timeEntryId: string) {
-    setTimeEntries(
-      timeEntries.map((entry) =>
-        entry.id === timeEntryId ? timeEntriesApi.stopTimeEntry(entry) : entry,
-      ),
-    )
+  async function stopTimer(timeEntryId: string) {
+    const entry = timeEntries.find((e) => e.id === timeEntryId)
+    if (!entry) return
+    try {
+      replaceTimeEntry(await timeEntriesApi.stopTimeEntry(entry))
+    } catch (error) {
+      console.error(error)
+      setSaveError('Não foi possível pausar. O cronômetro continua rodando.')
+    }
   }
 
   // Cria um novo time_entry pra mesma execução — nunca reabre um já
   // finalizado (voltar endedAt pra null seria dado estranho)
-  function resumeTimer(taskExecutionId: string): string | null {
+  async function resumeTimer(taskExecutionId: string): Promise<string | null> {
     const anyRunning = timeEntries.some((entry) => entry.endedAt === null)
     if (anyRunning) return null // mesma invariante global do startTimer
 
-    const entry = timeEntriesApi.startTimeEntry(taskExecutionId)
-    setTimeEntries([...timeEntries, entry])
-    return entry.id
+    try {
+      const entry = await timeEntriesApi.startTimeEntry(taskExecutionId)
+      setTimeEntries((current) => [...current, entry])
+      return entry.id
+    } catch (error) {
+      console.error(error)
+      setSaveError(
+        isConflict(error)
+          ? 'Já existe um cronômetro rodando (talvez em outro aparelho). Recarregue a página.'
+          : 'Não foi possível retomar. Tente de novo.',
+      )
+      return null
+    }
   }
 
   // Servidor primeiro: se falhar, o erro sobe pro TimerPanel e o cronômetro
-  // continua rodando — só para depois de confirmado
+  // continua rodando. O servidor fecha a sessão rodando com o mesmo
+  // completedAt, na mesma transação — aqui só espelha, sem new Date()
   async function finishExecution(executionId: string, description: string) {
     const execution = await executionsApi.finishExecution(
       executionId,
@@ -153,7 +189,7 @@ function App() {
     setTimeEntries((current) =>
       current.map((entry) =>
         entry.taskExecutionId === executionId && entry.endedAt === null
-          ? timeEntriesApi.stopTimeEntry(entry)
+          ? { ...entry, endedAt: execution.completedAt }
           : entry,
       ),
     )
@@ -175,13 +211,16 @@ function App() {
       setSaveError('Não foi possível desfazer. A execução continua finalizada.')
       return
     }
-    if (resumeEntryId) {
-      setTimeEntries((current) =>
-        current.map((entry) =>
-          entry.id === resumeEntryId
-            ? timeEntriesApi.resumeTimeEntry(entry)
-            : entry,
-        ),
+    // Depois da execução, nunca antes: o servidor só reabre sessão de
+    // execução aberta
+    const entry = timeEntries.find((e) => e.id === resumeEntryId)
+    if (!entry) return
+    try {
+      replaceTimeEntry(await timeEntriesApi.reopenTimeEntry(entry))
+    } catch (error) {
+      console.error(error)
+      setSaveError(
+        'A execução foi reaberta, mas o cronômetro ficou pausado: use "Retomar".',
       )
     }
   }
