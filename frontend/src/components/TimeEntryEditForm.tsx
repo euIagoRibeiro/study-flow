@@ -5,7 +5,10 @@ import type { TimeEntry } from '../types'
 
 function TimeEntryEditForm(props: {
   entry: TimeEntry
-  onSubmit: (changes: { startedAt: string; endedAt: string }) => void
+  onSubmit: (changes: {
+    startedAt: string
+    endedAt: string
+  }) => Promise<unknown>
 }) {
   const [startedAt, setStartedAt] = useState(
     toDatetimeLocalValue(props.entry.startedAt),
@@ -14,8 +17,9 @@ function TimeEntryEditForm(props: {
     toDatetimeLocalValue(props.entry.endedAt ?? new Date().toISOString()),
   )
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const startedIso = fromDatetimeLocalValue(startedAt)
@@ -25,7 +29,15 @@ function TimeEntryEditForm(props: {
       return
     }
 
-    props.onSubmit({ startedAt: startedIso, endedAt: endedIso })
+    setSubmitting(true)
+    try {
+      await props.onSubmit({ startedAt: startedIso, endedAt: endedIso })
+    } catch {
+      setError('Não foi possível salvar. Tente de novo.')
+      return
+    } finally {
+      setSubmitting(false)
+    }
     setError('')
   }
 
@@ -52,7 +64,11 @@ function TimeEntryEditForm(props: {
             className={fieldClass}
           />
         </label>
-        <button type="submit" className={primaryButtonClass}>
+        <button
+          type="submit"
+          disabled={submitting}
+          className={primaryButtonClass}
+        >
           Salvar
         </button>
       </div>

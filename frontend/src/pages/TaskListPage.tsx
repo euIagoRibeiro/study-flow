@@ -18,7 +18,7 @@ function TaskListPage(props: {
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
-  ) => void
+  ) => Promise<void>
 }) {
   const [showArchived, setShowArchived] = useState(false)
 

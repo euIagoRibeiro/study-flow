@@ -225,15 +225,12 @@ function App() {
     }
   }
 
-  function editTimeEntry(
+  // Erro sobe pro TimeEntryEditForm, que mostra a mensagem
+  async function editTimeEntry(
     id: string,
     changes: { startedAt: string; endedAt: string },
   ) {
-    setTimeEntries(
-      timeEntries.map((entry) =>
-        entry.id === id ? timeEntriesApi.editTimeEntry(entry, changes) : entry,
-      ),
-    )
+    replaceTimeEntry(await timeEntriesApi.editTimeEntry(id, changes))
   }
 
   // Mesmo caminho do addTask: o erro sobe pro TaskForm de edição

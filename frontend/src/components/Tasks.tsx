@@ -21,7 +21,7 @@ function Tasks(props: {
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
-  ) => void
+  ) => Promise<void>
 }) {
   // Um valor só pra lista inteira, não por linha (senão duas linhas abrem juntas)
   const [openTask, setOpenTask] = useState<{

@@ -16,7 +16,7 @@ function ExecutionHistory(props: {
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
-  ) => void
+  ) => Promise<void>
 }) {
   // Qual execução está em edição (descrição/data) — sem relação com qual
   // sessão de tempo está em edição, são coisas independentes
@@ -120,8 +120,8 @@ function ExecutionHistory(props: {
                       {editingEntryId === entry.id && (
                         <TimeEntryEditForm
                           entry={entry}
-                          onSubmit={(changes) => {
-                            props.onEditTimeEntry(entry.id, changes)
+                          onSubmit={async (changes) => {
+                            await props.onEditTimeEntry(entry.id, changes)
                             setEditingEntryId(null)
                           }}
                         />

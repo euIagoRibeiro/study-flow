@@ -40,8 +40,8 @@ export function reopenTimeEntry(entry: TimeEntry): Promise<TimeEntry> {
 }
 
 export function editTimeEntry(
-  entry: TimeEntry,
+  id: string,
   changes: { startedAt: string; endedAt: string },
-): TimeEntry {
-  return { ...entry, startedAt: changes.startedAt, endedAt: changes.endedAt }
+): Promise<TimeEntry> {
+  return putTimeEntry(id, changes)
 }

@@ -40,7 +40,7 @@ function Task(props: {
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
-  ) => void
+  ) => Promise<void>
 }) {
   const { id, title, frequency, active } = props.task
   const { openForm, onToggle } = props

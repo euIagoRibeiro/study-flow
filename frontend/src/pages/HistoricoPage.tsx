@@ -34,7 +34,7 @@ function HistoricoPage(props: {
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
-  ) => void
+  ) => Promise<void>
 }) {
   const [period, setPeriod] = useState<PeriodFilter>('all')
   const [frequency, setFrequency] = useState<Frequency | 'all'>('all')
