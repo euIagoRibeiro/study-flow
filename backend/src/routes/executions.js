@@ -83,8 +83,13 @@ executionsRouter.put('/:id', async (req, res) => {
   const { error, data: changes } = validate(executionChangesSchema, req.body)
   if (error) return res.status(400).json({ error })
 
+  // Finalizar também fecha a sessão rodando dessa execução: as duas
+  // escritas acontecem juntas ou nenhuma acontece. Uma transação só existe
+  // dentro de uma conexão, por isso pool.connect() e não pool.query()
+  const client = await pool.connect()
   try {
-    const result = await pool.query(
+    await client.query('BEGIN')
+    const result = await client.query(
       `UPDATE task_executions
        SET description = $1, completed_at = $2
        WHERE id = $3
@@ -92,13 +97,34 @@ executionsRouter.put('/:id', async (req, res) => {
       [changes.description, changes.completedAt, req.params.id],
     )
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Execução não encontrada' })
     }
+    if (changes.completedAt !== null) {
+      await client.query(
+        `UPDATE time_entries
+         SET ended_at = $1
+         WHERE task_execution_id = $2 AND ended_at IS NULL`,
+        [changes.completedAt, req.params.id],
+      )
+    }
+    await client.query('COMMIT')
     res.json(result.rows[0])
   } catch (err) {
+    await client.query('ROLLBACK')
     if (isOpenExecutionConflict(err)) {
       return res.status(409).json({ error: CONFLICT_ERROR })
     }
+    if (err.code === '23514' && err.constraint === 'time_entries_check') {
+      return res.status(400).json({
+        error:
+          'completedAt não pode ser antes do início da sessão em andamento',
+      })
+    }
     throw err
+  } finally {
+    // Sem isso, cada requisição prenderia uma conexão, e o pool (10) se
+    // esgotaria
+    client.release()
   }
 })
