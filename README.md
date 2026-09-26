@@ -3,10 +3,9 @@
 App pessoal para organizar tarefas e estudos, pensado para uso real no dia a dia,
 tanto no computador quanto no celular.
 
-> **Status:** em desenvolvimento. O frontend está completo com dados em memória
-> e está sendo ligado ao backend aos poucos, uma parte por vez. Hoje as
-> **tarefas** já são salvas no banco; **execuções e cronômetro** ainda vivem só
-> no navegador e somem ao recarregar a página.
+> **Status:** em desenvolvimento, rodando localmente. Tarefas, execuções e
+> cronômetro já são salvos no banco, pela API própria: nada se perde ao
+> recarregar a página.
 
 ## A ideia
 
@@ -59,10 +58,14 @@ Criado aos poucos, uma migration por parte do app ligada ao backend.
 
 ```
 tasks             → a tarefa-modelo (título, frequência, ativa/arquivada)   ✅ aplicada
-task_executions   → cada vez que a tarefa foi feita, com a descrição       ⏳ próxima
-time_entries      → sessões de cronômetro de cada execução                 ⏳ planejada
+task_executions   → cada vez que a tarefa foi feita, com a descrição       ✅ aplicada
+time_entries      → sessões de cronômetro de cada execução                 ✅ aplicada
 tags, task_tags   → tags (uma tarefa pode ter várias)                       ⏳ planejada
 ```
+
+Algumas regras são garantidas pelo próprio banco, não só pela tela: só uma
+execução em andamento por tarefa, só um cronômetro rodando por vez, e tarefa
+com histórico não pode ser apagada (só arquivada).
 
 ## Como rodar
 
@@ -93,17 +96,24 @@ Na raiz do projeto:
 docker compose up -d
 ```
 
-Depois, aplique as migrations em ordem. No Git Bash, Linux ou macOS:
+Depois, aplique todas as migrations, em ordem. No Git Bash, Linux ou macOS:
 
 ```bash
-docker compose exec -T postgres psql -U studyflow -d studyflow < backend/migrations/0001_create_tasks.sql
+for f in backend/migrations/*.sql; do
+  docker compose exec -T postgres psql -U studyflow -d studyflow < "$f"
+done
 ```
 
 No PowerShell, que não aceita `<`:
 
 ```powershell
-cmd /c "docker compose exec -T postgres psql -U studyflow -d studyflow < backend\migrations\0001_create_tasks.sql"
+Get-ChildItem backend\migrations\*.sql | Sort-Object Name | ForEach-Object {
+  cmd /c "docker compose exec -T postgres psql -U studyflow -d studyflow < `"$($_.FullName)`""
+}
 ```
+
+Num banco que já existe, aplique só as migrations novas: reaplicar uma antiga
+dá erro de "already exists".
 
 ### 3. Backend
 
