@@ -1,7 +1,8 @@
 import type { TimeEntry } from '../types'
+import { request } from './client'
 
-export function listTimeEntries(): TimeEntry[] {
-  return []
+export function listTimeEntries(): Promise<TimeEntry[]> {
+  return request<TimeEntry[]>('/time-entries')
 }
 
 export function startTimeEntry(taskExecutionId: string): TimeEntry {

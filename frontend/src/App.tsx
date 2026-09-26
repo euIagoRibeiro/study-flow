@@ -23,18 +23,21 @@ function App() {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [executions, setExecutions] = useState<TaskExecution[]>([])
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(() =>
-    timeEntriesApi.listTimeEntries(),
-  )
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
 
   useEffect(() => {
     let ignore = false
-    // As duas saem juntas; se qualquer uma falhar, o carregamento todo falha
-    Promise.all([tasksApi.listTasks(), executionsApi.listExecutions()])
-      .then(([taskList, executionList]) => {
+    // As três saem juntas; se qualquer uma falhar, o carregamento todo falha
+    Promise.all([
+      tasksApi.listTasks(),
+      executionsApi.listExecutions(),
+      timeEntriesApi.listTimeEntries(),
+    ])
+      .then(([taskList, executionList, timeEntryList]) => {
         if (ignore) return
         setTasks(taskList)
         setExecutions(executionList)
+        setTimeEntries(timeEntryList)
         setStatus('ready')
       })
       .catch((error) => {
