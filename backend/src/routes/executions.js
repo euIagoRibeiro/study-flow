@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { pool } from '../db.js'
-import { isUuid, validate } from '../validation.js'
+import { isoDateTime, isUuid, validate } from '../validation.js'
 
 export const executionsRouter = Router()
 
@@ -18,13 +18,9 @@ const description = z
   .transform((text) => (text === '' ? null : text))
   .nullable()
 
-const completedAt = z.iso
-  .datetime({
-    offset: true,
-    error: 'completedAt precisa ser uma data ISO ou null',
-  })
-  .transform((iso) => new Date(iso).toISOString())
-  .nullable()
+const completedAt = isoDateTime(
+  'completedAt precisa ser uma data ISO ou null',
+).nullable()
 
 // completedAt sem .optional(): pra iniciar aberta, o null tem que vir explícito
 const newExecutionSchema = z.object({
