@@ -184,7 +184,7 @@ function ExecutePage(props: {
         <button
           type="button"
           onClick={() => selectTask(null)}
-          className={inlineButtonClass}
+          className={`whitespace-nowrap ${inlineButtonClass}`}
         >
           trocar tarefa
         </button>

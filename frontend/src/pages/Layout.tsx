@@ -1,15 +1,42 @@
+import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import ThemeToggle from '../components/ThemeToggle'
-import {
-  activeNavLinkClass,
-  inlineButtonClass,
-  secondaryButtonClass,
-} from '../styles'
+import { HistoryIcon, ListIcon, TimerIcon } from '../components/icons'
+import { inlineButtonClass, secondaryButtonClass } from '../styles'
 import type { LoadStatus } from '../types'
 
-// NavLink é o Link que sabe se aponta pra rota atual, via isActive
+const focusRing =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta'
+
+// Um só <nav>: no celular vira barra fixa embaixo (ícone + texto, alcance do
+// polegar); a partir de sm, fica no topo como pílulas só de texto
 function navLinkClass({ isActive }: { isActive: boolean }) {
-  return isActive ? activeNavLinkClass : secondaryButtonClass
+  const base = `flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-xs font-medium sm:h-10 sm:flex-row sm:rounded-full sm:px-3.5 sm:py-0 sm:text-sm ${focusRing}`
+  return isActive
+    ? `${base} text-tinta sm:bg-tinta sm:text-papel`
+    : `${base} text-tinta-suave hover:text-tinta`
+}
+
+function NavItem(props: {
+  to: string
+  end?: boolean
+  icon: ReactNode
+  label: string
+}) {
+  return (
+    <NavLink to={props.to} end={props.end} className={navLinkClass}>
+      {({ isActive }) => (
+        <>
+          <span
+            className={`inline-flex rounded-full px-4 py-0.5 sm:hidden ${isActive ? 'bg-tinta/[0.07]' : ''}`}
+          >
+            {props.icon}
+          </span>
+          {props.label}
+        </>
+      )}
+    </NavLink>
+  )
 }
 
 function Layout(props: {
@@ -19,57 +46,63 @@ function Layout(props: {
   onDismissSaveError: () => void
 }) {
   return (
-    <main className="mx-auto max-w-xl px-4 py-6">
-      <header className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">StudyFlow</h1>
+    <div className="mx-auto max-w-xl px-4 pt-3 pb-28 sm:pb-10">
+      <header className="flex items-center gap-4 py-3">
+        <h1 className="mr-auto font-titulo text-xl font-bold tracking-tight">
+          StudyFlow
+        </h1>
         <ThemeToggle />
       </header>
-      <nav className="mb-6 flex gap-2">
+      <nav
+        aria-label="Principal"
+        className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-3 gap-1 border-t border-linha bg-superficie/90 px-3 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mb-6 sm:flex sm:gap-1 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
+      >
         {/* "end" evita que "/" fique marcada como ativa em "/executar" também */}
-        <NavLink to="/" end className={navLinkClass}>
-          Lista
-        </NavLink>
-        <NavLink to="/executar" className={navLinkClass}>
-          Executar
-        </NavLink>
-        <NavLink to="/historico" className={navLinkClass}>
-          Histórico
-        </NavLink>
+        <NavItem to="/" end icon={<ListIcon />} label="Lista" />
+        <NavItem to="/executar" icon={<TimerIcon />} label="Executar" />
+        <NavItem to="/historico" icon={<HistoryIcon />} label="Histórico" />
       </nav>
       {props.saveError && (
-        <p role="alert" className="mb-6 font-semibold">
-          {props.saveError}{' '}
+        <div
+          role="alert"
+          className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-alerta/40 bg-alerta/[0.08] px-4 py-3 text-sm"
+        >
+          <p className="font-semibold text-alerta">{props.saveError}</p>
           <button
             type="button"
             onClick={props.onDismissSaveError}
-            className={`font-normal ${inlineButtonClass}`}
+            className={`shrink-0 text-tinta-suave ${inlineButtonClass}`}
           >
             fechar
           </button>
-        </p>
-      )}
-      {/* A página só monta com os dados já carregados: a ExecutePage lê
-          ?tarefa= da URL uma vez só, na primeira renderização */}
-      {props.status === 'loading' && (
-        <p className="text-sm text-tinta-suave">Carregando…</p>
-      )}
-      {props.status === 'error' && (
-        <div role="alert" className="flex flex-col items-start gap-3">
-          <p className="font-semibold">
-            Não foi possível conectar ao servidor.
-          </p>
-          <button
-            type="button"
-            onClick={props.onRetry}
-            className={secondaryButtonClass}
-          >
-            Tentar de novo
-          </button>
         </div>
       )}
-      {/* A rota filha atual (TaskListPage ou ExecutePage) é desenhada aqui */}
-      {props.status === 'ready' && <Outlet />}
-    </main>
+      <main>
+        {/* A página só monta com os dados já carregados: a ExecutePage lê
+            ?tarefa= da URL uma vez só, na primeira renderização */}
+        {props.status === 'loading' && (
+          <p className="text-sm text-tinta-suave">Carregando…</p>
+        )}
+        {props.status === 'error' && (
+          <div
+            role="alert"
+            className="flex flex-col items-start gap-3 rounded-xl border border-alerta/40 bg-alerta/[0.08] px-4 py-4"
+          >
+            <p className="font-semibold text-alerta">
+              Não foi possível conectar ao servidor.
+            </p>
+            <button
+              type="button"
+              onClick={props.onRetry}
+              className={secondaryButtonClass}
+            >
+              Tentar de novo
+            </button>
+          </div>
+        )}
+        {props.status === 'ready' && <Outlet />}
+      </main>
+    </div>
   )
 }
 

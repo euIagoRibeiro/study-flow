@@ -6,11 +6,26 @@
   color-scheme: light dark;
 
   --papel: light-dark(#fafaf7, #23262d);
+  --superficie: light-dark(#ffffff, #2b2f37);
   --linha: light-dark(#bcd0e3, #383c45);
   --tinta: light-dark(#1b2a41, #e3e5e8);
   --tinta-suave: light-dark(#55606f, #a4aab4);
   --marca-texto: light-dark(#ffd84a, #e8c547);
   --sobre-marca: light-dark(#1b2a41, #23262d);
+  /* Uso restrito: alerta só em erro; andamento só em "rodando / em andamento" */
+  --alerta: light-dark(#b42318, #f97066);
+  --andamento: light-dark(#1f7a4d, #4cc38a);
+
+  /* Fonte por papel: componente usa o papel, nunca a fonte direta. Mudar
+     onde a mono aparece é trocar uma linha aqui. */
+  --fonte-sistema: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fonte-mono:
+    'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', Consolas,
+    monospace;
+  --fonte-interface: var(--fonte-mono);
+  --fonte-titulo: var(--fonte-mono);
+  --fonte-dados: var(--fonte-mono);
+  --fonte-texto: var(--fonte-sistema);
 }
 
 /* O botão de tema força um dos dois; sem atributo, segue o sistema. */
@@ -26,15 +41,47 @@
    que muda com o tema, em vez de congelar o valor na hora do build. */
 @theme inline {
   --color-papel: var(--papel);
+  --color-superficie: var(--superficie);
   --color-linha: var(--linha);
   --color-tinta: var(--tinta);
   --color-tinta-suave: var(--tinta-suave);
   --color-marca-texto: var(--marca-texto);
   --color-sobre-marca: var(--sobre-marca);
+  --color-alerta: var(--alerta);
+  --color-andamento: var(--andamento);
+
+  --font-interface: var(--fonte-interface);
+  --font-titulo: var(--fonte-titulo);
+  --font-dados: var(--fonte-dados);
+  --font-texto: var(--fonte-texto);
+}
+
+/* Escala: meta (13) pra metadados, conteudo (15) pro que você escreveu */
+@theme {
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.35;
+  --text-conteudo: 0.9375rem;
+  --text-conteudo--line-height: 1.45;
 }
 
 @layer base {
   body {
-    @apply min-h-dvh bg-papel text-tinta;
+    @apply min-h-dvh bg-papel font-interface text-tinta antialiased;
+  }
+}
+
+@keyframes pulsa {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+/* Única animação nova (além da transição do grifo): o ponto do "rodando" */
+@utility animate-pulsa {
+  animation: pulsa 1.6s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 }

@@ -127,7 +127,7 @@ function Task(props: {
             </p>
           )}
           {last?.description && (
-            <p className="text-sm text-tinta-suave break-words">
+            <p className="font-texto text-sm text-tinta-suave break-words">
               Último registro: {last.description}
             </p>
           )}

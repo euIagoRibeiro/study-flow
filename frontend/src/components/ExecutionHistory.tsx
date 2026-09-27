@@ -56,7 +56,7 @@ function ExecutionHistory(props: {
               {execution.taskFrequencyAtTime !== 'none' &&
                 ` · ${frequencyLabels[execution.taskFrequencyAtTime]}`}
             </p>
-            <p className="text-sm text-tinta-suave break-words">
+            <p className="font-texto text-sm text-tinta-suave break-words">
               {execution.description ?? 'Sem descrição'}
               {' · '}
               <button

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { secondaryButtonClass } from '../styles'
+import { quietIconButtonClass } from '../styles'
+import { MoonIcon, SunIcon } from './icons'
 
 type Theme = 'light' | 'dark'
 
@@ -16,9 +17,18 @@ function ThemeToggle() {
     setTheme(next)
   }
 
+  // Mostra o tema pra onde vai: no escuro, o sol
+  const label = theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'
+
   return (
-    <button type="button" onClick={toggle} className={secondaryButtonClass}>
-      {theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={label}
+      title={label}
+      className={quietIconButtonClass}
+    >
+      {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>
   )
 }
