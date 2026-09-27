@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { frequencyLabels } from '../frequency'
-import { fieldClass, primaryButtonClass } from '../styles'
+import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import type { Frequency, NewTask, Task } from '../types'
 
 function TaskForm(props: {
   task?: Task
   onSubmit: (task: NewTask) => Promise<unknown>
+  // Com onCancel, aparece o botão "Cancelar" (o form abre dentro de um cartão)
+  onCancel?: () => void
+  autoFocus?: boolean
 }) {
   const [title, setTitle] = useState(props.task?.title ?? '')
   const [frequency, setFrequency] = useState<Frequency>(
@@ -59,6 +62,7 @@ function TaskForm(props: {
               setError('')
             }}
             aria-invalid={error !== ''}
+            autoFocus={props.autoFocus}
             className={fieldClass}
           />
         </label>
@@ -76,13 +80,24 @@ function TaskForm(props: {
             ))}
           </select>
         </label>
-        <button
-          type="submit"
-          disabled={submitting}
-          className={primaryButtonClass}
-        >
-          {isEditing ? 'Salvar' : 'Adicionar'}
-        </button>
+        <div className="flex gap-2">
+          {props.onCancel && (
+            <button
+              type="button"
+              onClick={props.onCancel}
+              className={`flex-1 sm:flex-none ${secondaryButtonClass}`}
+            >
+              Cancelar
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className={`flex-1 sm:flex-none ${primaryButtonClass}`}
+          >
+            {isEditing ? 'Salvar' : 'Adicionar'}
+          </button>
+        </div>
       </div>
       {error && (
         <p role="alert" className="text-sm font-semibold">

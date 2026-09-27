@@ -97,3 +97,29 @@ export function ChevronDownIcon(props: { className?: string }) {
     </svg>
   )
 }
+
+export function MoreIcon() {
+  return (
+    <svg {...commonProps} fill="currentColor" stroke="none">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  )
+}
+
+export function PlayIcon() {
+  return (
+    <svg {...commonProps} className="h-4 w-4" fill="currentColor" stroke="none">
+      <path d="M8 5.5v13l11-6.5z" />
+    </svg>
+  )
+}
+
+export function PlusIcon() {
+  return (
+    <svg {...commonProps}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}

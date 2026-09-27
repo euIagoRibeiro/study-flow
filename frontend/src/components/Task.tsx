@@ -1,7 +1,12 @@
 import { Link } from 'react-router'
-import { isSameLocalDay } from '../dates'
+import { formatDayLabel, isSameLocalDay } from '../dates'
 import { frequencyLabels } from '../frequency'
-import { iconButtonClass, inlineButtonClass } from '../styles'
+import {
+  cardClass,
+  chipAndamentoClass,
+  chipClass,
+  secondaryButtonClass,
+} from '../styles'
 import type {
   CompletedExecution,
   NewTask,
@@ -9,9 +14,16 @@ import type {
   TaskExecution,
   TimeEntry,
 } from '../types'
-import { ArchiveIcon, HistoryIcon, PencilIcon, UnarchiveIcon } from './icons'
-import ExecutionEditForm from './ExecutionEditForm'
+import ActionMenu, { type MenuAction } from './ActionMenu'
+import ElapsedTime from './ElapsedTime'
 import ExecutionHistory from './ExecutionHistory'
+import {
+  ArchiveIcon,
+  HistoryIcon,
+  PencilIcon,
+  PlayIcon,
+  UnarchiveIcon,
+} from './icons'
 import TaskForm from './TaskForm'
 
 // Type guard: garante completedAt não-nulo pro TypeScript
@@ -21,8 +33,18 @@ function isCompleted(
   return execution.completedAt !== null
 }
 
+// Curto de propósito: no cartão, "seg, 21 set" quebrava linha no celular
+function lastLabel(iso: string, now: Date) {
+  const label = formatDayLabel(iso, now)
+  if (label === 'Hoje' || label === 'Ontem') return label.toLowerCase()
+  return new Date(iso).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+  })
+}
+
 // Exportado pro Tasks.tsx coordenar entre linhas
-export type OpenForm = 'edit' | 'edit-execution' | 'history' | null
+export type OpenForm = 'edit' | 'history' | null
 
 function Task(props: {
   task: TaskModel
@@ -64,6 +86,12 @@ function Task(props: {
   const openExecution = props.executions.find(
     (execution) => execution.completedAt === null,
   )
+  const runningEntry = openExecution
+    ? props.timeEntries.find(
+        (entry) =>
+          entry.taskExecutionId === openExecution.id && entry.endedAt === null,
+      )
+    : undefined
 
   function handleArchive() {
     const confirmed = window.confirm(
@@ -72,11 +100,38 @@ function Task(props: {
     if (confirmed) props.onArchive(id)
   }
 
+  const actions: MenuAction[] = []
+  if (active)
+    actions.push({
+      label: openForm === 'edit' ? 'Cancelar edição' : 'Editar tarefa',
+      icon: <PencilIcon />,
+      onSelect: () => onToggle('edit'),
+    })
+  if (completed.length > 0)
+    actions.push({
+      label: openForm === 'history' ? 'Fechar histórico' : 'Ver histórico',
+      icon: <HistoryIcon />,
+      onSelect: () => onToggle('history'),
+    })
+  actions.push(
+    active
+      ? { label: 'Arquivar', icon: <ArchiveIcon />, onSelect: handleArchive }
+      : {
+          label: 'Reativar',
+          icon: <UnarchiveIcon />,
+          onSelect: () => props.onReactivate(id),
+        },
+  )
+
+  const hasChips = openExecution || frequency !== 'none' || !active
+
   return (
-    <li className="border-b border-linha py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 sm:flex-1">
-          <p className="font-semibold break-words">
+    <li>
+      <article
+        className={`${cardClass} flex flex-col gap-2 ${active ? '' : 'opacity-75'}`}
+      >
+        <div className="flex items-start gap-2">
+          <h3 className="min-w-0 flex-1 pt-1.5 font-titulo text-base font-semibold break-words">
             <span
               // transition-colors fixo aqui, não junto do grifo — senão não há o que animar
               className={`transition-colors duration-300 ${
@@ -87,128 +142,79 @@ function Task(props: {
             >
               {title}
             </span>
-            {!active && (
-              <span className="ml-2 text-sm font-normal text-tinta-suave">
-                (arquivada)
-              </span>
+          </h3>
+          <ActionMenu label={`Mais ações de ${title}`} actions={actions} />
+        </div>
+
+        {hasChips && (
+          <div className="flex flex-wrap gap-1.5">
+            {openExecution &&
+              (runningEntry ? (
+                <span className={chipAndamentoClass}>
+                  <span className="h-2 w-2 animate-pulsa rounded-full bg-current" />
+                  Rodando · <ElapsedTime startedAt={runningEntry.startedAt} />
+                </span>
+              ) : (
+                <span className={chipAndamentoClass}>
+                  <span className="h-2 w-2 rounded-full border-[1.5px] border-current" />
+                  Pausado
+                </span>
+              ))}
+            {frequency !== 'none' && (
+              <span className={chipClass}>{frequencyLabels[frequency]}</span>
             )}
+            {!active && <span className={chipClass}>Arquivada</span>}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-dados text-meta text-tinta-suave">
+            {last
+              ? `Feita ${completed.length}× · última ${lastLabel(last.completedAt, now)}`
+              : 'Ainda não feita'}
           </p>
-          {frequency !== 'none' && (
-            <p className="text-sm text-tinta-suave">
-              {frequencyLabels[frequency]}
-            </p>
-          )}
-          {openExecution && (
-            <p className="text-sm text-tinta-suave">
-              Em andamento{' · '}
-              <Link to={`/executar?tarefa=${id}`} className={inlineButtonClass}>
-                retomar
-              </Link>
-            </p>
-          )}
-          {last !== null && (
-            <p className="text-sm text-tinta-suave">
-              Feita {completed.length}{' '}
-              {completed.length === 1 ? 'vez' : 'vezes'}, última em{' '}
-              {new Date(last.completedAt).toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-              })}
-              {' · '}
-              <button
-                type="button"
-                onClick={() => onToggle('edit-execution')}
-                aria-expanded={openForm === 'edit-execution'}
-                aria-label={`${openForm === 'edit-execution' ? 'Cancelar edição do' : 'Editar'} último registro de ${title}`}
-                className={inlineButtonClass}
-              >
-                {openForm === 'edit-execution' ? 'cancelar' : 'editar'}
-              </button>
-            </p>
-          )}
-          {last?.description && (
-            <p className="font-texto text-sm text-tinta-suave break-words">
-              Último registro: {last.description}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
           {active && (
-            <button
-              type="button"
-              onClick={() => onToggle('edit')}
-              aria-expanded={openForm === 'edit'}
-              aria-label={`${openForm === 'edit' ? 'Cancelar edição de' : 'Editar'} ${title}`}
-              title={openForm === 'edit' ? 'Cancelar' : 'Editar'}
-              className={iconButtonClass}
+            // Navegação de verdade: <Link>, não <button>
+            <Link
+              to={`/executar?tarefa=${id}`}
+              aria-label={`${openExecution ? 'Retomar' : 'Executar'} ${title}`}
+              className={secondaryButtonClass}
             >
-              <PencilIcon />
-            </button>
-          )}
-          {completed.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onToggle('history')}
-              aria-expanded={openForm === 'history'}
-              aria-label={`${openForm === 'history' ? 'Fechar' : 'Ver'} histórico de ${title}`}
-              title={openForm === 'history' ? 'Fechar' : 'Histórico'}
-              className={iconButtonClass}
-            >
-              <HistoryIcon />
-            </button>
-          )}
-          {!active && (
-            <button
-              type="button"
-              onClick={() => props.onReactivate(id)}
-              aria-label={`Reativar ${title}`}
-              title="Reativar"
-              className={iconButtonClass}
-            >
-              <UnarchiveIcon />
-            </button>
-          )}
-          {active && (
-            <button
-              type="button"
-              onClick={handleArchive}
-              aria-label={`Arquivar ${title}`}
-              title="Arquivar"
-              className={iconButtonClass}
-            >
-              <ArchiveIcon />
-            </button>
+              {openExecution ? (
+                'Retomar'
+              ) : (
+                <>
+                  <PlayIcon />
+                  Executar
+                </>
+              )}
+            </Link>
           )}
         </div>
-      </div>
-      {active && openForm === 'edit' && (
-        <TaskForm
-          task={props.task}
-          onSubmit={async (changes) => {
-            await props.onEdit(id, changes)
-            onToggle('edit')
-          }}
-        />
-      )}
-      {openForm === 'edit-execution' && last !== null && (
-        <ExecutionEditForm
-          execution={last}
-          onSubmit={async (changes) => {
-            await props.onEditExecution(last.id, changes)
-            onToggle('edit-execution')
-          }}
-        />
-      )}
-      {openForm === 'history' && (
-        <div className="mt-4">
-          <ExecutionHistory
-            executions={completed}
-            timeEntries={props.timeEntries}
-            onEdit={props.onEditExecution}
-            onEditTimeEntry={props.onEditTimeEntry}
-          />
-        </div>
-      )}
+
+        {active && openForm === 'edit' && (
+          <div className="mt-1 border-t border-dashed border-linha pt-3">
+            <TaskForm
+              task={props.task}
+              onSubmit={async (changes) => {
+                await props.onEdit(id, changes)
+                onToggle('edit')
+              }}
+              onCancel={() => onToggle('edit')}
+            />
+          </div>
+        )}
+        {openForm === 'history' && (
+          <div className="mt-1 border-t border-dashed border-linha pt-3">
+            <ExecutionHistory
+              executions={completed}
+              timeEntries={props.timeEntries}
+              onEdit={props.onEditExecution}
+              onEditTimeEntry={props.onEditTimeEntry}
+            />
+          </div>
+        )}
+      </article>
     </li>
   )
 }

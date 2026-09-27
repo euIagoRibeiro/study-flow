@@ -2,11 +2,8 @@ import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import ThemeToggle from '../components/ThemeToggle'
 import { HistoryIcon, ListIcon, TimerIcon } from '../components/icons'
-import { inlineButtonClass, secondaryButtonClass } from '../styles'
+import { focusRing, inlineButtonClass, secondaryButtonClass } from '../styles'
 import type { LoadStatus } from '../types'
-
-const focusRing =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta'
 
 // Um só <nav>: no celular vira barra fixa embaixo (ícone + texto, alcance do
 // polegar); a partir de sm, fica no topo como pílulas só de texto

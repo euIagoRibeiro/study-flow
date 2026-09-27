@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ExecutionHistory from '../components/ExecutionHistory'
 import { matchesPeriod, type PeriodFilter } from '../dates'
 import { frequencyLabels } from '../frequency'
+import { focusRing } from '../styles'
 import type {
   CompletedExecution,
   Frequency,
@@ -17,9 +18,6 @@ const periodLabels: Record<PeriodFilter, string> = {
   month: 'Este mês',
   year: 'Este ano',
 }
-
-const focusRing =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta'
 
 function periodChipClass(active: boolean) {
   const base = `h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium ${focusRing}`

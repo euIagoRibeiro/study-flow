@@ -38,7 +38,7 @@ function Tasks(props: {
   }
 
   return (
-    <ul className="mt-8 border-t border-linha">
+    <ul className="flex flex-col gap-2.5">
       {props.tasks.map((task) => (
         <Task
           key={task.id}
