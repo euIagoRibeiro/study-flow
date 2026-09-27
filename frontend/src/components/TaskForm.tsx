@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { frequencyLabels } from '../frequency'
 import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import type { Frequency, NewTask, Task } from '../types'
+import FormError from './FormError'
 
 function TaskForm(props: {
   task?: Task
@@ -50,7 +51,7 @@ function TaskForm(props: {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex flex-col gap-1 sm:flex-1">
+        <label className="flex flex-col gap-1.5 sm:flex-1">
           <span className="text-sm text-tinta-suave">
             {isEditing ? 'Título' : 'Nova tarefa'}
           </span>
@@ -66,7 +67,7 @@ function TaskForm(props: {
             className={fieldClass}
           />
         </label>
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1.5">
           <span className="text-sm text-tinta-suave">Frequência</span>
           <select
             value={frequency}
@@ -99,11 +100,7 @@ function TaskForm(props: {
           </button>
         </div>
       </div>
-      {error && (
-        <p role="alert" className="text-sm font-semibold">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
     </form>
   )
 }

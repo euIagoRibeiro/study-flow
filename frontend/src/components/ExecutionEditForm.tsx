@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, primaryButtonClass } from '../styles'
 import type { CompletedExecution } from '../types'
+import FormError from './FormError'
 
 function ExecutionEditForm(props: {
   execution: CompletedExecution
@@ -39,7 +40,7 @@ function ExecutionEditForm(props: {
   return (
     <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex flex-col gap-1 sm:flex-1">
+        <label className="flex flex-col gap-1.5 sm:flex-1">
           <span className="text-sm text-tinta-suave">
             O que foi feito (opcional)
           </span>
@@ -50,7 +51,7 @@ function ExecutionEditForm(props: {
             className={fieldClass}
           />
         </label>
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1.5">
           <span className="text-sm text-tinta-suave">Quando</span>
           <input
             type="datetime-local"
@@ -68,11 +69,7 @@ function ExecutionEditForm(props: {
           Salvar
         </button>
       </div>
-      {error && (
-        <p role="alert" className="text-sm font-semibold">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
     </form>
   )
 }

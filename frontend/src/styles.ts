@@ -15,10 +15,7 @@ export const secondaryButtonClass = `min-h-11 shrink-0 ${centered} gap-2 rounded
 // Item de lista, texto à esquerda — sem "centered" de propósito
 export const pickerButtonClass = `min-h-11 w-full rounded-xl border border-linha bg-superficie px-3 py-2 text-left text-base text-tinta hover:bg-tinta/[0.04] ${focusRing}`
 
-// Botão só-ícone (Editar/Arquivar/Histórico): 44px de toque, ícone de 20px
-export const iconButtonClass = `h-11 w-11 shrink-0 ${centered} rounded-xl border border-tinta-suave/45 text-tinta-suave hover:text-tinta ${focusRing}`
-
-// Só-ícone sem borda: tema e, a partir do R3, o menu ⋯
+// Botão só-ícone, sem borda (tema, menu ⋯, editar): 44px de toque
 export const quietIconButtonClass = `h-11 w-11 shrink-0 ${centered} rounded-xl text-tinta-suave hover:bg-tinta/[0.07] hover:text-tinta ${focusRing}`
 
 // <button> estilizado como link — nunca <a>, não há navegação aqui

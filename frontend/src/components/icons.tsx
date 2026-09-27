@@ -123,3 +123,12 @@ export function PlusIcon() {
     </svg>
   )
 }
+
+export function AlertIcon() {
+  return (
+    <svg {...commonProps} className="h-4 w-4 shrink-0">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v5M12 16.5v.01" />
+    </svg>
+  )
+}

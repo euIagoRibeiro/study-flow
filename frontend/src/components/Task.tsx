@@ -95,7 +95,7 @@ function Task(props: {
 
   function handleArchive() {
     const confirmed = window.confirm(
-      `Arquivar "${title}"? A tarefa some da lista, mas pode ser vista de novo ligando "Mostrar arquivadas" — o histórico de execuções continua guardado.`,
+      `Arquivar "${title}"? A tarefa some da lista, mas pode ser vista de novo ligando "Mostrar arquivadas". O histórico de execuções continua guardado.`,
     )
     if (confirmed) props.onArchive(id)
   }

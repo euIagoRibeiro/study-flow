@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, primaryButtonClass } from '../styles'
 import type { TimeEntry } from '../types'
+import FormError from './FormError'
 
 function TimeEntryEditForm(props: {
   entry: TimeEntry
@@ -44,7 +45,7 @@ function TimeEntryEditForm(props: {
   return (
     <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex flex-col gap-1 sm:flex-1">
+        <label className="flex flex-col gap-1.5 sm:flex-1">
           <span className="text-sm text-tinta-suave">Início</span>
           <input
             type="datetime-local"
@@ -54,7 +55,7 @@ function TimeEntryEditForm(props: {
             className={fieldClass}
           />
         </label>
-        <label className="flex flex-col gap-1 sm:flex-1">
+        <label className="flex flex-col gap-1.5 sm:flex-1">
           <span className="text-sm text-tinta-suave">Fim</span>
           <input
             type="datetime-local"
@@ -72,11 +73,7 @@ function TimeEntryEditForm(props: {
           Salvar
         </button>
       </div>
-      {error && (
-        <p role="alert" className="text-sm font-semibold">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
     </form>
   )
 }

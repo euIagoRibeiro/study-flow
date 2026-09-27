@@ -161,7 +161,14 @@ function App() {
   // finalizado (voltar endedAt pra null seria dado estranho)
   async function resumeTimer(taskExecutionId: string): Promise<string | null> {
     const anyRunning = timeEntries.some((entry) => entry.endedAt === null)
-    if (anyRunning) return null // mesma invariante global do startTimer
+    // Mesma invariante global do startTimer — mas avisando: recusar em
+    // silêncio parecia botão quebrado
+    if (anyRunning) {
+      setSaveError(
+        'Já tem um cronômetro rodando em outra tarefa. Pause ou finalize ele antes de retomar este.',
+      )
+      return null
+    }
 
     try {
       const entry = await timeEntriesApi.startTimeEntry(taskExecutionId)

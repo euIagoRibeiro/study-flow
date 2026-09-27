@@ -8,6 +8,7 @@ import {
 } from '../styles'
 import type { TaskExecution, TimeEntry } from '../types'
 import ElapsedTime from './ElapsedTime'
+import FormError from './FormError'
 
 function TimerPanel(props: {
   execution: TaskExecution
@@ -126,11 +127,7 @@ function TimerPanel(props: {
         >
           Finalizar
         </button>
-        {error && (
-          <p role="alert" className="text-sm font-semibold">
-            {error}
-          </p>
-        )}
+        {error && <FormError>{error}</FormError>}
       </form>
     </div>
   )

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { fieldClass, secondaryButtonClass } from '../styles'
+import FormError from './FormError'
 
 // Registrar sem cronômetro: botão secundário — na mesma tela, o amarelo é
 // do "Iniciar cronômetro" (um botão principal por estado)
@@ -44,11 +45,7 @@ function ExecutionForm(props: {
       >
         Registrar
       </button>
-      {error && (
-        <p role="alert" className="text-sm font-semibold">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
     </form>
   )
 }

@@ -57,12 +57,12 @@ function HistoricoPage(props: {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3">
         {/* -mx-4/px-4: os chips rolam até a borda da tela, sem cortar no gutter */}
         <div
           role="group"
           aria-label="Período"
-          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-1 sm:px-0 sm:pb-0"
+          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 sm:pb-0"
         >
           {Object.entries(periodLabels).map(([value, label]) => (
             <button
