@@ -89,3 +89,11 @@ export function MoonIcon() {
     </svg>
   )
 }
+
+export function ChevronDownIcon(props: { className?: string }) {
+  return (
+    <svg {...commonProps} className={props.className ?? 'h-4 w-4'}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}

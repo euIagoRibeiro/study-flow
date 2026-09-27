@@ -49,6 +49,48 @@ export function matchesPeriod(iso: string, period: PeriodFilter): boolean {
   return date.getFullYear() === now.getFullYear() // 'year'
 }
 
+const pad = (n: number) => String(n).padStart(2, '0')
+
+// Chave do dia LOCAL ("2026-09-26"), pra agrupar sem cair no dia UTC
+export function localDayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+const weekdays = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+const months = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+]
+
+// "Hoje", "Ontem", "sex, 19 set" — o ano só aparece se não for o atual
+export function formatDayLabel(iso: string, now = new Date()): string {
+  const date = new Date(iso)
+  if (isSameLocalDay(date, now)) return 'Hoje'
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (isSameLocalDay(date, yesterday)) return 'Ontem'
+  const year =
+    date.getFullYear() === now.getFullYear() ? '' : ` ${date.getFullYear()}`
+  return `${weekdays[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}${year}`
+}
+
+// "13:20", hora local
+export function formatTime(iso: string): string {
+  const d = new Date(iso)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export function formatDuration(ms: number): string {
   const totalMinutes = Math.round(Math.max(0, ms) / 60000)
   const hours = Math.floor(totalMinutes / 60)

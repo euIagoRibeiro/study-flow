@@ -200,12 +200,14 @@ function Task(props: {
         />
       )}
       {openForm === 'history' && (
-        <ExecutionHistory
-          executions={completed}
-          timeEntries={props.timeEntries}
-          onEdit={props.onEditExecution}
-          onEditTimeEntry={props.onEditTimeEntry}
-        />
+        <div className="mt-4">
+          <ExecutionHistory
+            executions={completed}
+            timeEntries={props.timeEntries}
+            onEdit={props.onEditExecution}
+            onEditTimeEntry={props.onEditTimeEntry}
+          />
+        </div>
       )}
     </li>
   )

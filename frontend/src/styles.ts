@@ -24,6 +24,9 @@ export const quietIconButtonClass = `h-11 w-11 shrink-0 ${centered} rounded-xl t
 // <button> estilizado como link — nunca <a>, não há navegação aqui
 export const inlineButtonClass = `underline decoration-dotted underline-offset-2 hover:text-tinta ${focusRing}`
 
+// Texto clicável discreto, sem sublinhado (ex.: "2 sessões ▾")
+export const textButtonClass = `inline-flex min-h-8 items-center gap-0.5 rounded-md hover:text-tinta ${focusRing}`
+
 // Superfície de um item (tarefa, registro): borda, sem sombra. Sombra só
 // em elemento que flutua por cima do conteúdo (menu, popover)
 export const cardClass =
