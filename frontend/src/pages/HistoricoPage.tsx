@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ExecutionHistory from '../components/ExecutionHistory'
+import FilterChips, { type ChipOption } from '../components/FilterChips'
 import { matchesPeriod, type PeriodFilter } from '../dates'
 import { frequencyLabels } from '../frequency'
 import { focusRing } from '../styles'
@@ -11,20 +12,13 @@ import type {
 } from '../types'
 
 // Tudo primeiro: é o padrão, e numa faixa que rola de lado não pode ficar escondido no fim
-const periodLabels: Record<PeriodFilter, string> = {
-  all: 'Tudo',
-  today: 'Hoje',
-  '7d': '7 dias',
-  month: 'Este mês',
-  year: 'Este ano',
-}
-
-function periodChipClass(active: boolean) {
-  const base = `h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium ${focusRing}`
-  return active
-    ? `${base} border-tinta bg-tinta text-papel`
-    : `${base} border-tinta-suave/40 text-tinta-suave hover:text-tinta`
-}
+const periodOptions: ChipOption<PeriodFilter>[] = [
+  { value: 'all', label: 'Tudo' },
+  { value: 'today', label: 'Hoje' },
+  { value: '7d', label: '7 dias' },
+  { value: 'month', label: 'Este mês' },
+  { value: 'year', label: 'Este ano' },
+]
 
 function isCompleted(
   execution: TaskExecution,
@@ -58,24 +52,12 @@ function HistoricoPage(props: {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
-        {/* -mx-4/px-4: os chips rolam até a borda da tela, sem cortar no gutter */}
-        <div
-          role="group"
-          aria-label="Período"
-          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 sm:pb-0"
-        >
-          {Object.entries(periodLabels).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={period === value}
-              onClick={() => setPeriod(value as PeriodFilter)}
-              className={periodChipClass(period === value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          label="Período"
+          options={periodOptions}
+          value={period}
+          onChange={setPeriod}
+        />
         <select
           aria-label="Frequência"
           value={frequency}

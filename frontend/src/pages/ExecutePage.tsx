@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import ExecutionForm from '../components/ExecutionForm'
+import FilterChips, { type ChipOption } from '../components/FilterChips'
 import TaskForm from '../components/TaskForm'
 import TimerPanel from '../components/TimerPanel'
 import UndoNotice from '../components/UndoNotice'
@@ -15,9 +16,18 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
-import type { NewTask, Task, TaskExecution, TimeEntry } from '../types'
+import type {
+  Frequency,
+  NewTask,
+  Task,
+  TaskExecution,
+  TimeEntry,
+} from '../types'
 
 const UNDO_SECONDS = 6
+
+// Ordem dos chips: das mais frequentes às avulsas
+const frequencyOrder: Frequency[] = ['daily', 'weekly', 'monthly', 'none']
 
 function ExecutePage(props: {
   tasks: Task[]
@@ -51,6 +61,9 @@ function ExecutePage(props: {
   // Enquanto o servidor confirma o desfazer: tira a contagem da tela (senão
   // ela poderia expirar e navegar no meio da requisição)
   const [undoing, setUndoing] = useState(false)
+  const [frequencyFilter, setFrequencyFilter] = useState<Frequency | 'all'>(
+    'all',
+  )
   const navigate = useNavigate()
 
   const activeTasks = props.tasks.filter((task) => task.active)
@@ -123,43 +136,91 @@ function ExecutePage(props: {
       : 'pausado'
   }
 
+  function renderPickerItem(task: Task) {
+    const state = openStateOf(task.id)
+    return (
+      <li key={task.id}>
+        <button
+          type="button"
+          onClick={() => selectTask(task.id)}
+          className={`${pickerButtonClass} flex flex-wrap items-center gap-x-2 gap-y-1`}
+        >
+          <span className="font-titulo">{task.title}</span>
+          {task.frequency !== 'none' && (
+            <span className={chipClass}>{frequencyLabels[task.frequency]}</span>
+          )}
+          {state && (
+            <span className={chipAndamentoClass}>
+              <span
+                className={`h-2 w-2 rounded-full ${state === 'rodando' ? 'animate-pulsa bg-current' : 'border-[1.5px] border-current'}`}
+              />
+              {state === 'rodando' ? 'Rodando' : 'Pausado'}
+            </span>
+          )}
+        </button>
+      </li>
+    )
+  }
+
   if (selectedTask === undefined) {
+    // Em andamento fica fora do filtro: o que está aberto nunca some da tela
+    const inProgress = activeTasks.filter((task) => openStateOf(task.id))
+    const others = activeTasks.filter((task) => !openStateOf(task.id))
+
+    // Frequência ATUAL da tarefa (não snapshot): aqui é escolher o que
+    // fazer agora. Chip sem nenhuma tarefa não aparece
+    const frequencyOptions: ChipOption<Frequency | 'all'>[] = [
+      { value: 'all', label: 'Todas', count: others.length },
+      ...frequencyOrder
+        .map((frequency) => ({
+          value: frequency,
+          label: frequencyLabels[frequency],
+          count: others.filter((task) => task.frequency === frequency).length,
+        }))
+        .filter((option) => option.count > 0),
+    ]
+    // Se o filtro escolhido ficou vazio (ex.: a última tarefa dele foi
+    // iniciada e subiu pra "Em andamento"), volta pra "Todas"
+    const activeFilter = frequencyOptions.some(
+      (option) => option.value === frequencyFilter,
+    )
+      ? frequencyFilter
+      : 'all'
+    const filtered = others.filter(
+      (task) => activeFilter === 'all' || task.frequency === activeFilter,
+    )
+
     return (
       <div className="flex flex-col gap-6">
-        <section>
-          <h2 className="mb-3 font-titulo text-base font-semibold">
-            Escolha uma tarefa
-          </h2>
-          <ul className="flex flex-col gap-2">
-            {activeTasks.map((task) => {
-              const state = openStateOf(task.id)
-              return (
-                <li key={task.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectTask(task.id)}
-                    className={`${pickerButtonClass} flex flex-wrap items-center gap-x-2 gap-y-1`}
-                  >
-                    <span className="font-titulo">{task.title}</span>
-                    {task.frequency !== 'none' && (
-                      <span className={chipClass}>
-                        {frequencyLabels[task.frequency]}
-                      </span>
-                    )}
-                    {state && (
-                      <span className={chipAndamentoClass}>
-                        <span
-                          className={`h-2 w-2 rounded-full ${state === 'rodando' ? 'animate-pulsa bg-current' : 'border-[1.5px] border-current'}`}
-                        />
-                        {state === 'rodando' ? 'Rodando' : 'Pausado'}
-                      </span>
-                    )}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+        {inProgress.length > 0 && (
+          <section>
+            <h2 className="mb-3 font-titulo text-base font-semibold">
+              Em andamento
+            </h2>
+            <ul className="flex flex-col gap-2">
+              {inProgress.map(renderPickerItem)}
+            </ul>
+          </section>
+        )}
+        {others.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="font-titulo text-base font-semibold">
+              Escolha uma tarefa
+            </h2>
+            {/* Com um tipo só de frequência, os chips não teriam o que filtrar */}
+            {frequencyOptions.length > 2 && (
+              <FilterChips
+                label="Frequência"
+                options={frequencyOptions}
+                value={activeFilter}
+                onChange={setFrequencyFilter}
+              />
+            )}
+            <ul className="flex flex-col gap-2">
+              {filtered.map(renderPickerItem)}
+            </ul>
+          </section>
+        )}
         <section className={cardClass}>
           <h2 className="mb-3 font-titulo text-base font-semibold">
             ou crie uma nova
