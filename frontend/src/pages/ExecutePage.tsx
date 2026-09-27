@@ -5,10 +5,15 @@ import TaskForm from '../components/TaskForm'
 import TimerPanel from '../components/TimerPanel'
 import UndoNotice from '../components/UndoNotice'
 import { frequencyLabels } from '../frequency'
+import { PlayIcon } from '../components/icons'
 import {
+  cardClass,
+  chipAndamentoClass,
+  chipClass,
   inlineButtonClass,
   pickerButtonClass,
   primaryButtonClass,
+  secondaryButtonClass,
 } from '../styles'
 import type { NewTask, Task, TaskExecution, TimeEntry } from '../types'
 
@@ -104,34 +109,49 @@ function ExecutePage(props: {
     setPendingUndo(null)
   }
 
+  // Estado de cada tarefa no seletor: em andamento (rodando/pausado) ou nada
+  function openStateOf(taskId: string): 'rodando' | 'pausado' | null {
+    const open = props.executions.find(
+      (execution) =>
+        execution.taskId === taskId && execution.completedAt === null,
+    )
+    if (!open) return null
+    return props.timeEntries.some(
+      (entry) => entry.taskExecutionId === open.id && entry.endedAt === null,
+    )
+      ? 'rodando'
+      : 'pausado'
+  }
+
   if (selectedTask === undefined) {
     return (
       <div className="flex flex-col gap-6">
-        <div>
-          <h2 className="mb-2 text-base font-semibold">Escolha uma tarefa</h2>
+        <section>
+          <h2 className="mb-3 font-titulo text-base font-semibold">
+            Escolha uma tarefa
+          </h2>
           <ul className="flex flex-col gap-2">
             {activeTasks.map((task) => {
-              const isOpen = props.executions.some(
-                (execution) =>
-                  execution.taskId === task.id &&
-                  execution.completedAt === null,
-              )
+              const state = openStateOf(task.id)
               return (
                 <li key={task.id}>
                   <button
                     type="button"
                     onClick={() => selectTask(task.id)}
-                    className={pickerButtonClass}
+                    className={`${pickerButtonClass} flex flex-wrap items-center gap-x-2 gap-y-1`}
                   >
-                    {task.title}
+                    <span className="font-titulo">{task.title}</span>
                     {task.frequency !== 'none' && (
-                      <span className="ml-2 text-sm text-tinta-suave">
+                      <span className={chipClass}>
                         {frequencyLabels[task.frequency]}
                       </span>
                     )}
-                    {isOpen && (
-                      <span className="ml-2 text-sm text-tinta-suave">
-                        (em andamento)
+                    {state && (
+                      <span className={chipAndamentoClass}>
+                        <span
+                          className={`h-2 w-2 rounded-full ${state === 'rodando' ? 'animate-pulsa bg-current' : 'border-[1.5px] border-current'}`}
+                        />
+                        {state === 'rodando' ? 'Rodando' : 'Pausado'}
                       </span>
                     )}
                   </button>
@@ -139,11 +159,13 @@ function ExecutePage(props: {
               )
             })}
           </ul>
-        </div>
-        <div>
-          <h2 className="mb-2 text-base font-semibold">ou crie uma nova</h2>
+        </section>
+        <section className={cardClass}>
+          <h2 className="mb-3 font-titulo text-base font-semibold">
+            ou crie uma nova
+          </h2>
           <TaskForm onSubmit={handleCreate} />
-        </div>
+        </section>
       </div>
     )
   }
@@ -152,39 +174,44 @@ function ExecutePage(props: {
     (execution) =>
       execution.taskId === selectedTask.id && execution.completedAt === null,
   )
-  const runningEntry = openExecution
-    ? props.timeEntries.find(
-        (entry) =>
-          entry.taskExecutionId === openExecution.id && entry.endedAt === null,
-      )
-    : undefined
+  const openEntries = openExecution
+    ? props.timeEntries
+        .filter((entry) => entry.taskExecutionId === openExecution.id)
+        .sort((a, b) => (a.startedAt > b.startedAt ? 1 : -1))
+    : []
+  const runningEntry = openEntries.find((entry) => entry.endedAt === null)
   // Rodando em OUTRA tarefa, não nessa — "Registrar" continua liberado (é
   // instantâneo, nunca fica aberto, então não conflita com essa invariante)
-  const runningElsewhere =
-    !runningEntry && props.timeEntries.some((entry) => entry.endedAt === null)
+  const runningElsewhere = runningEntry
+    ? undefined
+    : props.timeEntries.find((entry) => entry.endedAt === null)
+  const runningTask = runningElsewhere
+    ? activeTasks.find(
+        (task) =>
+          task.id ===
+          props.executions.find(
+            (execution) => execution.id === runningElsewhere.taskExecutionId,
+          )?.taskId,
+      )
+    : undefined
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">
-            Executar: {selectedTask.title}
+        <div className="flex min-w-0 flex-col items-start gap-1.5">
+          <h2 className="font-titulo text-xl font-bold break-words">
+            {selectedTask.title}
           </h2>
           {selectedTask.frequency !== 'none' && (
-            <p className="text-sm text-tinta-suave">
+            <span className={chipClass}>
               {frequencyLabels[selectedTask.frequency]}
-            </p>
-          )}
-          {openExecution && !pendingUndo && (
-            <p className="text-sm text-tinta-suave">
-              Seu progresso continua salvo.
-            </p>
+            </span>
           )}
         </div>
         <button
           type="button"
           onClick={() => selectTask(null)}
-          className={`whitespace-nowrap ${inlineButtonClass}`}
+          className={`mt-1 whitespace-nowrap text-sm text-tinta-suave ${inlineButtonClass}`}
         >
           trocar tarefa
         </button>
@@ -204,6 +231,7 @@ function ExecutePage(props: {
       ) : openExecution ? (
         <TimerPanel
           execution={openExecution}
+          entries={openEntries}
           runningEntry={runningEntry}
           onStop={props.onStopTimer}
           onResume={props.onResumeTimer}
@@ -212,22 +240,45 @@ function ExecutePage(props: {
       ) : (
         <>
           {runningElsewhere ? (
-            <p className="text-sm text-tinta-suave">
-              Você já tem um cronômetro rodando em outra tarefa. Finalize ou
-              pause antes.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-andamento/[0.13] px-4 py-3 text-sm">
+              <p className="inline-flex items-center gap-2">
+                <span className="h-2 w-2 shrink-0 animate-pulsa rounded-full bg-andamento" />
+                <span>
+                  {runningTask ? (
+                    <>
+                      <strong className="font-semibold">
+                        {runningTask.title}
+                      </strong>{' '}
+                      está rodando.
+                    </>
+                  ) : (
+                    'Já tem um cronômetro rodando.'
+                  )}
+                </span>
+              </p>
+              {runningTask && (
+                <button
+                  type="button"
+                  onClick={() => selectTask(runningTask.id)}
+                  className={secondaryButtonClass}
+                >
+                  Ir pro cronômetro →
+                </button>
+              )}
+            </div>
           ) : (
             <button
               type="button"
               onClick={handleStart}
               disabled={starting}
-              className={primaryButtonClass}
+              className={`h-13 w-full text-base ${primaryButtonClass}`}
             >
+              <PlayIcon />
               Iniciar cronômetro
             </button>
           )}
-          <p className="text-sm text-tinta-suave">
-            ou registre direto, sem cronômetro
+          <p className="flex items-center gap-3 text-sm text-tinta-suave before:h-px before:flex-1 before:bg-linha after:h-px after:flex-1 after:bg-linha">
+            ou registre sem cronômetro
           </p>
           <ExecutionForm onSubmit={handleExecute} />
         </>

@@ -91,6 +91,15 @@ export function formatTime(iso: string): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// "01:05:09" — o formato do relógio, rodando ou parado
+export function formatClock(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+}
+
 export function formatDuration(ms: number): string {
   const totalMinutes = Math.round(Math.max(0, ms) / 60000)
   const hours = Math.floor(totalMinutes / 60)

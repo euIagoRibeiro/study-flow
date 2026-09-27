@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { inlineButtonClass } from '../styles'
+import { secondaryButtonClass } from '../styles'
 
 function UndoNotice(props: {
   seconds: number
@@ -22,13 +22,15 @@ function UndoNotice(props: {
   }, [remaining, onExpire])
 
   return (
-    <p className="text-sm text-tinta-suave">
-      Finalizado{' · '}
-      <button type="button" onClick={onUndo} className={inlineButtonClass}>
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-tinta/[0.07] px-4 py-3">
+      <p className="font-semibold">Finalizado.</p>
+      <button type="button" onClick={onUndo} className={secondaryButtonClass}>
         Desfazer
-      </button>{' '}
-      ({remaining}s)
-    </p>
+        <span className="font-dados text-tinta-suave tabular-nums">
+          {remaining}s
+        </span>
+      </button>
+    </div>
   )
 }
 
