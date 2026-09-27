@@ -168,26 +168,31 @@ function Task(props: {
         )}
 
         <div className="flex items-center justify-between gap-3">
-          <p className="font-dados text-meta text-tinta-suave">
-            {last
-              ? `Feita ${completed.length}× · última ${lastLabel(last.completedAt, now)}`
-              : 'Ainda não feita'}
+          {/* Duas linhas fixas, de propósito: numa linha só, o texto ficava
+              no limite ao lado do botão e quebrava deixando uma palavra
+              sozinha (360/375px, ou com contagem de 2 dígitos). Cabem na
+              altura do botão (44px), então o cartão não cresce */}
+          <p className="flex flex-col font-dados text-meta text-tinta-suave">
+            {last ? (
+              <>
+                <span>Feita {completed.length}×</span>
+                <span>última {lastLabel(last.completedAt, now)}</span>
+              </>
+            ) : (
+              'Ainda não feita'
+            )}
           </p>
           {active && (
             // Navegação de verdade: <Link>, não <button>
             <Link
               to={`/executar?tarefa=${id}`}
               aria-label={`${openExecution ? 'Retomar' : 'Executar'} ${title}`}
-              className={secondaryButtonClass}
+              // Mesmo papel, nunca aparecem juntos: mesmo ícone e mesma
+              // largura mínima, pra não mudar de peso de um cartão pro outro
+              className={`min-w-30 ${secondaryButtonClass}`}
             >
-              {openExecution ? (
-                'Retomar'
-              ) : (
-                <>
-                  <PlayIcon />
-                  Executar
-                </>
-              )}
+              <PlayIcon />
+              {openExecution ? 'Retomar' : 'Executar'}
             </Link>
           )}
         </div>
