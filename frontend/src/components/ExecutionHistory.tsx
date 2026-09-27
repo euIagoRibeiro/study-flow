@@ -6,13 +6,9 @@ import {
   localDayKey,
 } from '../dates'
 import { frequencyLabels } from '../frequency'
-import {
-  cardClass,
-  chipClass,
-  quietIconButtonClass,
-  textButtonClass,
-} from '../styles'
+import { cardClass, chipClass, textButtonClass } from '../styles'
 import type { CompletedExecution, TimeEntry } from '../types'
+import CompactIconButton from './CompactIconButton'
 import ExecutionEditForm from './ExecutionEditForm'
 import { ChevronDownIcon, PencilIcon } from './icons'
 import TimeEntryEditForm from './TimeEntryEditForm'
@@ -133,16 +129,15 @@ function ExecutionHistory(props: {
               </button>
             )}
           </div>
-          <button
-            type="button"
+          <CompactIconButton
             onClick={() => setEditingId(editing ? null : execution.id)}
-            aria-expanded={editing}
-            aria-label={`${editing ? 'Cancelar edição do' : 'Editar'} registro de ${dateLabel}`}
+            expanded={editing}
+            label={`${editing ? 'Cancelar edição do' : 'Editar'} registro de ${dateLabel}`}
             title={editing ? 'Cancelar edição' : 'Editar registro'}
-            className={`${quietIconButtonClass} -my-1.5 -mr-2 aria-expanded:bg-tinta/[0.07] aria-expanded:text-tinta`}
+            className="-my-1.5 -mr-2"
           >
             <PencilIcon />
-          </button>
+          </CompactIconButton>
         </div>
         {editing && (
           <ExecutionEditForm
@@ -166,18 +161,17 @@ function ExecutionHistory(props: {
                       {start}–{end} ·{' '}
                       {formatDuration(entryMs(entry, execution))}
                     </span>
-                    <button
-                      type="button"
+                    <CompactIconButton
                       onClick={() =>
                         setEditingEntryId(editingEntry ? null : entry.id)
                       }
-                      aria-expanded={editingEntry}
-                      aria-label={`${editingEntry ? 'Cancelar edição da' : 'Editar'} sessão das ${start}`}
+                      expanded={editingEntry}
+                      label={`${editingEntry ? 'Cancelar edição da' : 'Editar'} sessão das ${start}`}
                       title={editingEntry ? 'Cancelar edição' : 'Editar sessão'}
-                      className={`${quietIconButtonClass} -mr-2 aria-expanded:bg-tinta/[0.07] aria-expanded:text-tinta`}
+                      className="-mr-2"
                     >
                       <PencilIcon />
-                    </button>
+                    </CompactIconButton>
                   </div>
                   {editingEntry && (
                     <TimeEntryEditForm

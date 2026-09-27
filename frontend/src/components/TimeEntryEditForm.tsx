@@ -44,8 +44,11 @@ function TimeEntryEditForm(props: {
 
   return (
     <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex flex-col gap-1.5 sm:flex-1">
+      {/* Sempre empilhado: o form vive dentro de um cartão, e na linha única
+          (antes, a partir de sm) os campos de data não encolhiam e empurravam
+          o Salvar pra fora do cartão */}
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
           <span className="text-sm text-tinta-suave">Início</span>
           <input
             type="datetime-local"
@@ -55,7 +58,7 @@ function TimeEntryEditForm(props: {
             className={fieldClass}
           />
         </label>
-        <label className="flex flex-col gap-1.5 sm:flex-1">
+        <label className="flex flex-col gap-1.5">
           <span className="text-sm text-tinta-suave">Fim</span>
           <input
             type="datetime-local"
@@ -68,7 +71,7 @@ function TimeEntryEditForm(props: {
         <button
           type="submit"
           disabled={submitting}
-          className={primaryButtonClass}
+          className={`w-full ${primaryButtonClass}`}
         >
           Salvar
         </button>
