@@ -9,9 +9,11 @@ import type { LoadStatus } from '../types'
 // polegar); a partir de sm, fica no topo como pílulas só de texto
 function navLinkClass({ isActive }: { isActive: boolean }) {
   const base = `flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-xs font-medium sm:h-10 sm:flex-row sm:rounded-full sm:px-3.5 sm:py-0 sm:text-sm ${focusRing}`
+  // No celular a barra é vidro, e texto sobre vidro é sempre `tinta`: o
+  // ativo se destaca pelo negrito e pela pílula, não pela cor dos outros
   return isActive
-    ? `${base} text-tinta sm:bg-tinta sm:text-papel`
-    : `${base} text-tinta-suave hover:text-tinta`
+    ? `${base} text-tinta max-sm:font-bold sm:bg-tinta sm:text-papel`
+    : `${base} text-tinta hover:text-tinta sm:text-tinta-suave`
 }
 
 function NavItem(props: {
@@ -25,7 +27,7 @@ function NavItem(props: {
       {({ isActive }) => (
         <>
           <span
-            className={`inline-flex rounded-full px-4 py-0.5 sm:hidden ${isActive ? 'bg-tinta/[0.07]' : ''}`}
+            className={`inline-flex rounded-full px-4 py-0.5 sm:hidden ${isActive ? 'bg-tinta/[0.12]' : ''}`}
           >
             {props.icon}
           </span>
@@ -52,7 +54,7 @@ function Layout(props: {
       </header>
       <nav
         aria-label="Principal"
-        className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-3 gap-1 border-t border-linha bg-superficie/90 px-3 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mb-6 sm:flex sm:gap-1 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
+        className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-3 gap-1 border-t border-vidro-fio px-3 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] max-sm:vidro sm:static sm:mb-6 sm:flex sm:gap-1 sm:border-0 sm:p-0"
       >
         {/* "end" evita que "/" fique marcada como ativa em "/executar" também */}
         <NavItem to="/" end icon={<ListIcon />} label="Lista" />
