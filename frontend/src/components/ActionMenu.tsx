@@ -54,11 +54,12 @@ function ActionMenu(props: { label: string; actions: MenuAction[] }) {
         <MoreIcon />
       </button>
       {open && (
-        // Sombra só aqui: é o único tipo de elemento que flutua por cima
+        // Flutua por cima do conteúdo: vidro + sombra (mais leve que a de
+        // um menu sólido, o vidro já separa do fundo)
         <div
           role="menu"
           aria-label={props.label}
-          className="absolute top-11 right-0 z-20 min-w-52 rounded-xl border border-linha bg-superficie p-1.5 shadow-lg shadow-black/15"
+          className="absolute top-11 right-0 z-20 min-w-52 rounded-xl border border-vidro-fio p-1.5 shadow-lg shadow-black/10 vidro"
         >
           {props.actions.map((action) => (
             <button
@@ -71,7 +72,8 @@ function ActionMenu(props: { label: string; actions: MenuAction[] }) {
               }}
               className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap hover:bg-tinta/[0.07] ${focusRing}`}
             >
-              <span className="text-tinta-suave">{action.icon}</span>
+              {/* Sobre vidro, ícone também em `tinta` */}
+              <span className="text-tinta">{action.icon}</span>
               {action.label}
             </button>
           ))}
