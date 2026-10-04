@@ -1,0 +1,6 @@
+# Quebra de linha sempre LF, no repositório e na pasta de trabalho, em
+# qualquer sistema — igual ao .editorconfig e ao Prettier (end_of_line = lf).
+# Sem isso, o core.autocrlf=true do Git for Windows reescrevia arquivos com
+# CRLF a cada checkout/stash e o format:check acusava o arquivo inteiro.
+# text=auto: o git decide sozinho o que é texto; binário não é tocado.
+* text=auto eol=lf
