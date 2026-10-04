@@ -73,6 +73,14 @@
   body {
     @apply min-h-dvh bg-papel font-interface text-tinta antialiased;
   }
+
+  /* Topo fixo no desktop (65px): foco por teclado para abaixo dele, em
+     vez de ficar escondido atrás (5rem = 65px + folga) */
+  @media (width >= 40rem) {
+    html {
+      scroll-padding-top: 5rem;
+    }
+  }
 }
 
 @keyframes pulsa {

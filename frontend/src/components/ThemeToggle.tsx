@@ -42,7 +42,8 @@ function ThemeToggle() {
       onClick={toggle}
       aria-label={label}
       title={label}
-      className={quietIconButtonClass}
+      // No desktop fica sobre o vidro do topo: lá, sempre `tinta`
+      className={`${quietIconButtonClass} sm:text-tinta`}
     >
       {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>
