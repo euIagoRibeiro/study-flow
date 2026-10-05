@@ -20,6 +20,11 @@ export type TaskExecution = {
   // atual: editar o molde não pode reescrever como o passado aparece.
   taskTitleAtTime: string
   taskFrequencyAtTime: Frequency
+  // Raiz das tags da execução (null = sem tag) e o conjunto gravado: o
+  // fechamento do que foi escolhido (nível 3 vem com o nível 2 pai). A tela
+  // mostra só as folhas
+  rootTagId: string | null
+  tagIds: string[]
 }
 
 // Execução que já foi concluída: completedAt deixa de aceitar null
@@ -30,6 +35,16 @@ export type TimeEntry = {
   taskExecutionId: string
   startedAt: string
   endedAt: string | null // null enquanto está rodando
+}
+
+// Até 3 níveis: raiz (contexto) › filho › neto. Nível e raiz quem calcula
+// é o servidor, a partir do pai
+export type Tag = {
+  id: string
+  name: string
+  parentId: string | null
+  level: 1 | 2 | 3
+  active: boolean
 }
 
 export type LoadStatus = 'loading' | 'error' | 'ready'

@@ -124,6 +124,15 @@ export function PlusIcon() {
   )
 }
 
+export function TagIcon() {
+  return (
+    <svg {...commonProps}>
+      <path d="M3.5 12V4.5a1 1 0 0 1 1-1H12l8.5 8.5-8.5 8.5z" />
+      <circle cx="8" cy="8" r="1.25" />
+    </svg>
+  )
+}
+
 export function AlertIcon() {
   return (
     <svg {...commonProps} className="h-4 w-4 shrink-0">

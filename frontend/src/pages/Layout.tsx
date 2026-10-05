@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import ThemeToggle from '../components/ThemeToggle'
-import { HistoryIcon, ListIcon, TimerIcon } from '../components/icons'
+import { HistoryIcon, ListIcon, TagIcon, TimerIcon } from '../components/icons'
 import { focusRing, inlineButtonClass, secondaryButtonClass } from '../styles'
 import type { LoadStatus } from '../types'
 
@@ -50,7 +50,7 @@ function Layout(props: {
           viraria a referência dos filhos `fixed`, e a barra do celular
           (que mora aqui dentro) deixaria de grudar no rodapé da tela */}
       <div className="sm:sticky sm:top-0 sm:z-20 sm:border-b sm:border-vidro-fio sm:vidro">
-        {/* Ordem = ordem visual do desktop (e do Tab): título, nav, tema */}
+        {/* Ordem = ordem visual do desktop (e do Tab): título, nav, tags, tema */}
         <header className="mx-auto flex max-w-xl items-center gap-4 px-4 pt-6 pb-3 sm:h-16 sm:py-0">
           <h1 className="mr-auto font-titulo text-xl font-bold tracking-tight">
             StudyFlow
@@ -64,6 +64,23 @@ function Layout(props: {
             <NavItem to="/executar" icon={<TimerIcon />} label="Executar" />
             <NavItem to="/historico" icon={<HistoryIcon />} label="Histórico" />
           </nav>
+          {/* Configuração, não uso diário: fica no topo, fora da barra de baixo */}
+          <NavLink
+            to="/tags"
+            aria-label="Tags"
+            title="Tags"
+            // Uma cor por estado (somar classes de cor no mesmo nível deixa o
+            // resultado depender da ordem do CSS gerado)
+            className={({ isActive }) =>
+              `flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${focusRing} ${
+                isActive
+                  ? 'bg-tinta/[0.09] text-tinta'
+                  : 'text-tinta-suave hover:bg-tinta/[0.07] hover:text-tinta sm:text-tinta'
+              }`
+            }
+          >
+            <TagIcon />
+          </NavLink>
           <ThemeToggle />
         </header>
       </div>

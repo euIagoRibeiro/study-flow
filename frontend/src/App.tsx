@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { ApiError } from './api/client'
 import * as executionsApi from './api/executions'
+import * as tagsApi from './api/tags'
 import * as tasksApi from './api/tasks'
 import * as timeEntriesApi from './api/timeEntries'
 import ExecutePage from './pages/ExecutePage'
 import HistoricoPage from './pages/HistoricoPage'
 import Layout from './pages/Layout'
+import TagsPage from './pages/TagsPage'
 import TaskListPage from './pages/TaskListPage'
 import type {
   LoadStatus,
   NewTask,
+  Tag,
   Task,
   TaskExecution,
   TimeEntry,
@@ -30,20 +33,23 @@ function App() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [executions, setExecutions] = useState<TaskExecution[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
 
   useEffect(() => {
     let ignore = false
-    // As três saem juntas; se qualquer uma falhar, o carregamento todo falha
+    // As quatro saem juntas; se qualquer uma falhar, o carregamento todo falha
     Promise.all([
       tasksApi.listTasks(),
       executionsApi.listExecutions(),
       timeEntriesApi.listTimeEntries(),
+      tagsApi.listTags(),
     ])
-      .then(([taskList, executionList, timeEntryList]) => {
+      .then(([taskList, executionList, timeEntryList, tagList]) => {
         if (ignore) return
         setTasks(taskList)
         setExecutions(executionList)
         setTimeEntries(timeEntryList)
+        setTags(tagList)
         setStatus('ready')
       })
       .catch((error) => {
@@ -320,6 +326,10 @@ function App() {
               onEditTimeEntry={editTimeEntry}
             />
           }
+        />
+        <Route
+          path="/tags"
+          element={<TagsPage tags={tags} executions={executions} />}
         />
       </Route>
     </Routes>
