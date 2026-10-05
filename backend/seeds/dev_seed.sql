@@ -100,4 +100,26 @@ INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES
   -- Docker Compose: 1h30
   ('5eed0000-0000-4000-8000-000000000702', (SELECT t FROM ancora) - interval '30 days 1 hour 30 minutes', (SELECT t FROM ancora) - interval '30 days');
 
+-- Tags (até 3 níveis). Bloco de ids próprio (4000-9000): centena = raiz,
+-- dezena = filho, unidade = neto. "Matemática" aparece duas vezes de
+-- propósito (dentro do Vestibular e solta): são tags diferentes. Pais antes
+-- dos filhos, por causa das FKs.
+INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
+  ('5eed0000-0000-4000-9000-000000000100', 'Vestibular', 1, NULL, NULL, true),
+  ('5eed0000-0000-4000-9000-000000000200', 'Matemática', 1, NULL, NULL, true),
+  ('5eed0000-0000-4000-9000-000000000300', 'Exercícios', 1, NULL, NULL, true);
+
+INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
+  ('5eed0000-0000-4000-9000-000000000110', 'Matemática', 2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
+  ('5eed0000-0000-4000-9000-000000000120', 'Física',     2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
+  ('5eed0000-0000-4000-9000-000000000130', 'Pesquisa',   2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
+  ('5eed0000-0000-4000-9000-000000000310', 'Academia',   2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
+  ('5eed0000-0000-4000-9000-000000000320', 'Casa',       2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
+  ('5eed0000-0000-4000-9000-000000000330', 'Corrida',    2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
+  ('5eed0000-0000-4000-9000-000000000340', 'Natação',    2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', false);
+
+INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
+  ('5eed0000-0000-4000-9000-000000000111', 'Álgebra', 3, '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', true),
+  ('5eed0000-0000-4000-9000-000000000112', 'Frações', 3, '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', true);
+
 COMMIT;
