@@ -1,6 +1,24 @@
-import { useState } from 'react'
-import { chipClass } from '../styles'
+import { useEffect, useState } from 'react'
+import { ChevronDownIcon } from '../components/icons'
+import { chipClass, focusRing } from '../styles'
 import type { Tag, TaskExecution } from '../types'
+
+// Quais tags estão abertas: conveniência de quem olha a tela (só neste
+// navegador), não dado do app — por isso localStorage, não o banco. Se o
+// armazenamento estiver bloqueado, começa tudo fechado
+const OPEN_KEY = 'studyflow:tags-abertas'
+
+function readOpen(existing: Tag[]): Set<string> {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '[]')
+    if (!Array.isArray(saved)) return new Set()
+    // Tags apagadas desde a última visita saem da lista
+    const ids = new Set(existing.map((tag) => tag.id))
+    return new Set(saved.filter((id) => ids.has(id)))
+  } catch {
+    return new Set()
+  }
+}
 
 // Mesma superfície do cardClass, com menos respiro: as linhas já têm 44px
 const tagCardClass =
@@ -20,6 +38,24 @@ function registros(count: number) {
 
 function TagsPage(props: { tags: Tag[]; executions: TaskExecution[] }) {
   const [showArchived, setShowArchived] = useState(false)
+  const [open, setOpen] = useState(() => readOpen(props.tags))
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify([...open]))
+    } catch {
+      // Sem armazenamento: só não lembra na próxima visita
+    }
+  }, [open])
+
+  function toggle(id: string) {
+    setOpen((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   // Registros = execuções concluídas que passam pela tag. tagIds já é o
   // fechamento, então "Matemática" conta também as de Álgebra/Frações
@@ -41,21 +77,42 @@ function TagsPage(props: { tags: Tag[]; executions: TaskExecution[] }) {
 
   function renderTag(tag: Tag) {
     const children = childrenOf(tag.id)
+    const isOpen = open.has(tag.id)
+    const listId = `subtags-${tag.id}`
+    const nameStyle = `${nameClass[tag.level]} ${tag.active ? '' : 'text-tinta-suave'}`
     return (
       <li key={tag.id}>
         <div className="flex min-h-11 items-center gap-2 pr-2">
-          <span
-            className={`min-w-0 flex-1 break-words ${nameClass[tag.level]} ${tag.active ? '' : 'text-tinta-suave'}`}
-          >
-            {tag.name}
-          </span>
+          {children.length > 0 ? (
+            // Nome + seta = um botão só (mesmo padrão do "2 sessões ⌄"):
+            // alvo grande no celular, e o estado vai no aria-expanded
+            <button
+              type="button"
+              onClick={() => toggle(tag.id)}
+              aria-expanded={isOpen}
+              aria-controls={listId}
+              aria-label={`Subtags de ${tag.name}`}
+              className={`flex min-h-11 min-w-0 items-center gap-1 rounded-md text-left break-words ${nameStyle} ${focusRing}`}
+            >
+              {tag.name}
+              <ChevronDownIcon
+                className={`h-4 w-4 shrink-0 text-tinta-suave transition-transform ${isOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+          ) : (
+            <span className={`min-w-0 break-words ${nameStyle}`}>
+              {tag.name}
+            </span>
+          )}
+          <span className="flex-1" />
           {!tag.active && <span className={chipClass}>Arquivada</span>}
           <span className="shrink-0 font-dados text-meta text-tinta-suave tabular-nums">
             {registros(counts.get(tag.id) ?? 0)}
           </span>
         </div>
-        {children.length > 0 && (
-          <ul className="ml-1.5 border-l border-linha pl-3">
+        {/* Fechada: nem renderiza, então o Tab não para em nada escondido */}
+        {children.length > 0 && isOpen && (
+          <ul id={listId} className="ml-1.5 border-l border-linha pl-3">
             {children.map(renderTag)}
           </ul>
         )}
