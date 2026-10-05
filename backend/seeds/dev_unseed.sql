@@ -1,6 +1,7 @@
 -- Remove só os dados do dev_seed.sql (ids começando com 5eed), sem tocar
--- nos seus. A ordem importa por causa dos ON DELETE RESTRICT: sessões,
--- depois execuções, depois tarefas; tags dos netos pras raízes.
+-- nos seus. A ordem importa por causa dos ON DELETE RESTRICT: sessões e
+-- ligações de tags, depois execuções, depois tarefas; tags dos netos pras
+-- raízes.
 --
 -- Se você registrou uma execução de verdade numa tarefa fictícia (ou criou
 -- uma tag sua dentro de uma tag fictícia), o RESTRICT recusa e a transação
@@ -9,6 +10,9 @@
 BEGIN;
 
 DELETE FROM time_entries
+WHERE task_execution_id::text LIKE '5eed%';
+
+DELETE FROM task_execution_tags
 WHERE task_execution_id::text LIKE '5eed%';
 
 DELETE FROM task_executions

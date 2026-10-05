@@ -32,7 +32,10 @@ INSERT INTO tasks (id, title, frequency, active, created_at) VALUES
   ('5eed0000-0000-4000-8000-000000000005', 'Organizar finanças',     'monthly', true,  now() - interval '56 days'),
   ('5eed0000-0000-4000-8000-000000000006', 'Exercício físico',       'none',    true,  now() - interval '55 days'),
   ('5eed0000-0000-4000-8000-000000000007', 'Curso de Docker',        'weekly',  false, now() - interval '54 days'),
-  ('5eed0000-0000-4000-8000-000000000008', 'Ideias de projeto',      'none',    true,  now() - interval '53 days');
+  ('5eed0000-0000-4000-8000-000000000008', 'Ideias de projeto',      'none',    true,  now() - interval '53 days'),
+  -- As duas abaixo existem pra ter execuções com tags (bloco no fim)
+  ('5eed0000-0000-4000-8000-000000000009', 'Estudar para o vestibular', 'daily', true, now() - interval '52 days'),
+  ('5eed0000-0000-4000-8000-000000000010', 'Matemática por diversão',   'none',  true, now() - interval '51 days');
 
 -- Execuções. completed_at NULL = em andamento (2: uma rodando, uma pausada)
 INSERT INTO task_executions
@@ -113,6 +116,7 @@ INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
   ('5eed0000-0000-4000-9000-000000000110', 'Matemática', 2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
   ('5eed0000-0000-4000-9000-000000000120', 'Física',     2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
   ('5eed0000-0000-4000-9000-000000000130', 'Pesquisa',   2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
+  ('5eed0000-0000-4000-9000-000000000210', 'Álgebra',    2, '5eed0000-0000-4000-9000-000000000200', '5eed0000-0000-4000-9000-000000000200', true),
   ('5eed0000-0000-4000-9000-000000000310', 'Academia',   2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
   ('5eed0000-0000-4000-9000-000000000320', 'Casa',       2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
   ('5eed0000-0000-4000-9000-000000000330', 'Corrida',    2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
@@ -121,5 +125,54 @@ INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
 INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
   ('5eed0000-0000-4000-9000-000000000111', 'Álgebra', 3, '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', true),
   ('5eed0000-0000-4000-9000-000000000112', 'Frações', 3, '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', true);
+
+-- Execuções com tags: aqui no fim porque a raiz (root_tag_id) tem que
+-- apontar pra uma tag que já existe. Cada caso de marcação aparece uma
+-- vez; as outras execuções do seed ficam sem tag, de propósito.
+INSERT INTO task_executions
+  (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id)
+VALUES
+  ('5eed0000-0000-4000-8000-000000000901', '5eed0000-0000-4000-8000-000000000009', 'Equações do 2º grau',           'Estudar para o vestibular', 'daily', (SELECT t FROM ancora) - interval '1 hour',  '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000902', '5eed0000-0000-4000-8000-000000000009', 'Exercícios de frações',         'Estudar para o vestibular', 'daily', (SELECT t FROM ancora) - interval '1 day',   '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000903', '5eed0000-0000-4000-8000-000000000009', 'Cinemática',                    'Estudar para o vestibular', 'daily', (SELECT t FROM ancora) - interval '2 days',  '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000904', '5eed0000-0000-4000-8000-000000000009', 'Organizei o cronograma',        'Estudar para o vestibular', 'daily', (SELECT t FROM ancora) - interval '3 days',  '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000905', '5eed0000-0000-4000-8000-000000000009', 'Edital e peso das matérias',    'Estudar para o vestibular', 'daily', (SELECT t FROM ancora) - interval '5 days',  '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000906', '5eed0000-0000-4000-8000-000000000009', 'Revisão geral de matemática',   'Estudar para o vestibular', 'daily', (SELECT t FROM ancora) - interval '6 days',  '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000907', '5eed0000-0000-4000-8000-000000000009', 'Lista de exercícios',           'Estudar para o vestibular', 'daily', (SELECT t FROM ancora) - interval '9 days',  '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000001001', '5eed0000-0000-4000-8000-000000000010', 'Álgebra linear por curiosidade', 'Matemática por diversão',  'none',  (SELECT t FROM ancora) - interval '12 days', '5eed0000-0000-4000-9000-000000000200');
+
+UPDATE task_executions SET root_tag_id = '5eed0000-0000-4000-9000-000000000300'
+WHERE id IN ('5eed0000-0000-4000-8000-000000000601', '5eed0000-0000-4000-8000-000000000602');
+
+-- Gravado como a API grava: o FECHAMENTO (nível 3 traz o nível 2 pai).
+-- 901 Álgebra · 902 Frações · 903 Física · 904 só a raiz (sem matéria) ·
+-- 905 Pesquisa · 906 Álgebra + Frações · 907 Matemática sem tema ·
+-- 1001 Matemática (solta) › Álgebra · 601 Corrida · 602 Academia
+INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id) VALUES
+  ('5eed0000-0000-4000-8000-000000000901', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000901', '5eed0000-0000-4000-9000-000000000111', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000902', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000902', '5eed0000-0000-4000-9000-000000000112', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000903', '5eed0000-0000-4000-9000-000000000120', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000905', '5eed0000-0000-4000-9000-000000000130', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000906', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000906', '5eed0000-0000-4000-9000-000000000111', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000906', '5eed0000-0000-4000-9000-000000000112', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000000907', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-8000-000000001001', '5eed0000-0000-4000-9000-000000000210', '5eed0000-0000-4000-9000-000000000200', '5eed0000-0000-4000-9000-000000000200'),
+  ('5eed0000-0000-4000-8000-000000000601', '5eed0000-0000-4000-9000-000000000330', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000000602', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300');
+
+-- Sessões das execuções com tag (907 sem cronômetro: "Registrar" direto)
+INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES
+  ('5eed0000-0000-4000-8000-000000000901', (SELECT t FROM ancora) - interval '1 hour 50 minutes', (SELECT t FROM ancora) - interval '1 hour'),
+  ('5eed0000-0000-4000-8000-000000000902', (SELECT t FROM ancora) - interval '1 day 40 minutes', (SELECT t FROM ancora) - interval '1 day'),
+  ('5eed0000-0000-4000-8000-000000000903', (SELECT t FROM ancora) - interval '2 days 1 hour', (SELECT t FROM ancora) - interval '2 days'),
+  ('5eed0000-0000-4000-8000-000000000904', (SELECT t FROM ancora) - interval '3 days 20 minutes', (SELECT t FROM ancora) - interval '3 days'),
+  ('5eed0000-0000-4000-8000-000000000905', (SELECT t FROM ancora) - interval '5 days 30 minutes', (SELECT t FROM ancora) - interval '5 days'),
+  -- Revisão geral: 2 sessões (40 + 40 min)
+  ('5eed0000-0000-4000-8000-000000000906', (SELECT t FROM ancora) - interval '6 days 1 hour 30 minutes', (SELECT t FROM ancora) - interval '6 days 50 minutes'),
+  ('5eed0000-0000-4000-8000-000000000906', (SELECT t FROM ancora) - interval '6 days 40 minutes', (SELECT t FROM ancora) - interval '6 days'),
+  ('5eed0000-0000-4000-8000-000000001001', (SELECT t FROM ancora) - interval '12 days 45 minutes', (SELECT t FROM ancora) - interval '12 days');
 
 COMMIT;
