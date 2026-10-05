@@ -172,8 +172,8 @@ tagsRouter.patch('/:id', async (req, res) => {
   }
 })
 
-// Só tag sem subtags (e, a partir da T3, nunca usada em execução — o
-// banco recusa); o caminho pra tag usada é arquivar
+// Só tag sem subtags e nunca usada em execução (o banco recusa as duas);
+// o caminho pra tag usada é arquivar
 tagsRouter.delete('/:id', async (req, res) => {
   if (!isUuid(req.params.id)) {
     return res.status(404).json({ error: NOT_FOUND })
@@ -187,6 +187,16 @@ tagsRouter.delete('/:id', async (req, res) => {
     }
     res.status(204).end()
   } catch (err) {
+    // Usada: como raiz de uma execução, ou ligada a uma (migration 0005)
+    if (
+      err.code === '23503' &&
+      (err.constraint === 'task_executions_root_tag_is_root' ||
+        err.constraint?.startsWith('task_execution_tags_'))
+    ) {
+      return res.status(409).json({
+        error: 'Esta tag está em uso em execuções: arquive em vez de apagar',
+      })
+    }
     if (err.code === '23503' && err.constraint?.startsWith('tags_')) {
       return res.status(409).json({
         error: 'Esta tag tem subtags: apague ou arquive as subtags antes',
