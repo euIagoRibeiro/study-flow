@@ -50,8 +50,10 @@ function TaskForm(props: {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex flex-col gap-1.5 sm:flex-1">
+      {/* Sempre empilhado: ele mora em cartões de no máximo 544px − padding,
+          e em linha (decidido pela largura da janela) vazava no desktop */}
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
           <span className="text-sm text-tinta-suave">
             {isEditing ? 'Título' : 'Nova tarefa'}
           </span>
@@ -86,7 +88,7 @@ function TaskForm(props: {
             <button
               type="button"
               onClick={props.onCancel}
-              className={`flex-1 sm:flex-none ${secondaryButtonClass}`}
+              className={`flex-1 ${secondaryButtonClass}`}
             >
               Cancelar
             </button>
@@ -94,7 +96,7 @@ function TaskForm(props: {
           <button
             type="submit"
             disabled={submitting}
-            className={`flex-1 sm:flex-none ${primaryButtonClass}`}
+            className={`flex-1 ${primaryButtonClass}`}
           >
             {isEditing ? 'Salvar' : 'Adicionar'}
           </button>
