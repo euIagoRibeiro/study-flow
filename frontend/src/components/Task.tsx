@@ -127,9 +127,9 @@ function Task(props: {
 
   return (
     <li>
-      <article
-        className={`${cardClass} flex flex-col gap-2 ${active ? '' : 'opacity-75'}`}
-      >
+      {/* Arquivada: tinta-suave + chip, sem opacity no cartão (apagar duas
+          vezes derrubava o contraste). Uma cor por estado: o grifo ganha */}
+      <article className={`${cardClass} flex flex-col gap-2`}>
         <div className="flex items-start gap-2">
           <h3 className="min-w-0 flex-1 pt-1.5 font-titulo text-base font-semibold break-words">
             <span
@@ -137,7 +137,9 @@ function Task(props: {
               className={`transition-colors duration-300 ${
                 doneToday
                   ? '-mx-1 box-decoration-clone bg-marca-texto px-1 text-sobre-marca'
-                  : ''
+                  : active
+                    ? ''
+                    : 'text-tinta-suave'
               }`}
             >
               {title}
