@@ -271,6 +271,67 @@ function App() {
     }
   }
 
+  // Só os campos de Tag (a resposta do PATCH traz archivedDescendants junto)
+  function replaceTag(updated: Tag) {
+    const tag: Tag = {
+      id: updated.id,
+      name: updated.name,
+      parentId: updated.parentId,
+      level: updated.level,
+      active: updated.active,
+    }
+    setTags((current) => current.map((t) => (t.id === tag.id ? tag : t)))
+  }
+
+  // Botões soltos (arquivar, reativar, apagar): o erro vai pro Layout, com
+  // o motivo do servidor quando houver
+  function tagError(error: unknown, fallback: string) {
+    console.error(error)
+    setSaveError(error instanceof ApiError ? error.message : fallback)
+  }
+
+  // Criar e renomear: o erro sobe pro TagForm, que mostra o motivo
+  async function addTag(name: string, parentId: string | null) {
+    const tag = await tagsApi.createTag(name, parentId)
+    setTags((current) => [...current, tag])
+  }
+
+  async function renameTag(id: string, name: string) {
+    replaceTag(await tagsApi.renameTag(id, name))
+  }
+
+  async function archiveTag(id: string) {
+    try {
+      const updated = await tagsApi.archiveTag(id)
+      // A cascata vem pronta do servidor: arquiva a subárvore aqui também
+      const archived = new Set([id, ...updated.archivedDescendants])
+      setTags((current) =>
+        current.map((tag) =>
+          archived.has(tag.id) ? { ...tag, active: false } : tag,
+        ),
+      )
+    } catch (error) {
+      tagError(error, 'Não foi possível arquivar a tag. Tente de novo.')
+    }
+  }
+
+  async function reactivateTag(id: string) {
+    try {
+      replaceTag(await tagsApi.reactivateTag(id))
+    } catch (error) {
+      tagError(error, 'Não foi possível reativar a tag. Tente de novo.')
+    }
+  }
+
+  async function deleteTag(id: string) {
+    try {
+      await tagsApi.deleteTag(id)
+      setTags((current) => current.filter((tag) => tag.id !== id))
+    } catch (error) {
+      tagError(error, 'Não foi possível apagar a tag. Tente de novo.')
+    }
+  }
+
   return (
     <Routes>
       <Route
@@ -329,7 +390,17 @@ function App() {
         />
         <Route
           path="/tags"
-          element={<TagsPage tags={tags} executions={executions} />}
+          element={
+            <TagsPage
+              tags={tags}
+              executions={executions}
+              onCreate={addTag}
+              onRename={renameTag}
+              onArchive={archiveTag}
+              onReactivate={reactivateTag}
+              onDelete={deleteTag}
+            />
+          }
         />
       </Route>
     </Routes>

@@ -133,6 +133,23 @@ export function TagIcon() {
   )
 }
 
+export function TrashIcon() {
+  return (
+    <svg {...commonProps}>
+      <path d="M4 7h16M9.5 7V4.5h5V7M6 7l1 13h10l1-13M10 11v5M14 11v5" />
+    </svg>
+  )
+}
+
+export function LockIcon() {
+  return (
+    <svg {...commonProps}>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" />
+      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+    </svg>
+  )
+}
+
 export function AlertIcon() {
   return (
     <svg {...commonProps} className="h-4 w-4 shrink-0">

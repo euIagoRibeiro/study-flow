@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { focusRing, quietIconButtonClass } from '../styles'
-import { MoreIcon } from './icons'
+import { LockIcon, MoreIcon } from './icons'
 
 export type MenuAction = {
   label: string
   icon: ReactNode
   onSelect: () => void
+  // Indisponível: continua na lista (com o motivo em `hint`) em vez de
+  // sumir sem explicação
+  disabled?: boolean
+  hint?: string
 }
 
-function ActionMenu(props: { label: string; actions: MenuAction[] }) {
+function ActionMenu(props: {
+  label: string
+  actions: MenuAction[]
+  // Margens negativas pensadas pro cabeçalho do cartão de tarefa
+  placement?: string
+}) {
   const [open, setOpen] = useState(false)
   // useRef guarda o elemento real da página, pra saber se um toque foi
   // dentro ou fora do menu — mudar o ref não re-renderiza
@@ -40,7 +49,10 @@ function ActionMenu(props: { label: string; actions: MenuAction[] }) {
   }, [open])
 
   return (
-    <div ref={rootRef} className="relative -mt-2 -mr-2">
+    <div
+      ref={rootRef}
+      className={`relative ${props.placement ?? '-mt-2 -mr-2'}`}
+    >
       <button
         ref={buttonRef}
         type="button"
@@ -61,22 +73,48 @@ function ActionMenu(props: { label: string; actions: MenuAction[] }) {
           aria-label={props.label}
           className="absolute top-11 right-0 z-20 min-w-52 rounded-xl border border-vidro-fio p-1.5 shadow-lg shadow-black/10 vidro"
         >
-          {props.actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false)
-                action.onSelect()
-              }}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap hover:bg-tinta/[0.07] ${focusRing}`}
-            >
-              {/* Sobre vidro, ícone também em `tinta` */}
-              <span className="text-tinta">{action.icon}</span>
-              {action.label}
-            </button>
-          ))}
+          {props.actions.map((action) =>
+            action.disabled ? (
+              // Em `tinta`, não em tinta-suave: sobre o vidro, suave não
+              // chega a 4.5:1. O "indisponível" vem do cadeado, da falta de
+              // hover/clique e do aria-disabled (continua focável, pro leitor
+              // de tela chegar no motivo)
+              <button
+                key={action.label}
+                type="button"
+                role="menuitem"
+                aria-disabled="true"
+                className={`flex w-full cursor-not-allowed items-start gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm ${focusRing}`}
+              >
+                <span className="text-tinta">
+                  <LockIcon />
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  {action.label}
+                  {action.hint && (
+                    <span className="max-w-48 font-texto text-xs leading-snug">
+                      {action.hint}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ) : (
+              <button
+                key={action.label}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false)
+                  action.onSelect()
+                }}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap hover:bg-tinta/[0.07] ${focusRing}`}
+              >
+                {/* Sobre vidro, ícone também em `tinta` */}
+                <span className="text-tinta">{action.icon}</span>
+                {action.label}
+              </button>
+            ),
+          )}
         </div>
       )}
     </div>
