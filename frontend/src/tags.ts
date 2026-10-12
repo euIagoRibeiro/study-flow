@@ -1,4 +1,4 @@
-import type { Tag, TaskExecution } from './types'
+import type { CompletedExecution, Tag, TagChoice, TaskExecution } from './types'
 
 export type TagIndex = Map<string, Tag>
 
@@ -41,4 +41,50 @@ export function leafTags(
   return tags
     .filter((tag) => !parents.has(tag.id))
     .sort((a, b) => compareNames(tagPath(a, byId), tagPath(b, byId)))
+}
+
+// Caminho escolhido nos campos (até 3 ids, da raiz pra baixo) → o que vai
+// pro servidor: a raiz e só a tag mais específica
+export function pathToChoice(path: string[]): TagChoice {
+  return {
+    rootTagId: path[0] ?? null,
+    tagIds: path.length > 1 ? [path[path.length - 1]] : [],
+  }
+}
+
+// O caminho de um registro que já tem tags (ex.: reabrir pelo Desfazer).
+// Registro com mais de uma folha (só dado antigo) fica pra T5c
+export function executionPath(
+  execution: Pick<TaskExecution, 'rootTagId' | 'tagIds'>,
+  byId: TagIndex,
+): string[] {
+  const leaves = leafTags(execution, byId)
+  return leaves.length === 1
+    ? tagLineage(leaves[0], byId).map((tag) => tag.id)
+    : []
+}
+
+// Pré-seleção: o contexto do registro concluído mais recente dessa tarefa
+// que tinha tag (registros sem tag no meio não contam), só se ainda ativo
+export function lastRootPath(
+  executions: TaskExecution[],
+  taskId: string,
+  byId: TagIndex,
+): string[] {
+  const last = executions
+    .filter(
+      (execution): execution is CompletedExecution =>
+        execution.taskId === taskId &&
+        execution.completedAt !== null &&
+        execution.rootTagId !== null,
+    )
+    .reduce<CompletedExecution | null>(
+      (latest, execution) =>
+        latest === null || execution.completedAt > latest.completedAt
+          ? execution
+          : latest,
+      null,
+    )
+  const root = last?.rootTagId ? byId.get(last.rootTagId) : undefined
+  return root?.active ? [root.id] : []
 }

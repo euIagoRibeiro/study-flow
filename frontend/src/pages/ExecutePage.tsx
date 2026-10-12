@@ -16,9 +16,12 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
+import { executionPath, indexTags, lastRootPath } from '../tags'
 import type {
   Frequency,
   NewTask,
+  Tag,
+  TagChoice,
   Task,
   TaskExecution,
   TimeEntry,
@@ -33,15 +36,25 @@ function ExecutePage(props: {
   tasks: Task[]
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
+  tags: Tag[]
   onCreate: (task: NewTask) => Promise<string>
-  onExecute: (taskId: string, description: string) => Promise<void>
+  onExecute: (
+    taskId: string,
+    description: string,
+    tags: TagChoice,
+  ) => Promise<void>
   onStartTimer: (taskId: string) => Promise<string | null>
   onStopTimer: (timeEntryId: string) => Promise<void>
   onResumeTimer: (executionId: string) => Promise<string | null>
-  onFinishExecution: (executionId: string, description: string) => Promise<void>
+  onFinishExecution: (
+    executionId: string,
+    description: string,
+    tags: TagChoice,
+  ) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,
     previousDescription: string | null,
+    previousTags: TagChoice,
     resumeEntryId: string | null,
   ) => Promise<void>
 }) {
@@ -55,6 +68,7 @@ function ExecutePage(props: {
   const [pendingUndo, setPendingUndo] = useState<{
     executionId: string
     previousDescription: string | null
+    previousTags: TagChoice
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
@@ -82,9 +96,9 @@ function ExecutePage(props: {
   }
 
   // Se o servidor recusar, o erro sobe pro ExecutionForm e não navega
-  async function handleExecute(description: string) {
+  async function handleExecute(description: string, tags: TagChoice) {
     if (selectedTask === undefined) return
-    await props.onExecute(selectedTask.id, description)
+    await props.onExecute(selectedTask.id, description, tags)
     navigate('/')
   }
 
@@ -96,16 +110,24 @@ function ExecutePage(props: {
   }
 
   // Capturado antes do await: depois dele, a execução já está finalizada
-  async function handleFinish(executionId: string, description: string) {
+  async function handleFinish(
+    executionId: string,
+    description: string,
+    tags: TagChoice,
+  ) {
     const execution = props.executions.find((e) => e.id === executionId)
     const resumeEntry = props.timeEntries.find(
       (entry) =>
         entry.taskExecutionId === executionId && entry.endedAt === null,
     )
-    await props.onFinishExecution(executionId, description)
+    await props.onFinishExecution(executionId, description, tags)
     setPendingUndo({
       executionId,
       previousDescription: execution?.description ?? null,
+      previousTags: {
+        rootTagId: execution?.rootTagId ?? null,
+        tagIds: execution?.tagIds ?? [],
+      },
       resumeEntryId: resumeEntry?.id ?? null,
     })
   }
@@ -116,6 +138,7 @@ function ExecutePage(props: {
     await props.onUndoFinishExecution(
       pendingUndo.executionId,
       pendingUndo.previousDescription,
+      pendingUndo.previousTags,
       pendingUndo.resumeEntryId,
     )
     setUndoing(false)
@@ -241,6 +264,10 @@ function ExecutePage(props: {
         .sort((a, b) => (a.startedAt > b.startedAt ? 1 : -1))
     : []
   const runningEntry = openEntries.find((entry) => entry.endedAt === null)
+  const tagsById = indexTags(props.tags)
+  const preselected = lastRootPath(props.executions, selectedTask.id, tagsById)
+  // Registro aberto que já tem tags (voltou pelo Desfazer): começa nelas
+  const openPath = openExecution ? executionPath(openExecution, tagsById) : []
   // Rodando em OUTRA tarefa, não nessa — "Registrar" continua liberado (é
   // instantâneo, nunca fica aberto, então não conflita com essa invariante)
   const runningElsewhere = runningEntry
@@ -291,12 +318,15 @@ function ExecutePage(props: {
         />
       ) : openExecution ? (
         <TimerPanel
+          key={openExecution.id}
           execution={openExecution}
           entries={openEntries}
           runningEntry={runningEntry}
           onStop={props.onStopTimer}
           onResume={props.onResumeTimer}
           onFinish={handleFinish}
+          tags={props.tags}
+          initialPath={openPath.length > 0 ? openPath : preselected}
         />
       ) : (
         <>
@@ -341,7 +371,12 @@ function ExecutePage(props: {
           <p className="flex items-center gap-3 text-sm text-tinta-suave before:h-px before:flex-1 before:bg-linha after:h-px after:flex-1 after:bg-linha">
             ou registre sem cronômetro
           </p>
-          <ExecutionForm onSubmit={handleExecute} />
+          <ExecutionForm
+            key={selectedTask.id}
+            tags={props.tags}
+            initialPath={preselected}
+            onSubmit={handleExecute}
+          />
         </>
       )}
     </div>

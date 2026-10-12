@@ -14,6 +14,7 @@ import type {
   LoadStatus,
   NewTask,
   Tag,
+  TagChoice,
   Task,
   TaskExecution,
   TimeEntry,
@@ -96,8 +97,16 @@ function App() {
   }
 
   // Erro sobe pro ExecutionForm, que mostra a mensagem
-  async function addExecution(taskId: string, description: string) {
-    const execution = await executionsApi.createExecution(taskId, description)
+  async function addExecution(
+    taskId: string,
+    description: string,
+    tags: TagChoice,
+  ) {
+    const execution = await executionsApi.createExecution(
+      taskId,
+      description,
+      tags,
+    )
     setExecutions((current) => [...current, execution])
   }
 
@@ -194,10 +203,15 @@ function App() {
   // Servidor primeiro: se falhar, o erro sobe pro TimerPanel e o cronômetro
   // continua rodando. O servidor fecha a sessão rodando com o mesmo
   // completedAt, na mesma transação — aqui só espelha, sem new Date()
-  async function finishExecution(executionId: string, description: string) {
+  async function finishExecution(
+    executionId: string,
+    description: string,
+    tags: TagChoice,
+  ) {
     const execution = await executionsApi.finishExecution(
       executionId,
       description,
+      tags,
     )
     setTimeEntries((current) =>
       current.map((entry) =>
@@ -213,11 +227,16 @@ function App() {
   async function undoFinishExecution(
     executionId: string,
     previousDescription: string | null,
+    previousTags: TagChoice,
     resumeEntryId: string | null,
   ) {
     try {
       replaceExecution(
-        await executionsApi.reopenExecution(executionId, previousDescription),
+        await executionsApi.reopenExecution(
+          executionId,
+          previousDescription,
+          previousTags,
+        ),
       )
     } catch (error) {
       console.error(error)
@@ -368,6 +387,7 @@ function App() {
               tasks={tasks}
               executions={executions}
               timeEntries={timeEntries}
+              tags={tags}
               onCreate={addTask}
               onExecute={addExecution}
               onStartTimer={startTimer}

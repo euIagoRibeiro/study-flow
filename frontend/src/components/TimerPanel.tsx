@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { ApiError } from '../api/client'
 import { formatClock, formatDuration } from '../dates'
 import {
   cardClass,
@@ -6,22 +7,33 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
-import type { TaskExecution, TimeEntry } from '../types'
+import { pathToChoice } from '../tags'
+import type { Tag, TagChoice, TaskExecution, TimeEntry } from '../types'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
+import TagFields from './TagFields'
 
 function TimerPanel(props: {
   execution: TaskExecution
   entries: TimeEntry[] // todas as sessões dessa execução
   runningEntry: TimeEntry | undefined // undefined = pausado
+  tags: Tag[]
+  // Tags que o registro já tem (ex.: voltou pelo Desfazer) ou, sem elas,
+  // a pré-seleção do contexto
+  initialPath: string[]
   onStop: (entryId: string) => Promise<unknown>
   onResume: (executionId: string) => Promise<unknown>
-  onFinish: (executionId: string, description: string) => Promise<unknown>
+  onFinish: (
+    executionId: string,
+    description: string,
+    tags: TagChoice,
+  ) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
   // estreitar o tipo dentro dos closures dos botões, sem precisar de "!"
   const { execution, entries, runningEntry, onStop, onResume, onFinish } = props
   const [description, setDescription] = useState(execution.description ?? '')
+  const [path, setPath] = useState(props.initialPath)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // Pausar/Retomar esperando o servidor: sem isso, clique duplo mandaria
@@ -54,9 +66,13 @@ function TimerPanel(props: {
     event.preventDefault()
     setSubmitting(true)
     try {
-      await onFinish(execution.id, description)
-    } catch {
-      setError('Não foi possível finalizar. Tente de novo.')
+      await onFinish(execution.id, description, pathToChoice(path))
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 400
+          ? err.message
+          : 'Não foi possível finalizar. Tente de novo.',
+      )
       return
     } finally {
       setSubmitting(false)
@@ -120,6 +136,12 @@ function TimerPanel(props: {
             className={fieldClass}
           />
         </label>
+        <TagFields
+          tags={props.tags}
+          value={path}
+          onChange={setPath}
+          keep={props.initialPath}
+        />
         <button
           type="submit"
           disabled={submitting}

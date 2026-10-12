@@ -47,4 +47,12 @@ export type Tag = {
   active: boolean
 }
 
+// O que a tela manda pro servidor: a raiz e, no máximo, a tag mais
+// específica escolhida (um caminho só por registro). O servidor completa
+// o caminho (fechamento)
+export type TagChoice = {
+  rootTagId: string | null
+  tagIds: string[]
+}
+
 export type LoadStatus = 'loading' | 'error' | 'ready'
