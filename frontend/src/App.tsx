@@ -351,6 +351,7 @@ function App() {
               tasks={tasks}
               executions={executions}
               timeEntries={timeEntries}
+              tags={tags}
               onCreate={addTask}
               onEdit={editTask}
               onArchive={archiveTask}
@@ -383,6 +384,7 @@ function App() {
             <HistoricoPage
               executions={executions}
               timeEntries={timeEntries}
+              tags={tags}
               onEditExecution={editExecution}
               onEditTimeEntry={editTimeEntry}
             />

@@ -29,9 +29,13 @@ export const textButtonClass = `inline-flex min-h-8 items-center gap-0.5 rounded
 export const cardClass =
   'rounded-[14px] border border-linha bg-superficie px-4 py-3.5'
 
-// Etiqueta curta: frequência, estado e, depois, as tags
+// Etiqueta curta: frequência, estado
 export const chipClass =
   'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-tinta/[0.07] px-2.5 py-0.5 font-dados text-xs font-medium text-tinta-suave'
+
+// Tag com o caminho completo: pode ser longa, então quebra linha
+export const tagChipClass =
+  'inline-flex max-w-full flex-wrap items-center gap-x-1.5 rounded-xl bg-tinta/[0.07] px-2.5 py-0.5 font-dados text-xs/[1.35] font-medium text-tinta-suave'
 
 export const chipAndamentoClass =
   'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-andamento/[0.13] px-2.5 py-0.5 font-dados text-xs font-medium text-andamento'

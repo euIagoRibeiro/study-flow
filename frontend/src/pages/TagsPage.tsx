@@ -10,6 +10,7 @@ import {
 } from '../components/icons'
 import TagForm from '../components/TagForm'
 import { cardClass, chipClass, focusRing } from '../styles'
+import { compareNames, indexTags, tagPath } from '../tags'
 import type { Tag, TaskExecution } from '../types'
 
 // Quais tags estão abertas: conveniência de quem olha a tela (só neste
@@ -82,11 +83,8 @@ function TagsPage(props: {
     })
   }
 
-  const byId = new Map(props.tags.map((tag) => [tag.id, tag]))
-  const path = (tag: Tag): string => {
-    const parent = tag.parentId ? byId.get(tag.parentId) : undefined
-    return parent ? `${path(parent)} › ${tag.name}` : tag.name
-  }
+  const byId = indexTags(props.tags)
+  const path = (tag: Tag) => tagPath(tag, byId)
 
   // Exibido: registros concluídos que passam pela tag (tagIds já é o
   // fechamento, então "Matemática" conta também Álgebra/Frações).
@@ -109,7 +107,7 @@ function TagsPage(props: {
   // Arquivar desce em cascata (T2): esconder a arquivada já esconde a
   // subárvore dela
   const visible = props.tags.filter((tag) => showArchived || tag.active)
-  const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name, 'pt-BR')
+  const byName = (a: Tag, b: Tag) => compareNames(a.name, b.name)
   const childrenOf = (parentId: string | null) =>
     visible.filter((tag) => tag.parentId === parentId).sort(byName)
   const roots = childrenOf(null)

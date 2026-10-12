@@ -6,8 +6,9 @@ import {
   localDayKey,
 } from '../dates'
 import { frequencyLabels } from '../frequency'
-import { cardClass, chipClass, textButtonClass } from '../styles'
-import type { CompletedExecution, TimeEntry } from '../types'
+import { cardClass, chipClass, tagChipClass, textButtonClass } from '../styles'
+import { indexTags, leafTags, tagLineage } from '../tags'
+import type { CompletedExecution, Tag, TimeEntry } from '../types'
 import CompactIconButton from './CompactIconButton'
 import ExecutionEditForm from './ExecutionEditForm'
 import { ChevronDownIcon, PencilIcon } from './icons'
@@ -29,6 +30,7 @@ function entryMs(entry: TimeEntry, execution: CompletedExecution) {
 function ExecutionHistory(props: {
   executions: CompletedExecution[]
   timeEntries: TimeEntry[]
+  tags: Tag[]
   onEdit: (
     executionId: string,
     changes: { description: string; completedAt: string },
@@ -53,6 +55,8 @@ function ExecutionHistory(props: {
       return next
     })
   }
+
+  const tagsById = indexTags(props.tags)
 
   const sorted = [...props.executions].sort((a, b) =>
     a.completedAt < b.completedAt ? 1 : -1,
@@ -87,6 +91,7 @@ function ExecutionHistory(props: {
     )
     const editing = editingId === execution.id
     const sessionsOpen = openSessions.has(execution.id)
+    const leaves = leafTags(execution, tagsById)
 
     return (
       <article className={`${cardClass} flex flex-col gap-1`}>
@@ -104,6 +109,27 @@ function ExecutionHistory(props: {
           <p className="font-texto text-conteudo break-words">
             {execution.description}
           </p>
+        )}
+        {leaves.length > 0 && (
+          <ul aria-label="Tags" className="flex flex-wrap gap-1.5 py-0.5">
+            {leaves.map((tag) => (
+              <li key={tag.id} className={tagChipClass}>
+                {tagLineage(tag, tagsById)
+                  .slice(0, -1)
+                  .map((ancestor) => (
+                    // O espaço no fim não aparece (fim de item flex), mas
+                    // fica no texto: sem ele, leitor de tela e copiar/colar
+                    // juntam "Exercícios ›Corrida"
+                    <span key={ancestor.id} className="wrap-anywhere">
+                      {`${ancestor.name} › `}
+                    </span>
+                  ))}
+                <span className="font-semibold wrap-anywhere text-tinta">
+                  {tag.name}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 font-dados text-meta text-tinta-suave">

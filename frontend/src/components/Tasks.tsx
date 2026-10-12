@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type {
   NewTask,
+  Tag,
   Task as TaskModel,
   TaskExecution,
   TimeEntry,
@@ -11,6 +12,7 @@ function Tasks(props: {
   tasks: TaskModel[]
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
+  tags: Tag[]
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
   onReactivate: (taskId: string) => void
@@ -49,6 +51,7 @@ function Tasks(props: {
           openForm={openTask?.taskId === task.id ? openTask.form : null}
           onToggle={(form) => toggle(task.id, form)}
           timeEntries={props.timeEntries}
+          tags={props.tags}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
           onReactivate={props.onReactivate}

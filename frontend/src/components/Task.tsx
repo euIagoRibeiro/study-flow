@@ -10,6 +10,7 @@ import {
 import type {
   CompletedExecution,
   NewTask,
+  Tag,
   Task as TaskModel,
   TaskExecution,
   TimeEntry,
@@ -50,6 +51,7 @@ function Task(props: {
   task: TaskModel
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
+  tags: Tag[]
   openForm: OpenForm
   onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
@@ -216,6 +218,7 @@ function Task(props: {
             <ExecutionHistory
               executions={completed}
               timeEntries={props.timeEntries}
+              tags={props.tags}
               onEdit={props.onEditExecution}
               onEditTimeEntry={props.onEditTimeEntry}
             />

@@ -3,12 +3,13 @@ import TaskForm from '../components/TaskForm'
 import Tasks from '../components/Tasks'
 import { PlusIcon } from '../components/icons'
 import { cardClass, focusRing } from '../styles'
-import type { NewTask, Task, TaskExecution, TimeEntry } from '../types'
+import type { NewTask, Tag, Task, TaskExecution, TimeEntry } from '../types'
 
 function TaskListPage(props: {
   tasks: Task[]
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
+  tags: Tag[]
   onCreate: (task: NewTask) => Promise<string>
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
@@ -71,6 +72,7 @@ function TaskListPage(props: {
           tasks={visibleTasks}
           executions={props.executions}
           timeEntries={props.timeEntries}
+          tags={props.tags}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
           onReactivate={props.onReactivate}

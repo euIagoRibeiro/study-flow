@@ -7,6 +7,7 @@ import { frequencyLabels } from '../frequency'
 import type {
   CompletedExecution,
   Frequency,
+  Tag,
   TaskExecution,
   TimeEntry,
 } from '../types'
@@ -29,6 +30,7 @@ function isCompleted(
 function HistoricoPage(props: {
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
+  tags: Tag[]
   onEditExecution: (
     executionId: string,
     changes: { description: string; completedAt: string },
@@ -105,6 +107,7 @@ function HistoricoPage(props: {
         <ExecutionHistory
           executions={filtered}
           timeEntries={props.timeEntries}
+          tags={props.tags}
           onEdit={props.onEditExecution}
           onEditTimeEntry={props.onEditTimeEntry}
         />
