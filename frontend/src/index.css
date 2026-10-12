@@ -81,6 +81,14 @@
       scroll-padding-top: 5rem;
     }
   }
+
+  /* Mesma coisa embaixo, no celular: barra fixa de 67px + a área do
+     iPhone (que a própria barra já soma no padding) */
+  @media (width < 40rem) {
+    html {
+      scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+  }
 }
 
 @keyframes pulsa {
