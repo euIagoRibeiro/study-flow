@@ -7,6 +7,7 @@ import FrequencySelect, {
 import TaskForm from '../components/TaskForm'
 import Tasks from '../components/Tasks'
 import { PlusIcon } from '../components/icons'
+import { isSameLocalDay } from '../dates'
 import { frequencyLabels } from '../frequency'
 import { cardClass, focusRing, inlineButtonClass } from '../styles'
 import { compareNames, indexTags, lastRootPath } from '../tags'
@@ -114,6 +115,21 @@ function TaskListPage(props: {
 
   const anyTask = props.tasks.some((task) => showArchived || task.active)
 
+  // "N de M feitas hoje": M = ativas que o filtro mostra (arquivada não é
+  // tarefa a fazer); feita hoje = a mesma regra do grifo do cartão
+  const now = new Date()
+  const doneToday = new Set(
+    props.executions
+      .filter(
+        (execution) =>
+          execution.completedAt !== null &&
+          isSameLocalDay(new Date(execution.completedAt), now),
+      )
+      .map((execution) => execution.taskId),
+  )
+  const toDo = visibleTasks.filter((task) => task.active)
+  const done = toDo.filter((task) => doneToday.has(task.id)).length
+
   return (
     <div className="flex flex-col gap-4">
       {creating ? (
@@ -178,17 +194,24 @@ function TaskListPage(props: {
           </button>
         </p>
       ) : (
-        <Tasks
-          tasks={visibleTasks}
-          executions={props.executions}
-          timeEntries={props.timeEntries}
-          tags={props.tags}
-          onEdit={props.onEdit}
-          onArchive={props.onArchive}
-          onReactivate={props.onReactivate}
-          onEditExecution={props.onEditExecution}
-          onEditTimeEntry={props.onEditTimeEntry}
-        />
+        <>
+          {toDo.length > 0 && (
+            <p className="-mb-1 px-0.5 font-dados text-meta text-tinta-suave tabular-nums">
+              {done} de {toDo.length} {done === 1 ? 'feita' : 'feitas'} hoje
+            </p>
+          )}
+          <Tasks
+            tasks={visibleTasks}
+            executions={props.executions}
+            timeEntries={props.timeEntries}
+            tags={props.tags}
+            onEdit={props.onEdit}
+            onArchive={props.onArchive}
+            onReactivate={props.onReactivate}
+            onEditExecution={props.onEditExecution}
+            onEditTimeEntry={props.onEditTimeEntry}
+          />
+        </>
       )}
     </div>
   )
