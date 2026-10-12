@@ -1,21 +1,24 @@
 import { useState, type FormEvent } from 'react'
+import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, primaryButtonClass } from '../styles'
-import type { CompletedExecution } from '../types'
+import { executionSelection, indexTags, pathToChoice } from '../tags'
+import type { CompletedExecution, ExecutionChanges, Tag } from '../types'
 import FormError from './FormError'
+import TagFields from './TagFields'
 
 function ExecutionEditForm(props: {
   execution: CompletedExecution
-  onSubmit: (changes: {
-    description: string
-    completedAt: string
-  }) => Promise<unknown>
+  tags: Tag[]
+  onSubmit: (changes: ExecutionChanges) => Promise<unknown>
 }) {
-  const [description, setDescription] = useState(
-    props.execution.description ?? '',
-  )
+  const { execution } = props
+  const [description, setDescription] = useState(execution.description ?? '')
   const [completedAt, setCompletedAt] = useState(
-    toDatetimeLocalValue(props.execution.completedAt),
+    toDatetimeLocalValue(execution.completedAt),
+  )
+  const [selection, setSelection] = useState(() =>
+    executionSelection(execution, indexTags(props.tags)),
   )
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -27,9 +30,16 @@ function ExecutionEditForm(props: {
       await props.onSubmit({
         description: description.trim(),
         completedAt: fromDatetimeLocalValue(completedAt),
+        // Registro antigo com mais de uma folha, sem mexer nas tags: não
+        // manda tags, e o servidor mantém as que estavam
+        ...(selection.legacyCount > 0 ? {} : pathToChoice(selection.path)),
       })
-    } catch {
-      setError('Não foi possível salvar. Tente de novo.')
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 400
+          ? err.message
+          : 'Não foi possível salvar. Tente de novo.',
+      )
       return
     } finally {
       setSubmitting(false)
@@ -64,6 +74,17 @@ function ExecutionEditForm(props: {
             className={fieldClass}
           />
         </label>
+        <TagFields
+          tags={props.tags}
+          value={selection.path}
+          onChange={(path) => setSelection({ path, legacyCount: 0 })}
+          // Tudo que o registro já tem continua escolhível, mesmo arquivado
+          keep={[
+            ...(execution.rootTagId ? [execution.rootTagId] : []),
+            ...execution.tagIds,
+          ]}
+          legacyCount={selection.legacyCount}
+        />
         <button
           type="submit"
           disabled={submitting}

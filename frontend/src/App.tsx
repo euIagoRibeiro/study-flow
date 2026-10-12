@@ -11,6 +11,7 @@ import Layout from './pages/Layout'
 import TagsPage from './pages/TagsPage'
 import TaskListPage from './pages/TaskListPage'
 import type {
+  ExecutionChanges,
   LoadStatus,
   NewTask,
   Tag,
@@ -111,10 +112,7 @@ function App() {
   }
 
   // Erro sobe pro ExecutionEditForm, que mostra a mensagem
-  async function editExecution(
-    id: string,
-    changes: { description: string; completedAt: string },
-  ) {
+  async function editExecution(id: string, changes: ExecutionChanges) {
     replaceExecution(await executionsApi.editExecution(id, changes))
   }
 
@@ -206,7 +204,7 @@ function App() {
   async function finishExecution(
     executionId: string,
     description: string,
-    tags: TagChoice,
+    tags: Partial<TagChoice>,
   ) {
     const execution = await executionsApi.finishExecution(
       executionId,

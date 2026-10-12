@@ -1,4 +1,4 @@
-import type { TagChoice, TaskExecution } from '../types'
+import type { ExecutionChanges, TagChoice, TaskExecution } from '../types'
 import { request } from './client'
 
 export function listExecutions(): Promise<TaskExecution[]> {
@@ -47,7 +47,7 @@ export function startExecution(taskId: string): Promise<TaskExecution> {
 export function finishExecution(
   id: string,
   description: string,
-  tags: TagChoice,
+  tags: Partial<TagChoice>,
 ): Promise<TaskExecution> {
   return putExecution(id, {
     description,
@@ -71,7 +71,7 @@ export function reopenExecution(
 
 export function editExecution(
   id: string,
-  changes: { description: string; completedAt: string },
+  changes: ExecutionChanges,
 ): Promise<TaskExecution> {
   return putExecution(id, changes)
 }

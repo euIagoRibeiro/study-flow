@@ -3,7 +3,14 @@ import TaskForm from '../components/TaskForm'
 import Tasks from '../components/Tasks'
 import { PlusIcon } from '../components/icons'
 import { cardClass, focusRing } from '../styles'
-import type { NewTask, Tag, Task, TaskExecution, TimeEntry } from '../types'
+import type {
+  ExecutionChanges,
+  NewTask,
+  Tag,
+  Task,
+  TaskExecution,
+  TimeEntry,
+} from '../types'
 
 function TaskListPage(props: {
   tasks: Task[]
@@ -16,7 +23,7 @@ function TaskListPage(props: {
   onReactivate: (taskId: string) => void
   onEditExecution: (
     executionId: string,
-    changes: { description: string; completedAt: string },
+    changes: ExecutionChanges,
   ) => Promise<void>
   onEditTimeEntry: (
     entryId: string,

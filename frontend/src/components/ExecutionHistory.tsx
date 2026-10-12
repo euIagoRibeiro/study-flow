@@ -8,7 +8,12 @@ import {
 import { frequencyLabels } from '../frequency'
 import { cardClass, chipClass, tagChipClass, textButtonClass } from '../styles'
 import { indexTags, leafTags, tagLineage } from '../tags'
-import type { CompletedExecution, Tag, TimeEntry } from '../types'
+import type {
+  CompletedExecution,
+  ExecutionChanges,
+  Tag,
+  TimeEntry,
+} from '../types'
 import CompactIconButton from './CompactIconButton'
 import ExecutionEditForm from './ExecutionEditForm'
 import { ChevronDownIcon, PencilIcon } from './icons'
@@ -31,10 +36,7 @@ function ExecutionHistory(props: {
   executions: CompletedExecution[]
   timeEntries: TimeEntry[]
   tags: Tag[]
-  onEdit: (
-    executionId: string,
-    changes: { description: string; completedAt: string },
-  ) => Promise<void>
+  onEdit: (executionId: string, changes: ExecutionChanges) => Promise<void>
   onEditTimeEntry: (
     entryId: string,
     changes: { startedAt: string; endedAt: string },
@@ -168,6 +170,7 @@ function ExecutionHistory(props: {
         {editing && (
           <ExecutionEditForm
             execution={execution}
+            tags={props.tags}
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)
               setEditingId(null)

@@ -4,6 +4,8 @@ import { fieldClass, focusRing } from '../styles'
 import { compareNames, indexTags } from '../tags'
 import type { Tag } from '../types'
 
+const LEGACY = '__legacy'
+
 // Um caminho só por registro: um campo por nível (contexto › subtag ›
 // subtag). O 2º e o 3º só aparecem quando há o que escolher; trocar um
 // campo limpa os de baixo. Controlado: quem guarda o caminho é o formulário
@@ -13,6 +15,9 @@ function TagFields(props: {
   onChange: (path: string[]) => void
   // Arquivadas que já estavam no registro: continuam escolhíveis aqui
   keep?: string[]
+  // Registro antigo com mais de uma folha: o campo logo abaixo de value
+  // mostra "N temas (registro antigo)" até a pessoa mexer nas tags
+  legacyCount?: number
 }) {
   const titleId = useId()
   const byId = indexTags(props.tags)
@@ -43,7 +48,10 @@ function TagFields(props: {
       },
   ]
 
+  const legacyLevel = props.legacyCount ? props.value.length : -1
+
   function choose(level: number, id: string) {
+    if (id === LEGACY) return
     const next = props.value.slice(0, level)
     if (id) next.push(id)
     props.onChange(next)
@@ -51,13 +59,16 @@ function TagFields(props: {
 
   return (
     <div role="group" aria-labelledby={titleId} className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <span id={titleId} className="text-sm text-tinta-suave">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span
+          id={titleId}
+          className="text-sm whitespace-nowrap text-tinta-suave"
+        >
           Tags (opcional)
         </span>
         <Link
           to="/tags"
-          className={`text-meta text-tinta-suave underline decoration-dotted underline-offset-2 hover:text-tinta ${focusRing}`}
+          className={`text-meta whitespace-nowrap text-tinta-suave underline decoration-dotted underline-offset-2 hover:text-tinta ${focusRing}`}
         >
           gerenciar tags
         </Link>
@@ -69,11 +80,18 @@ function TagFields(props: {
             <label key={level.label} className="flex flex-col gap-1.5">
               <span className="text-sm text-tinta-suave">{level.label}</span>
               <select
-                value={props.value[index] ?? ''}
+                value={
+                  index === legacyLevel ? LEGACY : (props.value[index] ?? '')
+                }
                 onChange={(event) => choose(index, event.target.value)}
                 className={fieldClass}
               >
                 <option value="">{level.none}</option>
+                {index === legacyLevel && (
+                  <option value={LEGACY}>
+                    {props.legacyCount} temas (registro antigo)
+                  </option>
+                )}
                 {level.options.map((tag) => (
                   <option key={tag.id} value={tag.id}>
                     {tag.active ? tag.name : `${tag.name} (arquivada)`}
@@ -82,6 +100,12 @@ function TagFields(props: {
               </select>
             </label>
           ),
+      )}
+      {legacyLevel >= 0 && (
+        <p className="font-texto text-meta text-tinta-suave">
+          Este registro tem {props.legacyCount} temas, de antes da regra de um
+          por registro. Se você não mexer nas tags, eles continuam como estão.
+        </p>
       )}
     </div>
   )

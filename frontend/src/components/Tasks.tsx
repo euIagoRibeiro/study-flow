@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type {
+  ExecutionChanges,
   NewTask,
   Tag,
-  Task as TaskModel,
   TaskExecution,
+  Task as TaskModel,
   TimeEntry,
 } from '../types'
 import Task, { type OpenForm } from './Task'
@@ -18,7 +19,7 @@ function Tasks(props: {
   onReactivate: (taskId: string) => void
   onEditExecution: (
     executionId: string,
-    changes: { description: string; completedAt: string },
+    changes: ExecutionChanges,
   ) => Promise<void>
   onEditTimeEntry: (
     entryId: string,

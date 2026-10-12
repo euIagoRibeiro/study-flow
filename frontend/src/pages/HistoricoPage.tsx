@@ -6,6 +6,7 @@ import { matchesPeriod, type PeriodFilter } from '../dates'
 import { frequencyLabels } from '../frequency'
 import type {
   CompletedExecution,
+  ExecutionChanges,
   Frequency,
   Tag,
   TaskExecution,
@@ -33,7 +34,7 @@ function HistoricoPage(props: {
   tags: Tag[]
   onEditExecution: (
     executionId: string,
-    changes: { description: string; completedAt: string },
+    changes: ExecutionChanges,
   ) => Promise<void>
   onEditTimeEntry: (
     entryId: string,

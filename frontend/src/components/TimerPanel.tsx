@@ -7,7 +7,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
-import { pathToChoice } from '../tags'
+import { pathToChoice, type TagSelection } from '../tags'
 import type { Tag, TagChoice, TaskExecution, TimeEntry } from '../types'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
@@ -20,20 +20,20 @@ function TimerPanel(props: {
   tags: Tag[]
   // Tags que o registro já tem (ex.: voltou pelo Desfazer) ou, sem elas,
   // a pré-seleção do contexto
-  initialPath: string[]
+  initial: TagSelection
   onStop: (entryId: string) => Promise<unknown>
   onResume: (executionId: string) => Promise<unknown>
   onFinish: (
     executionId: string,
     description: string,
-    tags: TagChoice,
+    tags: Partial<TagChoice>,
   ) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
   // estreitar o tipo dentro dos closures dos botões, sem precisar de "!"
   const { execution, entries, runningEntry, onStop, onResume, onFinish } = props
   const [description, setDescription] = useState(execution.description ?? '')
-  const [path, setPath] = useState(props.initialPath)
+  const [selection, setSelection] = useState(props.initial)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // Pausar/Retomar esperando o servidor: sem isso, clique duplo mandaria
@@ -66,7 +66,12 @@ function TimerPanel(props: {
     event.preventDefault()
     setSubmitting(true)
     try {
-      await onFinish(execution.id, description, pathToChoice(path))
+      await onFinish(
+        execution.id,
+        description,
+        // Registro com mais de uma folha, sem mexer nas tags: não manda tags
+        selection.legacyCount > 0 ? {} : pathToChoice(selection.path),
+      )
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 400
@@ -138,9 +143,13 @@ function TimerPanel(props: {
         </label>
         <TagFields
           tags={props.tags}
-          value={path}
-          onChange={setPath}
-          keep={props.initialPath}
+          value={selection.path}
+          onChange={(path) => setSelection({ path, legacyCount: 0 })}
+          keep={[
+            ...(execution.rootTagId ? [execution.rootTagId] : []),
+            ...execution.tagIds,
+          ]}
+          legacyCount={selection.legacyCount}
         />
         <button
           type="submit"

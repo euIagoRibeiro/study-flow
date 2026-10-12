@@ -16,7 +16,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
-import { executionPath, indexTags, lastRootPath } from '../tags'
+import { executionSelection, indexTags, lastRootPath } from '../tags'
 import type {
   Frequency,
   NewTask,
@@ -49,7 +49,7 @@ function ExecutePage(props: {
   onFinishExecution: (
     executionId: string,
     description: string,
-    tags: TagChoice,
+    tags: Partial<TagChoice>,
   ) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,
@@ -113,7 +113,7 @@ function ExecutePage(props: {
   async function handleFinish(
     executionId: string,
     description: string,
-    tags: TagChoice,
+    tags: Partial<TagChoice>,
   ) {
     const execution = props.executions.find((e) => e.id === executionId)
     const resumeEntry = props.timeEntries.find(
@@ -267,7 +267,9 @@ function ExecutePage(props: {
   const tagsById = indexTags(props.tags)
   const preselected = lastRootPath(props.executions, selectedTask.id, tagsById)
   // Registro aberto que já tem tags (voltou pelo Desfazer): começa nelas
-  const openPath = openExecution ? executionPath(openExecution, tagsById) : []
+  const openSelection = openExecution
+    ? executionSelection(openExecution, tagsById)
+    : null
   // Rodando em OUTRA tarefa, não nessa — "Registrar" continua liberado (é
   // instantâneo, nunca fica aberto, então não conflita com essa invariante)
   const runningElsewhere = runningEntry
@@ -326,7 +328,11 @@ function ExecutePage(props: {
           onResume={props.onResumeTimer}
           onFinish={handleFinish}
           tags={props.tags}
-          initialPath={openPath.length > 0 ? openPath : preselected}
+          initial={
+            openSelection && openSelection.path.length > 0
+              ? openSelection
+              : { path: preselected, legacyCount: 0 }
+          }
         />
       ) : (
         <>

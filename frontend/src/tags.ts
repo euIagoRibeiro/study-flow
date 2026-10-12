@@ -53,16 +53,23 @@ export function pathToChoice(path: string[]): TagChoice {
   }
 }
 
-// O caminho de um registro que já tem tags (ex.: reabrir pelo Desfazer).
-// Registro com mais de uma folha (só dado antigo) fica pra T5c
-export function executionPath(
+// Como os campos começam pra um registro que já tem tags. Registro antigo
+// com mais de uma folha (de antes da regra de um caminho): os campos param
+// no trecho em comum, e legacyCount diz quantas folhas não cabem num campo
+export type TagSelection = { path: string[]; legacyCount: number }
+
+export function executionSelection(
   execution: Pick<TaskExecution, 'rootTagId' | 'tagIds'>,
   byId: TagIndex,
-): string[] {
-  const leaves = leafTags(execution, byId)
-  return leaves.length === 1
-    ? tagLineage(leaves[0], byId).map((tag) => tag.id)
-    : []
+): TagSelection {
+  const lineages = leafTags(execution, byId).map((leaf) =>
+    tagLineage(leaf, byId).map((tag) => tag.id),
+  )
+  if (lineages.length <= 1) return { path: lineages[0] ?? [], legacyCount: 0 }
+  const common = lineages[0].filter((id, level) =>
+    lineages.every((lineage) => lineage[level] === id),
+  )
+  return { path: common, legacyCount: lineages.length }
 }
 
 // Pré-seleção: o contexto do registro concluído mais recente dessa tarefa

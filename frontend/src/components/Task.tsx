@@ -9,10 +9,11 @@ import {
 } from '../styles'
 import type {
   CompletedExecution,
+  ExecutionChanges,
   NewTask,
   Tag,
-  Task as TaskModel,
   TaskExecution,
+  Task as TaskModel,
   TimeEntry,
 } from '../types'
 import ActionMenu, { type MenuAction } from './ActionMenu'
@@ -59,7 +60,7 @@ function Task(props: {
   onReactivate: (taskId: string) => void
   onEditExecution: (
     executionId: string,
-    changes: { description: string; completedAt: string },
+    changes: ExecutionChanges,
   ) => Promise<void>
   onEditTimeEntry: (
     entryId: string,

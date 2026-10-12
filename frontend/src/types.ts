@@ -55,4 +55,11 @@ export type TagChoice = {
   tagIds: string[]
 }
 
+// Editar um registro: tags ausentes = o servidor não mexe nelas (registro
+// antigo com mais de uma folha, salvo sem tocar nas tags)
+export type ExecutionChanges = {
+  description: string
+  completedAt: string
+} & Partial<TagChoice>
+
 export type LoadStatus = 'loading' | 'error' | 'ready'
