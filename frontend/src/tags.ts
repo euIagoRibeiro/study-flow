@@ -6,9 +6,10 @@ export function indexTags(tags: Tag[]): TagIndex {
   return new Map(tags.map((tag) => [tag.id, tag]))
 }
 
-// sort() sem isso compara código Unicode e põe "Álgebra" depois de "Frações"
+// sort() sem isso compara código Unicode e põe "Álgebra" depois de "Frações".
+// numeric: números pelo valor ("Unidade 2" antes de "Unidade 10")
 export function compareNames(a: string, b: string) {
-  return a.localeCompare(b, 'pt-BR')
+  return a.localeCompare(b, 'pt-BR', { numeric: true })
 }
 
 // Da raiz até a tag: [Vestibular, Matemática, Álgebra]
