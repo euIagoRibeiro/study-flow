@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import ExecutionHistory from '../components/ExecutionHistory'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
-import { ChevronDownIcon } from '../components/icons'
+import FrequencySelect, {
+  type FrequencyFilter,
+} from '../components/FrequencySelect'
 import { matchesPeriod, type PeriodFilter } from '../dates'
-import { frequencyLabels } from '../frequency'
 import type {
   CompletedExecution,
   ExecutionChanges,
-  Frequency,
   Tag,
   TaskExecution,
   TimeEntry,
@@ -42,7 +42,7 @@ function HistoricoPage(props: {
   ) => Promise<void>
 }) {
   const [period, setPeriod] = useState<PeriodFilter>('all')
-  const [frequency, setFrequency] = useState<Frequency | 'all'>('all')
+  const [frequency, setFrequency] = useState<FrequencyFilter>('all')
 
   const filtered = props.executions.filter(isCompleted).filter(
     (execution) =>
@@ -51,8 +51,6 @@ function HistoricoPage(props: {
       // atual da tarefa — mesmo princípio do resto do app
       (frequency === 'all' || execution.taskFrequencyAtTime === frequency),
   )
-
-  const filtering = frequency !== 'all'
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,42 +61,7 @@ function HistoricoPage(props: {
           value={period}
           onChange={setPeriod}
         />
-        <div className="flex h-9 items-center gap-2 font-dados text-meta text-tinta-suave">
-          <span>Frequência</span>
-          {/* O que se vê é o texto; o <select> fica invisível por cima, pra
-              largura seguir o valor escolhido (o nativo mede pela opção
-              mais longa) sem perder o seletor nativo do celular */}
-          <span
-            className={`relative inline-flex h-7 items-center gap-1 border-b-2 px-0.5 font-interface text-sm has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-tinta ${
-              filtering
-                ? 'border-tinta font-semibold text-tinta'
-                : 'border-transparent font-medium hover:text-tinta'
-            }`}
-          >
-            {frequency === 'all' ? 'Todas' : frequencyLabels[frequency]}
-            <ChevronDownIcon className="h-3.5 w-3.5" />
-            <select
-              aria-label="Frequência"
-              value={frequency}
-              onChange={(event) =>
-                setFrequency(event.target.value as Frequency | 'all')
-              }
-              // 16px: abaixo disso o Safari do iPhone dá zoom ao tocar.
-              // Toque de 44px sobre um texto de 28px (absolute conta a
-              // partir de dentro da borda: 26 + 8 + 10). Cores explícitas
-              // mesmo invisível: a lista de opções que abre usa as do
-              // <select>, e o reset do Tailwind deixa o fundo transparente
-              className="absolute inset-x-0 -top-2 -bottom-2.5 cursor-pointer bg-superficie text-base font-normal text-tinta opacity-0"
-            >
-              <option value="all">Todas</option>
-              {Object.entries(frequencyLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </span>
-        </div>
+        <FrequencySelect value={frequency} onChange={setFrequency} />
       </div>
       {filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-tinta-suave">
