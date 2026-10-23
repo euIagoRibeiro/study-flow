@@ -226,6 +226,13 @@ tagsRouter.delete('/:id', async (req, res) => {
         error: 'Esta tag está em uso em execuções: arquive em vez de apagar',
       })
     }
+    // Declara medida (migration 0010): a medida sai antes (apagar ou arquivar)
+    if (err.code === '23503' && err.constraint === 'measures_tag') {
+      return res.status(409).json({
+        error:
+          'Esta tag declara uma medida: apague a medida antes, ou arquive a tag',
+      })
+    }
     if (err.code === '23503' && err.constraint?.startsWith('tags_')) {
       return res.status(409).json({
         error: 'Esta tag tem subtags: apague ou arquive as subtags antes',

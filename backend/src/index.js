@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import { executionsRouter } from './routes/executions.js'
+import { measureKindsRouter, measuresRouter } from './routes/measures.js'
 import { tagsRouter } from './routes/tags.js'
 import { tasksRouter } from './routes/tasks.js'
 import { timeEntriesRouter } from './routes/timeEntries.js'
@@ -18,6 +19,8 @@ app.use('/tasks', tasksRouter)
 app.use('/executions', executionsRouter)
 app.use('/time-entries', timeEntriesRouter)
 app.use('/tags', tagsRouter)
+app.use('/measures', measuresRouter)
+app.use('/measure-kinds', measureKindsRouter)
 
 // Os 4 parâmetros são obrigatórios: é pela contagem que o Express
 // reconhece um middleware de erro

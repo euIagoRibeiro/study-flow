@@ -20,7 +20,15 @@ const SELECT_EXECUTION = `SELECT e.id,
   COALESCE(
     array_agg(et.tag_id ORDER BY et.tag_id) FILTER (WHERE et.tag_id IS NOT NULL),
     '{}'
-  ) AS "tagIds"
+  ) AS "tagIds",
+  (SELECT json_build_object(
+     'measureId', em.measure_id,
+     'values', COALESCE(
+       (SELECT json_agg(json_build_object('kindId', v.kind_id, 'quantity', v.quantity::float8)
+                        ORDER BY v.created_at, v.id)
+        FROM execution_measure_values v WHERE v.task_execution_id = e.id),
+       '[]'))
+   FROM execution_measures em WHERE em.task_execution_id = e.id) AS measure
 FROM task_executions e
 LEFT JOIN task_execution_tags et ON et.task_execution_id = e.id`
 
@@ -89,6 +97,22 @@ const quantity = z
   .nullable()
   .optional()
 
+// Medida por contexto: o servidor descobre QUAL medida pelo caminho; a
+// tela manda só os valores. No PUT, ausente mantém e [] remove
+const measureValues = z
+  .array(
+    z.object({
+      kindId: z.uuid('kindId precisa ser um uuid ou null').nullable(),
+      quantity: z
+        .number('quantity precisa ser um número')
+        .positive('quantity precisa ser maior que zero')
+        .max(99999999.99, 'quantity pode ir até 99.999.999,99'),
+    }),
+    'measureValues precisa ser uma lista',
+  )
+  .max(20, 'No máximo 20 valores por registro')
+  .optional()
+
 const quantityUnit = z
   .string('quantityUnit precisa ser um texto ou null')
   .trim()
@@ -130,6 +154,7 @@ const newExecutionSchema = withTagRule(
     estimatedMinutes,
     quantity,
     quantityUnit,
+    measureValues,
     ...tagFields,
   }),
 )
@@ -142,9 +167,152 @@ const executionChangesSchema = withTagRule(
     estimatedMinutes,
     quantity,
     quantityUnit,
+    measureValues,
     ...tagFields,
   }),
 )
+
+class MeasureError extends Error {}
+
+// A medida que vale pro caminho GRAVADO: a da tag mais funda que declara
+// uma. Arquivada continua sendo a mais próxima (não volta pro ancestral:
+// a subtag substituiu de propósito)
+async function nearestMeasure(client, executionId) {
+  const result = await client.query(
+    `SELECT m.id, m.tag_id AS "tagId", m.active, m.allows_decimal AS "allowsDecimal", t.level
+     FROM measures m JOIN tags t ON t.id = m.tag_id
+     WHERE m.tag_id IN (
+       SELECT root_tag_id FROM task_executions WHERE id = $1
+       UNION SELECT tag_id FROM task_execution_tags WHERE task_execution_id = $1)
+     ORDER BY t.level DESC`,
+    [executionId],
+  )
+  const [first, second] = result.rows
+  // Registro antigo com 2 temas no mesmo nível, cada um com medida
+  if (second && second.level === first.level) {
+    throw new MeasureError('Registro com mais de um tema não tem medida')
+  }
+  return first ?? null
+}
+
+// Grava os valores (já dentro de uma transação, com o caminho gravado).
+// [] remove a medida do registro. Tipo/medida arquivados: só se já estavam
+async function setMeasure(client, executionId, values) {
+  const previous = await client.query(
+    `SELECT em.measure_id AS "measureId",
+            array_remove(array_agg(v.kind_id), NULL) AS "kindIds"
+     FROM execution_measures em
+     LEFT JOIN execution_measure_values v ON v.task_execution_id = em.task_execution_id
+     WHERE em.task_execution_id = $1
+     GROUP BY em.measure_id`,
+    [executionId],
+  )
+  const before = previous.rows[0]
+  await dropMeasure(client, executionId)
+  if (values.length === 0) return
+
+  const measure = await nearestMeasure(client, executionId)
+  if (!measure) throw new MeasureError('Este caminho não tem medida')
+  const keeps = before?.measureId === measure.id
+  if (!measure.active && !keeps) {
+    throw new MeasureError('A medida deste caminho está arquivada')
+  }
+  const kinds = new Map(
+    (
+      await client.query(
+        'SELECT id, active FROM measure_kinds WHERE measure_id = $1',
+        [measure.id],
+      )
+    ).rows.map((kind) => [kind.id, kind.active]),
+  )
+  const keptKinds = new Set(keeps ? before.kindIds : [])
+  const seen = new Set()
+  for (const value of values) {
+    if (kinds.size > 0) {
+      if (value.kindId === null) {
+        throw new MeasureError(
+          'Esta medida tem tipos: escolha o tipo de cada valor',
+        )
+      }
+      if (!kinds.has(value.kindId)) {
+        throw new MeasureError('Tipo que não é desta medida')
+      }
+      if (!kinds.get(value.kindId) && !keptKinds.has(value.kindId)) {
+        throw new MeasureError('Tipo arquivado não pode ser adicionado')
+      }
+    } else {
+      if (value.kindId !== null) {
+        throw new MeasureError('Esta medida não tem tipos')
+      }
+      if (values.length > 1) {
+        throw new MeasureError('Esta medida tem um valor só')
+      }
+    }
+    if (seen.has(value.kindId)) {
+      throw new MeasureError('Tipo repetido no mesmo registro')
+    }
+    seen.add(value.kindId)
+    const hundredths =
+      Math.abs(value.quantity * 100 - Math.round(value.quantity * 100)) < 1e-6
+    if (
+      measure.allowsDecimal ? !hundredths : !Number.isInteger(value.quantity)
+    ) {
+      throw new MeasureError(
+        measure.allowsDecimal
+          ? 'Quantidade com no máximo 2 casas decimais'
+          : 'Esta medida aceita só números inteiros',
+      )
+    }
+  }
+
+  await client.query(
+    `INSERT INTO execution_measures (task_execution_id, measure_id, tag_id, root_tag_id)
+     SELECT id, $2, $3, root_tag_id FROM task_executions WHERE id = $1`,
+    [executionId, measure.id, measure.tagId],
+  )
+  for (const value of values) {
+    await client.query(
+      `INSERT INTO execution_measure_values (task_execution_id, measure_id, kind_id, quantity)
+       VALUES ($1, $2, $3, $4)`,
+      [executionId, measure.id, value.kindId, value.quantity],
+    )
+  }
+}
+
+async function dropMeasure(client, executionId) {
+  await client.query(
+    'DELETE FROM execution_measure_values WHERE task_execution_id = $1',
+    [executionId],
+  )
+  await client.query(
+    'DELETE FROM execution_measures WHERE task_execution_id = $1',
+    [executionId],
+  )
+}
+
+// Caminho trocado sem mandar medidas: sai a medida cuja declarante deixou
+// o caminho (a tela avisa antes; aqui é a garantia)
+async function dropMeasureIfOffPath(client, executionId) {
+  const off = await client.query(
+    `SELECT 1 FROM execution_measures em
+     WHERE em.task_execution_id = $1
+       AND em.tag_id <> em.root_tag_id
+       AND NOT EXISTS (SELECT 1 FROM task_execution_tags et
+                       WHERE et.task_execution_id = em.task_execution_id
+                         AND et.tag_id = em.tag_id)`,
+    [executionId],
+  )
+  if (off.rowCount > 0) await dropMeasure(client, executionId)
+}
+
+// Rede de segurança: recusas do banco (migration 0010), pelo nome
+function measureConstraintError(err) {
+  return (
+    ['23503', '23505', '23514'].includes(err.code) &&
+    (err.constraint?.startsWith('execution_measures_') ||
+      err.constraint?.startsWith('execution_measure_values_'))
+  )
+}
 
 // No PUT: ausente mantém, null nos dois limpa
 async function setQuantity(client, executionId, value, unit) {
@@ -360,14 +528,21 @@ executionsRouter.post('/', async (req, res) => {
     if (execution.estimatedMinutes) {
       await setEstimate(client, id, execution.estimatedMinutes)
     }
+    // Depois das tags: a medida sai do caminho já gravado
+    if (execution.measureValues?.length) {
+      await setMeasure(client, id, execution.measureValues)
+    }
     const created = await findExecution(client, id)
     const timeEntries = await entriesOf(client, id)
     await client.query('COMMIT')
     res.status(201).json({ ...created, timeEntries })
   } catch (err) {
     await client.query('ROLLBACK')
-    if (err instanceof TagError) {
+    if (err instanceof TagError || err instanceof MeasureError) {
       return res.status(400).json({ error: err.message })
+    }
+    if (measureConstraintError(err)) {
+      return res.status(400).json({ error: 'Medida não confere com o caminho' })
     }
     if (phaseError(err)) return res.status(400).json({ error: phaseError(err) })
     if (isOpenExecutionConflict(err)) {
@@ -439,6 +614,10 @@ executionsRouter.put('/:id', async (req, res) => {
           : rootTagId === current.rootTagId
             ? current.phase
             : null
+      // Raiz nova: a medida sai ANTES (a FK da raiz não é adiável)
+      if (rootTagId !== current.rootTagId) {
+        await dropMeasure(client, req.params.id)
+      }
       await applyTags(
         client,
         req.params.id,
@@ -450,6 +629,11 @@ executionsRouter.put('/:id', async (req, res) => {
         },
         newPhase,
       )
+      // Subtag saiu sem mandar medidas: a medida dela sai junto (a FK do
+      // caminho é adiável, então dá pra conferir depois do applyTags)
+      if (changes.measureValues === undefined) {
+        await dropMeasureIfOffPath(client, req.params.id)
+      }
     } else if (changes.phase !== undefined) {
       await setPhase(client, req.params.id, changes.phase)
     }
@@ -466,6 +650,9 @@ executionsRouter.put('/:id', async (req, res) => {
         changes.quantityUnit,
       )
     }
+    if (changes.measureValues !== undefined) {
+      await setMeasure(client, req.params.id, changes.measureValues)
+    }
     const updated = {
       ...(await findExecution(client, req.params.id)),
       timeEntries: await entriesOf(client, req.params.id),
@@ -474,8 +661,12 @@ executionsRouter.put('/:id', async (req, res) => {
     res.json(updated)
   } catch (err) {
     await client.query('ROLLBACK')
-    if (err instanceof TagError) {
+    if (err instanceof TagError || err instanceof MeasureError) {
       return res.status(400).json({ error: err.message })
+    }
+    // Inclui a FK adiável do caminho, que só é conferida no COMMIT
+    if (measureConstraintError(err)) {
+      return res.status(400).json({ error: 'Medida não confere com o caminho' })
     }
     if (isOpenExecutionConflict(err)) {
       return res.status(409).json({ error: CONFLICT_ERROR })
