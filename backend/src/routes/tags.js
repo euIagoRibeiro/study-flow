@@ -5,7 +5,8 @@ import { isUuid, validate } from '../validation.js'
 
 export const tagsRouter = Router()
 
-const COLUMNS = 'id, name, parent_id AS "parentId", level, active'
+const COLUMNS =
+  'id, name, parent_id AS "parentId", level, active, tracks_phase AS "tracksPhase"'
 const NOT_FOUND = 'Tag não encontrada'
 const DUPLICATE = 'Já existe uma tag com esse nome aqui'
 
@@ -24,10 +25,11 @@ const tagChangesSchema = z
   .object({
     name: name.optional(),
     active: z.boolean('active precisa ser true ou false').optional(),
+    tracksPhase: z.boolean('tracksPhase precisa ser true ou false').optional(),
   })
   .refine(
     (changes) => Object.keys(changes).length > 0,
-    'Nenhum campo pra atualizar (name, active)',
+    'Nenhum campo pra atualizar (name, active, tracksPhase)',
   )
 
 function isDuplicateName(err) {
@@ -39,12 +41,21 @@ function isDuplicateName(err) {
   )
 }
 
+// Contexto com registros que têm fase (migration 0007)
+function isPhaseInUse(err) {
+  return (
+    err.code === '23503' &&
+    err.constraint === 'task_executions_phase_root_tracks'
+  )
+}
+
 // Árvore achatada: cada raiz, logo depois os filhos dela, e depois de cada
 // filho os netos — ordem feita aqui, o frontend só monta. Profundidade
 // fixa (3): dois LEFT JOIN bastam, sem WITH RECURSIVE
 tagsRouter.get('/', async (req, res) => {
   const result = await pool.query(
-    `SELECT t.id, t.name, t.parent_id AS "parentId", t.level, t.active
+    `SELECT t.id, t.name, t.parent_id AS "parentId", t.level, t.active,
+            t.tracks_phase AS "tracksPhase"
      FROM tags t
      LEFT JOIN tags p ON p.id = t.parent_id
      LEFT JOIN tags g ON g.id = p.parent_id
@@ -121,7 +132,7 @@ tagsRouter.patch('/:id', async (req, res) => {
   try {
     await client.query('BEGIN')
     const current = await client.query(
-      `SELECT t.id, p.active AS "parentActive"
+      `SELECT t.id, t.level, p.active AS "parentActive"
        FROM tags t LEFT JOIN tags p ON p.id = t.parent_id
        WHERE t.id = $1
        FOR UPDATE OF t`,
@@ -137,14 +148,24 @@ tagsRouter.patch('/:id', async (req, res) => {
         .status(400)
         .json({ error: 'Reative a tag-pai antes de reativar esta' })
     }
+    if (changes.tracksPhase === true && current.rows[0].level !== 1) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({ error: 'Só um contexto pode usar fase' })
+    }
 
     const result = await client.query(
       `UPDATE tags
-       SET name   = COALESCE($1, name),
-           active = COALESCE($2, active)
-       WHERE id = $3
+       SET name         = COALESCE($1, name),
+           active       = COALESCE($2, active),
+           tracks_phase = COALESCE($3, tracks_phase)
+       WHERE id = $4
        RETURNING ${COLUMNS}`,
-      [changes.name ?? null, changes.active ?? null, req.params.id],
+      [
+        changes.name ?? null,
+        changes.active ?? null,
+        changes.tracksPhase ?? null,
+        req.params.id,
+      ],
     )
 
     let archivedDescendants = []
@@ -166,6 +187,12 @@ tagsRouter.patch('/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK')
     if (isDuplicateName(err)) return res.status(409).json({ error: DUPLICATE })
+    if (isPhaseInUse(err)) {
+      return res.status(409).json({
+        error:
+          'Há registros com fase neste contexto: tire a fase deles antes de desligar',
+      })
+    }
     throw err
   } finally {
     client.release()
@@ -187,11 +214,13 @@ tagsRouter.delete('/:id', async (req, res) => {
     }
     res.status(204).end()
   } catch (err) {
-    // Usada: como raiz de uma execução, ou ligada a uma (migration 0005)
+    // Usada: como raiz de uma execução, ligada a uma (0005) ou com fase (0007).
+    // Qual FK recusa primeiro muda depois de pg_dump/restore: traduzir todas
     if (
-      err.code === '23503' &&
-      (err.constraint === 'task_executions_root_tag_is_root' ||
-        err.constraint?.startsWith('task_execution_tags_'))
+      isPhaseInUse(err) ||
+      (err.code === '23503' &&
+        (err.constraint === 'task_executions_root_tag_is_root' ||
+          err.constraint?.startsWith('task_execution_tags_')))
     ) {
       return res.status(409).json({
         error: 'Esta tag está em uso em execuções: arquive em vez de apagar',

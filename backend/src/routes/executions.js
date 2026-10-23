@@ -13,6 +13,7 @@ const SELECT_EXECUTION = `SELECT e.id,
   e.task_title_at_time AS "taskTitleAtTime",
   e.task_frequency_at_time AS "taskFrequencyAtTime",
   e.root_tag_id AS "rootTagId",
+  e.phase,
   COALESCE(
     array_agg(et.tag_id ORDER BY et.tag_id) FILTER (WHERE et.tag_id IS NOT NULL),
     '{}'
@@ -53,6 +54,14 @@ const tagFields = {
     .optional(),
 }
 
+const PHASES = ['requisitos', 'prototipo', 'validacao', 'implementacao']
+
+// Ausente: no POST, sem fase; no PUT, mantém. null limpa
+const phase = z
+  .enum(PHASES, `phase precisa ser um de: ${PHASES.join(', ')}, ou null`)
+  .nullable()
+  .optional()
+
 function withTagRule(schema) {
   return schema.refine(
     (data) => !(data.tagIds?.length > 0 && !data.rootTagId),
@@ -70,13 +79,38 @@ const newExecutionSchema = withTagRule(
     taskId: z.uuid('taskId precisa ser um uuid'),
     description: description.default(null),
     completedAt,
+    phase,
     ...tagFields,
   }),
 )
 
 const executionChangesSchema = withTagRule(
-  z.object({ description, completedAt, ...tagFields }),
+  z.object({ description, completedAt, phase, ...tagFields }),
 )
+
+// Recusas da fase (migration 0007), pelo nome da regra
+function phaseError(err) {
+  if (
+    err.code === '23514' &&
+    err.constraint === 'task_executions_phase_needs_root'
+  ) {
+    return 'Fase precisa de um contexto'
+  }
+  if (
+    err.code === '23503' &&
+    err.constraint === 'task_executions_phase_root_tracks'
+  ) {
+    return 'Esse contexto não usa fase'
+  }
+  return null
+}
+
+async function setPhase(client, executionId, newPhase) {
+  await client.query('UPDATE task_executions SET phase = $1 WHERE id = $2', [
+    newPhase,
+    executionId,
+  ])
+}
 
 function isOpenExecutionConflict(err) {
   return (
@@ -91,8 +125,16 @@ class TagError extends Error {}
 
 // Valida e grava as tags de uma execução (já dentro de uma transação).
 // Grava o fechamento: cada nível 3 escolhido leva o nível 2 pai junto.
-// Tag arquivada só pode continuar se já estava; nova, não
-async function applyTags(client, executionId, rootTagId, tagIds, previous) {
+// Tag arquivada só pode continuar se já estava; nova, não.
+// A fase troca na mesma instrução que a raiz (o banco recusa separado)
+async function applyTags(
+  client,
+  executionId,
+  rootTagId,
+  tagIds,
+  previous,
+  newPhase,
+) {
   if (rootTagId) {
     const root = (
       await client.query('SELECT level, active FROM tags WHERE id = $1', [
@@ -143,8 +185,8 @@ async function applyTags(client, executionId, rootTagId, tagIds, previous) {
     [executionId],
   )
   await client.query(
-    'UPDATE task_executions SET root_tag_id = $1 WHERE id = $2',
-    [rootTagId, executionId],
+    'UPDATE task_executions SET root_tag_id = $1, phase = $2 WHERE id = $3',
+    [rootTagId, newPhase, executionId],
   )
   if (closure.size > 0) {
     await client.query(
@@ -195,7 +237,11 @@ executionsRouter.post('/', async (req, res) => {
         execution.rootTagId ?? null,
         execution.tagIds ?? [],
         { rootTagId: null, tagIds: [] },
+        execution.phase ?? null,
       )
+    } else if (execution.phase) {
+      // Sem tag: o banco recusa (fase precisa de contexto)
+      await setPhase(client, id, execution.phase)
     }
     const created = await findExecution(client, id)
     await client.query('COMMIT')
@@ -205,6 +251,7 @@ executionsRouter.post('/', async (req, res) => {
     if (err instanceof TagError) {
       return res.status(400).json({ error: err.message })
     }
+    if (phaseError(err)) return res.status(400).json({ error: phaseError(err) })
     if (isOpenExecutionConflict(err)) {
       return res.status(409).json({ error: CONFLICT_ERROR })
     }
@@ -231,7 +278,7 @@ executionsRouter.put('/:id', async (req, res) => {
       `UPDATE task_executions
        SET description = $1, completed_at = $2
        WHERE id = $3
-       RETURNING id, root_tag_id AS "rootTagId"`,
+       RETURNING id, root_tag_id AS "rootTagId", phase`,
       [changes.description, changes.completedAt, req.params.id],
     )
     if (result.rowCount === 0) {
@@ -246,21 +293,34 @@ executionsRouter.put('/:id', async (req, res) => {
         [changes.completedAt, req.params.id],
       )
     }
+    const current = result.rows[0]
     if (hasTags(changes)) {
       const previousTags = await client.query(
         'SELECT tag_id FROM task_execution_tags WHERE task_execution_id = $1',
         [req.params.id],
       )
+      const rootTagId = changes.rootTagId ?? null
+      // Sem phase no pedido: mantém, a não ser que a raiz troque (a fase era
+      // do projeto antigo)
+      const newPhase =
+        changes.phase !== undefined
+          ? changes.phase
+          : rootTagId === current.rootTagId
+            ? current.phase
+            : null
       await applyTags(
         client,
         req.params.id,
-        changes.rootTagId ?? null,
+        rootTagId,
         changes.tagIds ?? [],
         {
-          rootTagId: result.rows[0].rootTagId,
+          rootTagId: current.rootTagId,
           tagIds: previousTags.rows.map((row) => row.tag_id),
         },
+        newPhase,
       )
+    } else if (changes.phase !== undefined) {
+      await setPhase(client, req.params.id, changes.phase)
     }
     const updated = await findExecution(client, req.params.id)
     await client.query('COMMIT')
@@ -273,6 +333,7 @@ executionsRouter.put('/:id', async (req, res) => {
     if (isOpenExecutionConflict(err)) {
       return res.status(409).json({ error: CONFLICT_ERROR })
     }
+    if (phaseError(err)) return res.status(400).json({ error: phaseError(err) })
     if (err.code === '23514' && err.constraint === 'time_entries_check') {
       return res.status(400).json({
         error:
