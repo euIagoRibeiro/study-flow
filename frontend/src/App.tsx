@@ -296,6 +296,7 @@ function App() {
       parentId: updated.parentId,
       level: updated.level,
       active: updated.active,
+      tracksPhase: updated.tracksPhase,
     }
     setTags((current) => current.map((t) => (t.id === tag.id ? tag : t)))
   }
@@ -337,6 +338,14 @@ function App() {
       replaceTag(await tagsApi.reactivateTag(id))
     } catch (error) {
       tagError(error, 'Não foi possível reativar a tag. Tente de novo.')
+    }
+  }
+
+  async function setTagPhases(id: string, tracksPhase: boolean) {
+    try {
+      replaceTag(await tagsApi.setTracksPhase(id, tracksPhase))
+    } catch (error) {
+      tagError(error, 'Não foi possível mudar as fases. Tente de novo.')
     }
   }
 
@@ -418,6 +427,7 @@ function App() {
               onRename={renameTag}
               onArchive={archiveTag}
               onReactivate={reactivateTag}
+              onSetPhases={setTagPhases}
               onDelete={deleteTag}
             />
           }

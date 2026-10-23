@@ -25,7 +25,12 @@ export type TaskExecution = {
   // mostra só as folhas
   rootTagId: string | null
   tagIds: string[]
+  // Só sob contexto com fases (tracksPhase); null = sem fase
+  phase: Phase | null
 }
+
+// Fase de trabalho: ordem do enum do banco
+export type Phase = 'requisitos' | 'prototipo' | 'validacao' | 'implementacao'
 
 // Execução que já foi concluída: completedAt deixa de aceitar null
 export type CompletedExecution = TaskExecution & { completedAt: string }
@@ -45,6 +50,7 @@ export type Tag = {
   parentId: string | null
   level: 1 | 2 | 3
   active: boolean
+  tracksPhase: boolean // só contexto (nível 1) pode ser true
 }
 
 // O que a tela manda pro servidor: a raiz e, no máximo, a tag mais

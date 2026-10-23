@@ -6,6 +6,7 @@ import {
   localDayKey,
 } from '../dates'
 import { frequencyLabels } from '../frequency'
+import { phaseLabels } from '../phases'
 import { cardClass, chipClass, tagChipClass, textButtonClass } from '../styles'
 import { indexTags, leafTags, tagLineage } from '../tags'
 import type {
@@ -131,6 +132,12 @@ function ExecutionHistory(props: {
                 </span>
               </li>
             ))}
+            {execution.phase && (
+              <li className={chipClass}>
+                <span className="sr-only">Fase: </span>
+                {phaseLabels[execution.phase]}
+              </li>
+            )}
           </ul>
         )}
         <div className="flex items-center gap-2">

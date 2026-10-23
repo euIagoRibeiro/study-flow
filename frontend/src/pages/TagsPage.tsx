@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   ChevronDownIcon,
   PencilIcon,
+  PhasesIcon,
   PlusIcon,
   TrashIcon,
   UnarchiveIcon,
@@ -59,6 +60,7 @@ function TagsPage(props: {
   onRename: (id: string, name: string) => Promise<void>
   onArchive: (id: string) => void
   onReactivate: (id: string) => void
+  onSetPhases: (id: string, tracksPhase: boolean) => void
   onDelete: (id: string) => void
 }) {
   const [showArchived, setShowArchived] = useState(false)
@@ -92,7 +94,15 @@ function TagsPage(props: {
   // recusa as duas
   const counts = new Map<string, number>()
   const used = new Map<string, number>()
+  // Registros com fase por contexto: com algum, "Parar de usar fases" trava
+  const phased = new Map<string, number>()
   for (const execution of props.executions) {
+    if (execution.phase && execution.rootTagId) {
+      phased.set(
+        execution.rootTagId,
+        (phased.get(execution.rootTagId) ?? 0) + 1,
+      )
+    }
     const ids = execution.rootTagId
       ? [execution.rootTagId, ...execution.tagIds]
       : execution.tagIds
@@ -161,6 +171,27 @@ function TagsPage(props: {
           setForm({ kind: 'child', parentId: tag.id })
         },
       })
+    }
+    if (tag.active && tag.level === 1) {
+      const inUse = phased.get(tag.id) ?? 0
+      actions.push(
+        tag.tracksPhase
+          ? {
+              label: 'Parar de usar fases',
+              icon: <PhasesIcon />,
+              onSelect: () => props.onSetPhases(tag.id, false),
+              disabled: inUse > 0,
+              hint:
+                inUse > 0
+                  ? `Em uso em ${registros(inUse)} com fase.`
+                  : undefined,
+            }
+          : {
+              label: 'Usar fases de trabalho',
+              icon: <PhasesIcon />,
+              onSelect: () => props.onSetPhases(tag.id, true),
+            },
+      )
     }
     if (tag.active) {
       actions.push({
@@ -243,6 +274,7 @@ function TagsPage(props: {
               </span>
             )}
             <span className="flex-1" />
+            {tag.tracksPhase && <span className={chipClass}>Fases</span>}
             {!tag.active && <span className={chipClass}>Arquivada</span>}
             <span className="shrink-0 font-dados text-meta text-tinta-suave tabular-nums">
               {registros(counts.get(tag.id) ?? 0)}

@@ -133,6 +133,15 @@ export function TagIcon() {
   )
 }
 
+// Degraus: fases de trabalho, uma depois da outra
+export function PhasesIcon() {
+  return (
+    <svg {...commonProps}>
+      <path d="M3.5 19.5h5v-5h5v-5h5v-5" />
+    </svg>
+  )
+}
+
 export function TrashIcon() {
   return (
     <svg {...commonProps}>
