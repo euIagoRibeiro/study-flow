@@ -95,6 +95,11 @@ function ExecutionHistory(props: {
     const editing = editingId === execution.id
     const sessionsOpen = openSessions.has(execution.id)
     const leaves = leafTags(execution, tagsById)
+    const estimate = entries.find((entry) => entry.estimated)
+    // Tempo todo estimado: o cabeçalho diz. Misto (cronômetro + estimativa):
+    // quem diz é a sessão estimada, na lista
+    const allEstimated =
+      entries.length > 0 && entries.every((entry) => entry.estimated)
 
     return (
       <article className={`${cardClass} flex flex-col gap-1`}>
@@ -105,6 +110,11 @@ function ExecutionHistory(props: {
           {entries.length > 0 && (
             <span className="shrink-0 font-dados text-conteudo font-semibold tabular-nums">
               {formatDuration(totalMs)}
+              {allEstimated && (
+                <span className="ml-1.5 text-meta font-normal text-tinta-suave">
+                  estimado
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -178,6 +188,11 @@ function ExecutionHistory(props: {
           <ExecutionEditForm
             execution={execution}
             tags={props.tags}
+            estimateMinutes={
+              estimate
+                ? Math.round(entryMs(estimate, execution) / 60_000)
+                : null
+            }
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)
               setEditingId(null)
@@ -196,18 +211,24 @@ function ExecutionHistory(props: {
                     <span>
                       {start}–{end} ·{' '}
                       {formatDuration(entryMs(entry, execution))}
+                      {entry.estimated && ' · estimada'}
                     </span>
-                    <CompactIconButton
-                      onClick={() =>
-                        setEditingEntryId(editingEntry ? null : entry.id)
-                      }
-                      expanded={editingEntry}
-                      label={`${editingEntry ? 'Cancelar edição da' : 'Editar'} sessão das ${start}`}
-                      title={editingEntry ? 'Cancelar edição' : 'Editar sessão'}
-                      className="-mr-2"
-                    >
-                      <PencilIcon />
-                    </CompactIconButton>
+                    {/* Estimada: sem lápis, ajusta-se pelo registro (a âncora) */}
+                    {!entry.estimated && (
+                      <CompactIconButton
+                        onClick={() =>
+                          setEditingEntryId(editingEntry ? null : entry.id)
+                        }
+                        expanded={editingEntry}
+                        label={`${editingEntry ? 'Cancelar edição da' : 'Editar'} sessão das ${start}`}
+                        title={
+                          editingEntry ? 'Cancelar edição' : 'Editar sessão'
+                        }
+                        className="-mr-2"
+                      >
+                        <PencilIcon />
+                      </CompactIconButton>
+                    )}
                   </div>
                   {editingEntry && (
                     <TimeEntryEditForm

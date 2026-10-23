@@ -1,4 +1,9 @@
-import type { ExecutionChanges, TagChoice, TaskExecution } from '../types'
+import type {
+  ExecutionChanges,
+  SavedExecution,
+  TagChoice,
+  TaskExecution,
+} from '../types'
 import { request } from './client'
 
 export function listExecutions(): Promise<TaskExecution[]> {
@@ -7,48 +12,62 @@ export function listExecutions(): Promise<TaskExecution[]> {
 
 // O snapshot (título/frequência) é copiado pelo servidor — não vai no corpo
 function postExecution(
-  taskId: string,
-  description: string | null,
-  completedAt: string | null,
-  tags?: TagChoice,
-): Promise<TaskExecution> {
-  return request<TaskExecution>('/executions', {
+  body: {
+    taskId: string
+    description: string | null
+    completedAt: string | null
+    estimatedMinutes?: number
+  } & Partial<TagChoice>,
+): Promise<SavedExecution> {
+  return request<SavedExecution>('/executions', {
     method: 'POST',
-    body: JSON.stringify({ taskId, description, completedAt, ...tags }),
+    body: JSON.stringify(body),
   })
 }
 
-// Sem rootTagId/tagIds no corpo, o servidor não mexe nas tags
+// Sem rootTagId/tagIds no corpo, o servidor não mexe nas tags; sem
+// estimatedMinutes, mantém a estimativa
 function putExecution(
   id: string,
   changes: {
     description: string | null
     completedAt: string | null
+    estimatedMinutes?: number | null
   } & Partial<TagChoice>,
-): Promise<TaskExecution> {
-  return request<TaskExecution>(`/executions/${id}`, {
+): Promise<SavedExecution> {
+  return request<SavedExecution>(`/executions/${id}`, {
     method: 'PUT',
     body: JSON.stringify(changes),
   })
 }
 
+// Registrar sem cronômetro: o "Quando" e a duração estimada vêm da tela
 export function createExecution(
   taskId: string,
   description: string,
+  completedAt: string,
   tags: TagChoice,
-): Promise<TaskExecution> {
-  return postExecution(taskId, description, new Date().toISOString(), tags)
+  estimatedMinutes: number | null,
+): Promise<SavedExecution> {
+  return postExecution({
+    taskId,
+    description,
+    completedAt,
+    ...tags,
+    ...(estimatedMinutes ? { estimatedMinutes } : {}),
+  })
 }
 
-export function startExecution(taskId: string): Promise<TaskExecution> {
-  return postExecution(taskId, null, null) // aberta: cronômetro rodando
+export function startExecution(taskId: string): Promise<SavedExecution> {
+  // aberta: cronômetro rodando
+  return postExecution({ taskId, description: null, completedAt: null })
 }
 
 export function finishExecution(
   id: string,
   description: string,
   tags: Partial<TagChoice>,
-): Promise<TaskExecution> {
+): Promise<SavedExecution> {
   return putExecution(id, {
     description,
     completedAt: new Date().toISOString(),
@@ -61,7 +80,7 @@ export function reopenExecution(
   id: string,
   previousDescription: string | null,
   previousTags: TagChoice,
-): Promise<TaskExecution> {
+): Promise<SavedExecution> {
   return putExecution(id, {
     description: previousDescription,
     completedAt: null,
@@ -72,6 +91,6 @@ export function reopenExecution(
 export function editExecution(
   id: string,
   changes: ExecutionChanges,
-): Promise<TaskExecution> {
+): Promise<SavedExecution> {
   return putExecution(id, changes)
 }

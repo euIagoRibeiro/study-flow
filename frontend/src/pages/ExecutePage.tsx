@@ -42,7 +42,9 @@ function ExecutePage(props: {
   onExecute: (
     taskId: string,
     description: string,
+    completedAt: string,
     tags: TagChoice,
+    estimatedMinutes: number | null,
   ) => Promise<void>
   onStartTimer: (taskId: string) => Promise<string | null>
   onStopTimer: (timeEntryId: string) => Promise<void>
@@ -97,9 +99,20 @@ function ExecutePage(props: {
   }
 
   // Se o servidor recusar, o erro sobe pro ExecutionForm e não navega
-  async function handleExecute(description: string, tags: TagChoice) {
+  async function handleExecute(
+    description: string,
+    completedAt: string,
+    tags: TagChoice,
+    estimatedMinutes: number | null,
+  ) {
     if (selectedTask === undefined) return
-    await props.onExecute(selectedTask.id, description, tags)
+    await props.onExecute(
+      selectedTask.id,
+      description,
+      completedAt,
+      tags,
+      estimatedMinutes,
+    )
     navigate('/')
   }
 

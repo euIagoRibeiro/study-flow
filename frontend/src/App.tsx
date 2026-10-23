@@ -14,6 +14,7 @@ import type {
   ExecutionChanges,
   LoadStatus,
   NewTask,
+  SavedExecution,
   Tag,
   TagChoice,
   Task,
@@ -89,31 +90,43 @@ function App() {
     )
   }
 
-  function replaceExecution(updated: TaskExecution) {
+  // A resposta de gravar traz a execução e as sessões dela como ficaram no
+  // servidor: as sessões daquela execução são trocadas pelas da resposta
+  function keepSaved(saved: SavedExecution) {
+    const { timeEntries: entries, ...execution } = saved
     setExecutions((current) =>
-      current.map((execution) =>
-        execution.id === updated.id ? updated : execution,
-      ),
+      current.some((e) => e.id === execution.id)
+        ? current.map((e) => (e.id === execution.id ? execution : e))
+        : [...current, execution],
     )
+    setTimeEntries((current) => [
+      ...current.filter((entry) => entry.taskExecutionId !== execution.id),
+      ...entries,
+    ])
   }
 
   // Erro sobe pro ExecutionForm, que mostra a mensagem
   async function addExecution(
     taskId: string,
     description: string,
+    completedAt: string,
     tags: TagChoice,
+    estimatedMinutes: number | null,
   ) {
-    const execution = await executionsApi.createExecution(
-      taskId,
-      description,
-      tags,
+    keepSaved(
+      await executionsApi.createExecution(
+        taskId,
+        description,
+        completedAt,
+        tags,
+        estimatedMinutes,
+      ),
     )
-    setExecutions((current) => [...current, execution])
   }
 
   // Erro sobe pro ExecutionEditForm, que mostra a mensagem
   async function editExecution(id: string, changes: ExecutionChanges) {
-    replaceExecution(await executionsApi.editExecution(id, changes))
+    keepSaved(await executionsApi.editExecution(id, changes))
   }
 
   // Devolve o id da execução criada, ou null se recusar (nenhum caso deveria
@@ -130,7 +143,7 @@ function App() {
     )
     if (alreadyOpenForTask) return null // já tem execução aberta — usar resumeTimer
 
-    let execution: TaskExecution
+    let execution: SavedExecution
     try {
       execution = await executionsApi.startExecution(taskId)
     } catch (error) {
@@ -144,7 +157,7 @@ function App() {
     }
     // A execução já existe no servidor: entra no estado mesmo se a sessão
     // falhar abaixo (fica aberta como "Pausado", com "Retomar" disponível)
-    setExecutions((current) => [...current, execution])
+    keepSaved(execution)
     try {
       const entry = await timeEntriesApi.startTimeEntry(execution.id)
       setTimeEntries((current) => [...current, entry])
@@ -200,25 +213,15 @@ function App() {
 
   // Servidor primeiro: se falhar, o erro sobe pro TimerPanel e o cronômetro
   // continua rodando. O servidor fecha a sessão rodando com o mesmo
-  // completedAt, na mesma transação — aqui só espelha, sem new Date()
+  // completedAt, na mesma transação, e devolve as sessões já fechadas
   async function finishExecution(
     executionId: string,
     description: string,
     tags: Partial<TagChoice>,
   ) {
-    const execution = await executionsApi.finishExecution(
-      executionId,
-      description,
-      tags,
+    keepSaved(
+      await executionsApi.finishExecution(executionId, description, tags),
     )
-    setTimeEntries((current) =>
-      current.map((entry) =>
-        entry.taskExecutionId === executionId && entry.endedAt === null
-          ? { ...entry, endedAt: execution.completedAt }
-          : entry,
-      ),
-    )
-    replaceExecution(execution)
   }
 
   // "Desfazer" é um botão solto, sem formulário: o erro vai pro Layout
@@ -229,7 +232,7 @@ function App() {
     resumeEntryId: string | null,
   ) {
     try {
-      replaceExecution(
+      keepSaved(
         await executionsApi.reopenExecution(
           executionId,
           previousDescription,

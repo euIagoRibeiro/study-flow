@@ -5,6 +5,7 @@ import { fieldClass, primaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
 import type { CompletedExecution, ExecutionChanges, Tag } from '../types'
+import EstimateField from './EstimateField'
 import FormError from './FormError'
 import PhaseField from './PhaseField'
 import TagFields from './TagFields'
@@ -12,6 +13,7 @@ import TagFields from './TagFields'
 function ExecutionEditForm(props: {
   execution: CompletedExecution
   tags: Tag[]
+  estimateMinutes: number | null // a estimativa que o registro já tem
   onSubmit: (changes: ExecutionChanges) => Promise<unknown>
 }) {
   const { execution } = props
@@ -19,6 +21,8 @@ function ExecutionEditForm(props: {
   const [completedAt, setCompletedAt] = useState(
     toDatetimeLocalValue(execution.completedAt),
   )
+  const initialMinutes = props.estimateMinutes?.toString() ?? ''
+  const [minutes, setMinutes] = useState(initialMinutes)
   const byId = indexTags(props.tags)
   const [selection, setSelection] = useState(() =>
     executionSelection(execution, byId),
@@ -48,6 +52,10 @@ function ExecutionEditForm(props: {
         ...(selection.legacyCount > 0
           ? {}
           : pathToChoice(selection.path, showPhase ? phase : null)),
+        // Sem mexer, não vai: o servidor mantém e move junto com o "Quando"
+        ...(minutes === initialMinutes
+          ? {}
+          : { estimatedMinutes: minutes === '' ? null : Number(minutes) }),
       })
     } catch (err) {
       setError(
@@ -89,6 +97,7 @@ function ExecutionEditForm(props: {
             className={fieldClass}
           />
         </label>
+        <EstimateField value={minutes} onChange={setMinutes} />
         <TagFields
           tags={props.tags}
           value={selection.path}

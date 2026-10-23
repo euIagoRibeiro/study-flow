@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice } from '../tags'
 import type { Phase, Tag, TagChoice } from '../types'
+import EstimateField from './EstimateField'
 import FormError from './FormError'
 import PhaseField from './PhaseField'
 import TagFields from './TagFields'
@@ -14,9 +16,21 @@ function ExecutionForm(props: {
   tags: Tag[]
   initialPath: string[] // pré-seleção: o contexto do último registro
   suggestPhase: (path: string[]) => Phase | null
-  onSubmit: (description: string, tags: TagChoice) => Promise<unknown>
+  onSubmit: (
+    description: string,
+    completedAt: string,
+    tags: TagChoice,
+    estimatedMinutes: number | null,
+  ) => Promise<unknown>
 }) {
   const [description, setDescription] = useState('')
+  // "Quando" começa na hora em que o formulário abriu; sem mexer, grava a
+  // hora do clique (preencher não deixa o registro no passado)
+  const [openedAt] = useState(() =>
+    toDatetimeLocalValue(new Date().toISOString()),
+  )
+  const [when, setWhen] = useState(openedAt)
+  const [minutes, setMinutes] = useState('')
   const [path, setPath] = useState(props.initialPath)
   const [phase, setPhase] = useState(() => props.suggestPhase(path))
   const [error, setError] = useState('')
@@ -35,7 +49,11 @@ function ExecutionForm(props: {
     try {
       await props.onSubmit(
         description,
+        when === openedAt
+          ? new Date().toISOString()
+          : fromDatetimeLocalValue(when),
         pathToChoice(path, showPhase ? phase : null),
+        minutes === '' ? null : Number(minutes),
       )
     } catch (err) {
       // 400: o servidor recusou com motivo (ex.: tag arquivada em outra aba)
@@ -64,6 +82,17 @@ function ExecutionForm(props: {
           className={fieldClass}
         />
       </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm text-tinta-suave">Quando</span>
+        <input
+          type="datetime-local"
+          value={when}
+          onChange={(event) => setWhen(event.target.value)}
+          required
+          className={fieldClass}
+        />
+      </label>
+      <EstimateField value={minutes} onChange={setMinutes} />
       <TagFields tags={props.tags} value={path} onChange={changePath} />
       {showPhase && <PhaseField value={phase} onChange={setPhase} />}
       <button

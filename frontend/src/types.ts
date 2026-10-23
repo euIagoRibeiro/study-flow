@@ -40,7 +40,14 @@ export type TimeEntry = {
   taskExecutionId: string
   startedAt: string
   endedAt: string | null // null enquanto está rodando
+  // Duração estimada (sem cronômetro): termina no "Quando" do registro e
+  // só se edita por ele. Nunca está rodando
+  estimated: boolean
 }
+
+// Resposta de gravar uma execução: ela e as sessões dela já como ficaram
+// (a estimativa pode ter mudado ou se movido junto com o "Quando")
+export type SavedExecution = TaskExecution & { timeEntries: TimeEntry[] }
 
 // Até 3 níveis: raiz (contexto) › filho › neto. Nível e raiz quem calcula
 // é o servidor, a partir do pai
@@ -68,6 +75,8 @@ export type TagChoice = {
 export type ExecutionChanges = {
   description: string
   completedAt: string
+  // Ausente: mantém (e acompanha o "Quando"). null remove
+  estimatedMinutes?: number | null
 } & Partial<TagChoice>
 
 export type LoadStatus = 'loading' | 'error' | 'ready'
