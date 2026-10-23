@@ -35,7 +35,10 @@ INSERT INTO tasks (id, title, frequency, active, created_at) VALUES
   ('5eed0000-0000-4000-8000-000000000008', 'Ideias de projeto',      'none',    true,  now() - interval '53 days'),
   -- As duas abaixo existem pra ter execuções com tags (bloco no fim)
   ('5eed0000-0000-4000-8000-000000000009', 'Estudar para o vestibular', 'daily', true, now() - interval '52 days'),
-  ('5eed0000-0000-4000-8000-000000000010', 'Matemática por diversão',   'none',  true, now() - interval '51 days');
+  ('5eed0000-0000-4000-8000-000000000010', 'Matemática por diversão',   'none',  true, now() - interval '51 days'),
+  -- As duas abaixo trabalham no MESMO projeto (bloco da fase, no fim)
+  ('5eed0000-0000-4000-8000-000000000011', 'Projeto ai-boundaries', 'none',  true, now() - interval '50 days'),
+  ('5eed0000-0000-4000-8000-000000000012', 'Programar',             'daily', true, now() - interval '65 days');
 
 -- Execuções. completed_at NULL = em andamento (2: uma rodando, uma pausada)
 INSERT INTO task_executions
@@ -173,5 +176,74 @@ INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES
   ('5eed0000-0000-4000-8000-000000000906', (SELECT t FROM ancora) - interval '6 days 1 hour 30 minutes', (SELECT t FROM ancora) - interval '6 days 50 minutes'),
   ('5eed0000-0000-4000-8000-000000000906', (SELECT t FROM ancora) - interval '6 days 40 minutes', (SELECT t FROM ancora) - interval '6 days'),
   ('5eed0000-0000-4000-8000-000000001001', (SELECT t FROM ancora) - interval '12 days 45 minutes', (SELECT t FROM ancora) - interval '12 days');
+
+-- Fase de trabalho: "Código" é o único contexto com fases. Projeto = a tag
+-- mais específica do caminho (nível 3, ou nível 2 no StudyFlow).
+-- projeto-antigo arquivado: mantém o histórico, sai da pré-seleção.
+INSERT INTO tags (id, name, level, parent_id, root_id, active, tracks_phase) VALUES
+  ('5eed0000-0000-4000-9000-000000000400', 'Código', 1, NULL, NULL, true, true);
+
+INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
+  ('5eed0000-0000-4000-9000-000000000410', 'Pessoal',   2, '5eed0000-0000-4000-9000-000000000400', '5eed0000-0000-4000-9000-000000000400', true),
+  ('5eed0000-0000-4000-9000-000000000420', 'Empresa',   2, '5eed0000-0000-4000-9000-000000000400', '5eed0000-0000-4000-9000-000000000400', true),
+  ('5eed0000-0000-4000-9000-000000000430', 'StudyFlow', 2, '5eed0000-0000-4000-9000-000000000400', '5eed0000-0000-4000-9000-000000000400', true);
+
+INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
+  ('5eed0000-0000-4000-9000-000000000411', 'ai-boundaries',        3, '5eed0000-0000-4000-9000-000000000410', '5eed0000-0000-4000-9000-000000000400', true),
+  ('5eed0000-0000-4000-9000-000000000421', 'equipamentos-medicos', 3, '5eed0000-0000-4000-9000-000000000420', '5eed0000-0000-4000-9000-000000000400', true),
+  ('5eed0000-0000-4000-9000-000000000422', 'projeto-antigo',       3, '5eed0000-0000-4000-9000-000000000420', '5eed0000-0000-4000-9000-000000000400', false);
+
+-- ai-boundaries: requisitos → protótipo → requisitos (voltou) → protótipo →
+-- validação. A última execução dele (1201) é da tarefa "Programar", não da
+-- "Projeto ai-boundaries": pré-seleção pela tarefa daria protótipo, errado.
+-- 1203 sem fase e sem cronômetro: a fatia "(sem fase)" dentro de Código.
+-- Totais: ai-boundaries 135/270/50 min (req/prot/val); Código 675 min.
+INSERT INTO task_executions
+  (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id, phase)
+VALUES
+  ('5eed0000-0000-4000-8000-000000001101', '5eed0000-0000-4000-8000-000000000011', 'Levantar casos de uso',          'Projeto ai-boundaries', 'none',  (SELECT t FROM ancora) - interval '40 days', '5eed0000-0000-4000-9000-000000000400', 'requisitos'),
+  ('5eed0000-0000-4000-8000-000000001102', '5eed0000-0000-4000-8000-000000000011', 'Limites do que o modelo decide', 'Projeto ai-boundaries', 'none',  (SELECT t FROM ancora) - interval '35 days', '5eed0000-0000-4000-9000-000000000400', 'requisitos'),
+  ('5eed0000-0000-4000-8000-000000001103', '5eed0000-0000-4000-8000-000000000011', 'Primeiro protótipo de regras',   'Projeto ai-boundaries', 'none',  (SELECT t FROM ancora) - interval '28 days', '5eed0000-0000-4000-9000-000000000400', 'prototipo'),
+  ('5eed0000-0000-4000-8000-000000001104', '5eed0000-0000-4000-8000-000000000011', 'Protótipo com interface',        'Projeto ai-boundaries', 'none',  (SELECT t FROM ancora) - interval '21 days', '5eed0000-0000-4000-9000-000000000400', 'prototipo'),
+  ('5eed0000-0000-4000-8000-000000001105', '5eed0000-0000-4000-8000-000000000011', 'Voltamos aos requisitos',        'Projeto ai-boundaries', 'none',  (SELECT t FROM ancora) - interval '14 days', '5eed0000-0000-4000-9000-000000000400', 'requisitos'),
+  ('5eed0000-0000-4000-8000-000000001106', '5eed0000-0000-4000-8000-000000000011', 'Novo protótipo',                 'Projeto ai-boundaries', 'none',  (SELECT t FROM ancora) - interval '7 days',  '5eed0000-0000-4000-9000-000000000400', 'prototipo'),
+  ('5eed0000-0000-4000-8000-000000001201', '5eed0000-0000-4000-8000-000000000012', 'Testes com usuários',            'Programar',             'daily', (SELECT t FROM ancora) - interval '2 days',  '5eed0000-0000-4000-9000-000000000400', 'validacao'),
+  ('5eed0000-0000-4000-8000-000000001202', '5eed0000-0000-4000-8000-000000000012', 'Integração com o sensor',        'Programar',             'daily', (SELECT t FROM ancora) - interval '3 days',  '5eed0000-0000-4000-9000-000000000400', 'implementacao'),
+  ('5eed0000-0000-4000-8000-000000001203', '5eed0000-0000-4000-8000-000000000012', 'Reunião de alinhamento',         'Programar',             'daily', (SELECT t FROM ancora) - interval '10 days', '5eed0000-0000-4000-9000-000000000400', NULL),
+  ('5eed0000-0000-4000-8000-000000001204', '5eed0000-0000-4000-8000-000000000012', 'Desenho da fase de trabalho',    'Programar',             'daily', (SELECT t FROM ancora) - interval '1 day',   '5eed0000-0000-4000-9000-000000000400', 'requisitos'),
+  ('5eed0000-0000-4000-8000-000000001205', '5eed0000-0000-4000-8000-000000000012', 'Entrega final',                  'Programar',             'daily', (SELECT t FROM ancora) - interval '60 days', '5eed0000-0000-4000-9000-000000000400', 'implementacao');
+
+-- Fechamento: o projeto de nível 3 leva o nível 2 pai; StudyFlow vai sozinho
+INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id)
+SELECT e.id, t.id, t.parent_id, '5eed0000-0000-4000-9000-000000000400'
+FROM (VALUES
+  ('5eed0000-0000-4000-8000-000000001101'::uuid, '5eed0000-0000-4000-9000-000000000411'::uuid),
+  ('5eed0000-0000-4000-8000-000000001102', '5eed0000-0000-4000-9000-000000000411'),
+  ('5eed0000-0000-4000-8000-000000001103', '5eed0000-0000-4000-9000-000000000411'),
+  ('5eed0000-0000-4000-8000-000000001104', '5eed0000-0000-4000-9000-000000000411'),
+  ('5eed0000-0000-4000-8000-000000001105', '5eed0000-0000-4000-9000-000000000411'),
+  ('5eed0000-0000-4000-8000-000000001106', '5eed0000-0000-4000-9000-000000000411'),
+  ('5eed0000-0000-4000-8000-000000001201', '5eed0000-0000-4000-9000-000000000411'),
+  ('5eed0000-0000-4000-8000-000000001202', '5eed0000-0000-4000-9000-000000000421'),
+  ('5eed0000-0000-4000-8000-000000001203', '5eed0000-0000-4000-9000-000000000421'),
+  ('5eed0000-0000-4000-8000-000000001204', '5eed0000-0000-4000-9000-000000000430'),
+  ('5eed0000-0000-4000-8000-000000001205', '5eed0000-0000-4000-9000-000000000422')
+) AS e (id, leaf_id)
+JOIN tags leaf ON leaf.id = e.leaf_id
+JOIN tags t ON t.id = leaf.id OR (leaf.level = 3 AND t.id = leaf.parent_id);
+
+INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES
+  ('5eed0000-0000-4000-8000-000000001101', (SELECT t FROM ancora) - interval '40 days 1 hour',             (SELECT t FROM ancora) - interval '40 days'),
+  ('5eed0000-0000-4000-8000-000000001102', (SELECT t FROM ancora) - interval '35 days 45 minutes',         (SELECT t FROM ancora) - interval '35 days'),
+  ('5eed0000-0000-4000-8000-000000001103', (SELECT t FROM ancora) - interval '28 days 1 hour 30 minutes',  (SELECT t FROM ancora) - interval '28 days'),
+  -- 2 sessões com pausa (60 + 60 min)
+  ('5eed0000-0000-4000-8000-000000001104', (SELECT t FROM ancora) - interval '21 days 2 hours 10 minutes', (SELECT t FROM ancora) - interval '21 days 1 hour 10 minutes'),
+  ('5eed0000-0000-4000-8000-000000001104', (SELECT t FROM ancora) - interval '21 days 1 hour',             (SELECT t FROM ancora) - interval '21 days'),
+  ('5eed0000-0000-4000-8000-000000001105', (SELECT t FROM ancora) - interval '14 days 30 minutes',         (SELECT t FROM ancora) - interval '14 days'),
+  ('5eed0000-0000-4000-8000-000000001106', (SELECT t FROM ancora) - interval '7 days 1 hour',              (SELECT t FROM ancora) - interval '7 days'),
+  ('5eed0000-0000-4000-8000-000000001201', (SELECT t FROM ancora) - interval '2 days 50 minutes',          (SELECT t FROM ancora) - interval '2 days'),
+  ('5eed0000-0000-4000-8000-000000001202', (SELECT t FROM ancora) - interval '3 days 1 hour 20 minutes',   (SELECT t FROM ancora) - interval '3 days'),
+  ('5eed0000-0000-4000-8000-000000001204', (SELECT t FROM ancora) - interval '1 day 40 minutes',           (SELECT t FROM ancora) - interval '1 day'),
+  ('5eed0000-0000-4000-8000-000000001205', (SELECT t FROM ancora) - interval '60 days 1 hour 40 minutes',  (SELECT t FROM ancora) - interval '60 days');
 
 COMMIT;
