@@ -7,10 +7,12 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
-import { pathToChoice, type TagSelection } from '../tags'
-import type { Tag, TagChoice, TaskExecution, TimeEntry } from '../types'
+import { phaseApplies } from '../phases'
+import { indexTags, pathToChoice, type TagSelection } from '../tags'
+import type { Phase, Tag, TagChoice, TaskExecution, TimeEntry } from '../types'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
+import PhaseField from './PhaseField'
 import TagFields from './TagFields'
 
 function TimerPanel(props: {
@@ -21,6 +23,7 @@ function TimerPanel(props: {
   // Tags que o registro já tem (ex.: voltou pelo Desfazer) ou, sem elas,
   // a pré-seleção do contexto
   initial: TagSelection
+  suggestPhase: (path: string[]) => Phase | null
   onStop: (entryId: string) => Promise<unknown>
   onResume: (executionId: string) => Promise<unknown>
   onFinish: (
@@ -34,6 +37,11 @@ function TimerPanel(props: {
   const { execution, entries, runningEntry, onStop, onResume, onFinish } = props
   const [description, setDescription] = useState(execution.description ?? '')
   const [selection, setSelection] = useState(props.initial)
+  // Voltou pelo Desfazer: começa na fase que tinha
+  const [phase, setPhase] = useState(
+    () => execution.phase ?? props.suggestPhase(props.initial.path),
+  )
+  const showPhase = phaseApplies(selection.path, indexTags(props.tags))
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // Pausar/Retomar esperando o servidor: sem isso, clique duplo mandaria
@@ -70,7 +78,9 @@ function TimerPanel(props: {
         execution.id,
         description,
         // Registro com mais de uma folha, sem mexer nas tags: não manda tags
-        selection.legacyCount > 0 ? {} : pathToChoice(selection.path),
+        selection.legacyCount > 0
+          ? {}
+          : pathToChoice(selection.path, showPhase ? phase : null),
       )
     } catch (err) {
       setError(
@@ -144,13 +154,17 @@ function TimerPanel(props: {
         <TagFields
           tags={props.tags}
           value={selection.path}
-          onChange={(path) => setSelection({ path, legacyCount: 0 })}
+          onChange={(path) => {
+            setSelection({ path, legacyCount: 0 })
+            setPhase(props.suggestPhase(path))
+          }}
           keep={[
             ...(execution.rootTagId ? [execution.rootTagId] : []),
             ...execution.tagIds,
           ]}
           legacyCount={selection.legacyCount}
         />
+        {showPhase && <PhaseField value={phase} onChange={setPhase} />}
         <button
           type="submit"
           disabled={submitting}

@@ -1,4 +1,10 @@
-import type { CompletedExecution, Tag, TagChoice, TaskExecution } from './types'
+import type {
+  CompletedExecution,
+  Phase,
+  Tag,
+  TagChoice,
+  TaskExecution,
+} from './types'
 
 export type TagIndex = Map<string, Tag>
 
@@ -45,11 +51,12 @@ export function leafTags(
 }
 
 // Caminho escolhido nos campos (até 3 ids, da raiz pra baixo) → o que vai
-// pro servidor: a raiz e só a tag mais específica
-export function pathToChoice(path: string[]): TagChoice {
+// pro servidor: a raiz e só a tag mais específica, com a fase
+export function pathToChoice(path: string[], phase: Phase | null): TagChoice {
   return {
     rootTagId: path[0] ?? null,
     tagIds: path.length > 1 ? [path[path.length - 1]] : [],
+    phase,
   }
 }
 

@@ -7,6 +7,7 @@ import TimerPanel from '../components/TimerPanel'
 import UndoNotice from '../components/UndoNotice'
 import { frequencyLabels } from '../frequency'
 import { PlayIcon } from '../components/icons'
+import { lastPhase } from '../phases'
 import {
   cardClass,
   chipAndamentoClass,
@@ -127,6 +128,7 @@ function ExecutePage(props: {
       previousTags: {
         rootTagId: execution?.rootTagId ?? null,
         tagIds: execution?.tagIds ?? [],
+        phase: execution?.phase ?? null,
       },
       resumeEntryId: resumeEntry?.id ?? null,
     })
@@ -266,6 +268,9 @@ function ExecutePage(props: {
   const runningEntry = openEntries.find((entry) => entry.endedAt === null)
   const tagsById = indexTags(props.tags)
   const preselected = lastRootPath(props.executions, selectedTask.id, tagsById)
+  // Fase: pelo caminho (de qualquer tarefa), não pela tarefa como o contexto
+  const suggestPhase = (path: string[]) =>
+    lastPhase(props.executions, path, tagsById)
   // Registro aberto que já tem tags (voltou pelo Desfazer): começa nelas
   const openSelection = openExecution
     ? executionSelection(openExecution, tagsById)
@@ -328,6 +333,7 @@ function ExecutePage(props: {
           onResume={props.onResumeTimer}
           onFinish={handleFinish}
           tags={props.tags}
+          suggestPhase={suggestPhase}
           initial={
             openSelection && openSelection.path.length > 0
               ? openSelection
@@ -381,6 +387,7 @@ function ExecutePage(props: {
             key={selectedTask.id}
             tags={props.tags}
             initialPath={preselected}
+            suggestPhase={suggestPhase}
             onSubmit={handleExecute}
           />
         </>

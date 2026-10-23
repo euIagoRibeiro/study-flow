@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { fieldClass, secondaryButtonClass } from '../styles'
-import { pathToChoice } from '../tags'
-import type { Tag, TagChoice } from '../types'
+import { phaseApplies } from '../phases'
+import { indexTags, pathToChoice } from '../tags'
+import type { Phase, Tag, TagChoice } from '../types'
 import FormError from './FormError'
+import PhaseField from './PhaseField'
 import TagFields from './TagFields'
 
 // Registrar sem cronômetro: botão secundário — na mesma tela, o amarelo é
@@ -11,18 +13,30 @@ import TagFields from './TagFields'
 function ExecutionForm(props: {
   tags: Tag[]
   initialPath: string[] // pré-seleção: o contexto do último registro
+  suggestPhase: (path: string[]) => Phase | null
   onSubmit: (description: string, tags: TagChoice) => Promise<unknown>
 }) {
   const [description, setDescription] = useState('')
   const [path, setPath] = useState(props.initialPath)
+  const [phase, setPhase] = useState(() => props.suggestPhase(path))
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const showPhase = phaseApplies(path, indexTags(props.tags))
+
+  // Caminho novo, pré-seleção nova
+  function changePath(next: string[]) {
+    setPath(next)
+    setPhase(props.suggestPhase(next))
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitting(true)
     try {
-      await props.onSubmit(description, pathToChoice(path))
+      await props.onSubmit(
+        description,
+        pathToChoice(path, showPhase ? phase : null),
+      )
     } catch (err) {
       // 400: o servidor recusou com motivo (ex.: tag arquivada em outra aba)
       setError(
@@ -50,7 +64,8 @@ function ExecutionForm(props: {
           className={fieldClass}
         />
       </label>
-      <TagFields tags={props.tags} value={path} onChange={setPath} />
+      <TagFields tags={props.tags} value={path} onChange={changePath} />
+      {showPhase && <PhaseField value={phase} onChange={setPhase} />}
       <button
         type="submit"
         disabled={submitting}

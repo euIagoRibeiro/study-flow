@@ -55,10 +55,12 @@ export type Tag = {
 
 // O que a tela manda pro servidor: a raiz e, no máximo, a tag mais
 // específica escolhida (um caminho só por registro). O servidor completa
-// o caminho (fechamento)
+// o caminho (fechamento). A fase vai sempre junto com as tags (null se o
+// campo estiver escondido): com a mesma raiz, o servidor manteria a antiga
 export type TagChoice = {
   rootTagId: string | null
   tagIds: string[]
+  phase: Phase | null
 }
 
 // Editar um registro: tags ausentes = o servidor não mexe nelas (registro

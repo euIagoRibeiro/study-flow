@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, primaryButtonClass } from '../styles'
+import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
 import type { CompletedExecution, ExecutionChanges, Tag } from '../types'
 import FormError from './FormError'
+import PhaseField from './PhaseField'
 import TagFields from './TagFields'
 
 function ExecutionEditForm(props: {
@@ -17,10 +19,21 @@ function ExecutionEditForm(props: {
   const [completedAt, setCompletedAt] = useState(
     toDatetimeLocalValue(execution.completedAt),
   )
+  const byId = indexTags(props.tags)
   const [selection, setSelection] = useState(() =>
-    executionSelection(execution, indexTags(props.tags)),
+    executionSelection(execution, byId),
   )
+  const [phase, setPhase] = useState(execution.phase)
+  const showPhase = phaseApplies(selection.path, byId)
   const [error, setError] = useState('')
+
+  // Outro projeto: "Sem fase", sem chutar o passado com dado de hoje. De
+  // volta ao projeto do registro, a fase dele volta junto
+  function changePath(path: string[]) {
+    const original = executionSelection(execution, byId).path
+    setSelection({ path, legacyCount: 0 })
+    setPhase(path.at(-1) === original.at(-1) ? execution.phase : null)
+  }
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -32,7 +45,9 @@ function ExecutionEditForm(props: {
         completedAt: fromDatetimeLocalValue(completedAt),
         // Registro antigo com mais de uma folha, sem mexer nas tags: não
         // manda tags, e o servidor mantém as que estavam
-        ...(selection.legacyCount > 0 ? {} : pathToChoice(selection.path)),
+        ...(selection.legacyCount > 0
+          ? {}
+          : pathToChoice(selection.path, showPhase ? phase : null)),
       })
     } catch (err) {
       setError(
@@ -77,7 +92,7 @@ function ExecutionEditForm(props: {
         <TagFields
           tags={props.tags}
           value={selection.path}
-          onChange={(path) => setSelection({ path, legacyCount: 0 })}
+          onChange={changePath}
           // Tudo que o registro já tem continua escolhível, mesmo arquivado
           keep={[
             ...(execution.rootTagId ? [execution.rootTagId] : []),
@@ -85,6 +100,7 @@ function ExecutionEditForm(props: {
           ]}
           legacyCount={selection.legacyCount}
         />
+        {showPhase && <PhaseField value={phase} onChange={setPhase} />}
         <button
           type="submit"
           disabled={submitting}
