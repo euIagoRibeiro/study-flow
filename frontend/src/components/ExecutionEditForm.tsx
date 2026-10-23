@@ -5,6 +5,7 @@ import { fieldClass, primaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
 import type { CompletedExecution, ExecutionChanges, Tag } from '../types'
+import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import PhaseField from './PhaseField'
@@ -42,6 +43,11 @@ function ExecutionEditForm(props: {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const estimate = parseMinutes(minutes)
+    if (estimate === null) {
+      setError(MINUTES_ERROR)
+      return
+    }
     setSubmitting(true)
     try {
       await props.onSubmit({
@@ -55,7 +61,7 @@ function ExecutionEditForm(props: {
         // Sem mexer, não vai: o servidor mantém e move junto com o "Quando"
         ...(minutes === initialMinutes
           ? {}
-          : { estimatedMinutes: minutes === '' ? null : Number(minutes) }),
+          : { estimatedMinutes: estimate === '' ? null : estimate }),
       })
     } catch (err) {
       setError(

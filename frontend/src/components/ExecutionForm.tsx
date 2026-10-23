@@ -5,6 +5,7 @@ import { fieldClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice } from '../tags'
 import type { Phase, Tag, TagChoice } from '../types'
+import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import PhaseField from './PhaseField'
@@ -45,6 +46,11 @@ function ExecutionForm(props: {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const estimate = parseMinutes(minutes)
+    if (estimate === null) {
+      setError(MINUTES_ERROR)
+      return
+    }
     setSubmitting(true)
     try {
       await props.onSubmit(
@@ -53,7 +59,7 @@ function ExecutionForm(props: {
           ? new Date().toISOString()
           : fromDatetimeLocalValue(when),
         pathToChoice(path, showPhase ? phase : null),
-        minutes === '' ? null : Number(minutes),
+        estimate === '' ? null : estimate,
       )
     } catch (err) {
       // 400: o servidor recusou com motivo (ex.: tag arquivada em outra aba)
