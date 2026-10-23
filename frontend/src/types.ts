@@ -30,6 +30,50 @@ export type TaskExecution = {
   // "2 exercícios", "5,5 km": sempre os dois juntos, ou os dois null
   quantity: number | null
   quantityUnit: string | null
+  // Medida por contexto (qual medida e os valores); null = sem medida
+  measure: ExecutionMeasure | null
+}
+
+export type ExecutionMeasure = {
+  measureId: string
+  values: { kindId: string | null; quantity: number }[]
+}
+
+// A medida que uma tag declara (descendentes herdam; subtag substitui)
+export type MeasureKind = { id: string; name: string; active: boolean }
+
+export type Measure = {
+  id: string
+  tagId: string
+  name: string // plural: "exercícios"
+  singular: string // "exercício"
+  allowsDecimal: boolean
+  active: boolean
+  kinds: MeasureKind[]
+}
+
+export type MeasureFields = Pick<Measure, 'name' | 'singular' | 'allowsDecimal'>
+
+// O que a tela de tags pode fazer com medidas. Os erros sobem pro
+// formulário de medida, que mostra o motivo do servidor
+export type MeasureActions = {
+  create: (
+    tagId: string,
+    fields: MeasureFields,
+    kinds: string[],
+  ) => Promise<void>
+  update: (
+    id: string,
+    changes: Partial<MeasureFields> & { active?: boolean },
+  ) => Promise<void>
+  remove: (id: string) => Promise<void>
+  createKind: (measureId: string, name: string) => Promise<void>
+  updateKind: (
+    measureId: string,
+    kindId: string,
+    changes: { name?: string; active?: boolean },
+  ) => Promise<void>
+  removeKind: (measureId: string, kindId: string) => Promise<void>
 }
 
 // Quantidade que vai pro servidor (null nos dois = sem quantidade)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { ApiError } from './api/client'
 import * as executionsApi from './api/executions'
+import * as measuresApi from './api/measures'
 import * as tagsApi from './api/tags'
 import * as tasksApi from './api/tasks'
 import * as timeEntriesApi from './api/timeEntries'
@@ -13,6 +14,8 @@ import TaskListPage from './pages/TaskListPage'
 import type {
   ExecutionChanges,
   LoadStatus,
+  Measure,
+  MeasureActions,
   NewTask,
   QuantityChoice,
   SavedExecution,
@@ -38,24 +41,29 @@ function App() {
   const [executions, setExecutions] = useState<TaskExecution[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [tags, setTags] = useState<Tag[]>([])
+  const [measures, setMeasures] = useState<Measure[]>([])
 
   useEffect(() => {
     let ignore = false
-    // As quatro saem juntas; se qualquer uma falhar, o carregamento todo falha
+    // Saem todas juntas; se qualquer uma falhar, o carregamento todo falha
     Promise.all([
       tasksApi.listTasks(),
       executionsApi.listExecutions(),
       timeEntriesApi.listTimeEntries(),
       tagsApi.listTags(),
+      measuresApi.listMeasures(),
     ])
-      .then(([taskList, executionList, timeEntryList, tagList]) => {
-        if (ignore) return
-        setTasks(taskList)
-        setExecutions(executionList)
-        setTimeEntries(timeEntryList)
-        setTags(tagList)
-        setStatus('ready')
-      })
+      .then(
+        ([taskList, executionList, timeEntryList, tagList, measureList]) => {
+          if (ignore) return
+          setTasks(taskList)
+          setExecutions(executionList)
+          setTimeEntries(timeEntryList)
+          setTags(tagList)
+          setMeasures(measureList)
+          setStatus('ready')
+        },
+      )
       .catch((error) => {
         if (ignore) return
         console.error(error)
@@ -372,6 +380,54 @@ function App() {
     }
   }
 
+  // Medidas: os erros sobem pro formulário de medida (mostra o motivo)
+  function replaceMeasure(updated: Measure) {
+    setMeasures((current) =>
+      current.map((m) => (m.id === updated.id ? updated : m)),
+    )
+  }
+  const measureActions: MeasureActions = {
+    async create(tagId, fields, kinds) {
+      const created = await measuresApi.createMeasure(tagId, fields, kinds)
+      setMeasures((current) => [...current, created])
+    },
+    async update(id, changes) {
+      replaceMeasure(await measuresApi.updateMeasure(id, changes))
+    },
+    async remove(id) {
+      await measuresApi.deleteMeasure(id)
+      setMeasures((current) => current.filter((m) => m.id !== id))
+    },
+    async createKind(measureId, name) {
+      const kind = await measuresApi.createKind(measureId, name)
+      setMeasures((current) =>
+        current.map((m) =>
+          m.id === measureId ? { ...m, kinds: [...m.kinds, kind] } : m,
+        ),
+      )
+    },
+    async updateKind(measureId, kindId, changes) {
+      const kind = await measuresApi.updateKind(kindId, changes)
+      setMeasures((current) =>
+        current.map((m) =>
+          m.id === measureId
+            ? { ...m, kinds: m.kinds.map((k) => (k.id === kindId ? kind : k)) }
+            : m,
+        ),
+      )
+    },
+    async removeKind(measureId, kindId) {
+      await measuresApi.deleteKind(kindId)
+      setMeasures((current) =>
+        current.map((m) =>
+          m.id === measureId
+            ? { ...m, kinds: m.kinds.filter((k) => k.id !== kindId) }
+            : m,
+        ),
+      )
+    },
+  }
+
   return (
     <Routes>
       <Route
@@ -436,6 +492,8 @@ function App() {
           element={
             <TagsPage
               tags={tags}
+              measures={measures}
+              measureActions={measureActions}
               executions={executions}
               onCreate={addTag}
               onRename={renameTag}

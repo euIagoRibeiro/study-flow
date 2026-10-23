@@ -133,6 +133,16 @@ export function TagIcon() {
   )
 }
 
+// Régua: medida (o que se conta nos registros de uma tag)
+export function RulerIcon() {
+  return (
+    <svg {...commonProps}>
+      <rect x="2.5" y="8" width="19" height="8" rx="1.5" />
+      <path d="M6.5 8v3M10.5 8v4M14.5 8v3M18.5 8v4" />
+    </svg>
+  )
+}
+
 // Degraus: fases de trabalho, uma depois da outra
 export function PhasesIcon() {
   return (

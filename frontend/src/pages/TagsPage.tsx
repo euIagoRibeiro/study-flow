@@ -6,13 +6,15 @@ import {
   PencilIcon,
   PhasesIcon,
   PlusIcon,
+  RulerIcon,
   TrashIcon,
   UnarchiveIcon,
 } from '../components/icons'
+import MeasureForm from '../components/MeasureForm'
 import TagForm from '../components/TagForm'
 import { cardClass, chipClass, focusRing } from '../styles'
 import { compareNames, indexTags, tagPath } from '../tags'
-import type { Tag, TaskExecution } from '../types'
+import type { Measure, MeasureActions, Tag, TaskExecution } from '../types'
 
 // Quais tags estão abertas: conveniência de quem olha a tela (só neste
 // navegador), não dado do app — por isso localStorage, não o banco. Se o
@@ -51,10 +53,13 @@ type FormState =
   | { kind: 'root' }
   | { kind: 'child'; parentId: string }
   | { kind: 'rename'; tagId: string }
+  | { kind: 'measure'; tagId: string }
   | null
 
 function TagsPage(props: {
   tags: Tag[]
+  measures: Measure[]
+  measureActions: MeasureActions
   executions: TaskExecution[]
   onCreate: (name: string, parentId: string | null) => Promise<void>
   onRename: (id: string, name: string) => Promise<void>
@@ -65,7 +70,7 @@ function TagsPage(props: {
 }) {
   const [showArchived, setShowArchived] = useState(false)
   const [open, setOpen] = useState(() => readOpen(props.tags))
-  // Um formulário por vez (criar raiz, criar subtag ou renomear)
+  // Um formulário por vez (criar raiz, criar subtag, renomear ou medida)
   const [form, setForm] = useState<FormState>(null)
 
   useEffect(() => {
@@ -96,7 +101,16 @@ function TagsPage(props: {
   const used = new Map<string, number>()
   // Registros com fase por contexto: com algum, "Parar de usar fases" trava
   const phased = new Map<string, number>()
+  // Medidas e tipos usados: com uso, apagar vira arquivar
+  const usedMeasures = new Set<string>()
+  const usedKinds = new Set<string>()
   for (const execution of props.executions) {
+    if (execution.measure) {
+      usedMeasures.add(execution.measure.measureId)
+      for (const value of execution.measure.values) {
+        if (value.kindId) usedKinds.add(value.kindId)
+      }
+    }
     if (execution.phase && execution.rootTagId) {
       phased.set(
         execution.rootTagId,
@@ -127,6 +141,34 @@ function TagsPage(props: {
 
   const allChildrenOf = (id: string) =>
     props.tags.filter((tag) => tag.parentId === id)
+  const measureByTag = new Map(
+    props.measures.map((measure) => [measure.tagId, measure]),
+  )
+
+  // A herança em uma linha: as herdeiras não mostram chip, então é aqui
+  // que a substituição aparece
+  function measureNote(tag: Tag): string {
+    const below = allChildrenOf(tag.id).flatMap((child) => [
+      child,
+      ...allChildrenOf(child.id),
+    ])
+    const own = below.filter((t) => measureByTag.has(t.id)).map((t) => t.name)
+    const scope = tag.level < 3 ? `${tag.name} e as subtags` : tag.name
+    const overrides =
+      own.length === 0
+        ? ''
+        : ` ${own.join(', ')} ${own.length === 1 ? 'tem' : 'têm'} medida própria.`
+    let ancestor = tag.parentId ? byId.get(tag.parentId) : undefined
+    while (ancestor && !measureByTag.has(ancestor.id)) {
+      ancestor = ancestor.parentId ? byId.get(ancestor.parentId) : undefined
+    }
+    const inherited =
+      !measureByTag.has(tag.id) && ancestor
+        ? `Hoje herda "${measureByTag.get(ancestor.id)?.name}" de ${ancestor.name}; definida aqui, substitui. `
+        : ''
+    return `${inherited}Vale para ${scope}.${overrides}`
+  }
+
   // Recursiva: o TypeScript precisa do tipo de retorno escrito
   const activeDescendants = (id: string): Tag[] =>
     allChildrenOf(id).flatMap((child) =>
@@ -193,6 +235,14 @@ function TagsPage(props: {
             },
       )
     }
+    // Qualquer nível (neto também: Código › Empresa › X pode medir diferente)
+    if (tag.active) {
+      actions.push({
+        label: measureByTag.has(tag.id) ? 'Editar medida' : 'Definir medida',
+        icon: <RulerIcon />,
+        onSelect: () => setForm({ kind: 'measure', tagId: tag.id }),
+      })
+    }
     if (tag.active) {
       actions.push({
         label: 'Arquivar',
@@ -219,7 +269,9 @@ function TagsPage(props: {
           ? 'Tem subtags: apague ou arquive as subtags antes.'
           : uses > 0
             ? `Em uso em ${registros(uses)}. Arquive em vez de apagar.`
-            : undefined
+            : measureByTag.has(tag.id)
+              ? 'Declara uma medida: apague a medida antes.'
+              : undefined
     actions.push({
       label: 'Apagar',
       icon: <TrashIcon />,
@@ -237,6 +289,7 @@ function TagsPage(props: {
     const nameStyle = `${nameClass[tag.level]} ${tag.active ? '' : 'text-tinta-suave'}`
     const addingHere = form?.kind === 'child' && form.parentId === tag.id
     const closeForm = () => setForm(null)
+    const measure = measureByTag.get(tag.id)
     return (
       <li key={tag.id}>
         {form?.kind === 'rename' && form.tagId === tag.id ? (
@@ -249,6 +302,16 @@ function TagsPage(props: {
               closeForm()
             }}
             onCancel={closeForm}
+          />
+        ) : form?.kind === 'measure' && form.tagId === tag.id ? (
+          <MeasureForm
+            tag={tag}
+            measure={measure}
+            note={measureNote(tag)}
+            used={measure !== undefined && usedMeasures.has(measure.id)}
+            usedKinds={usedKinds}
+            actions={props.measureActions}
+            onClose={closeForm}
           />
         ) : (
           <div className="flex min-h-11 items-center gap-2">
@@ -285,6 +348,20 @@ function TagsPage(props: {
               placement=""
             />
           </div>
+        )}
+        {/* Linha própria, não chip na linha da tag: em 320px o chip não cabia
+            junto de "Fases", da contagem e do menu (rolagem lateral, medido) */}
+        {measure && form?.kind !== 'measure' && (
+          <p className="-mt-1.5 pr-2 pb-1.5 font-dados text-meta break-words text-tinta-suave">
+            Medida: {measure.name}
+            {measure.kinds.some((kind) => kind.active) &&
+              ` (${measure.kinds
+                .filter((kind) => kind.active)
+                .map((kind) => kind.name)
+                .sort(compareNames)
+                .join(', ')})`}
+            {measure.active ? '' : ' · arquivada'}
+          </p>
         )}
         {/* Fechada: nem renderiza, então o Tab não para em nada escondido */}
         {((children.length > 0 && isOpen) || addingHere) && (
