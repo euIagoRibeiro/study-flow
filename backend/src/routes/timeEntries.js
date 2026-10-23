@@ -5,10 +5,13 @@ import { isoDateTime, isUuid, validate } from '../validation.js'
 
 export const timeEntriesRouter = Router()
 
-const COLUMNS = `id,
+// Exportado: a resposta de execuções traz as sessões do registro no mesmo formato
+export const TIME_ENTRY_COLUMNS = `id,
   task_execution_id AS "taskExecutionId",
   started_at AS "startedAt",
-  ended_at AS "endedAt"`
+  ended_at AS "endedAt",
+  estimated`
+const COLUMNS = TIME_ENTRY_COLUMNS
 
 const startedAt = isoDateTime('startedAt precisa ser uma data ISO')
 
@@ -81,11 +84,13 @@ timeEntriesRouter.put('/:id', async (req, res) => {
     // Reabrir (endedAt null) só se a execução dela estiver aberta: senão
     // sobraria uma sessão rodando dentro de uma execução concluída.
     // O cast é obrigatório: sozinho no IS NOT NULL, o Postgres não deduz o
-    // tipo de $2 (erro 42P08, testado)
+    // tipo de $2 (erro 42P08, testado). Estimada: só pelo registro, que é
+    // a âncora dela
     const result = await pool.query(
       `UPDATE time_entries
        SET started_at = $1, ended_at = $2
        WHERE id = $3
+         AND NOT estimated
          AND ($2::timestamptz IS NOT NULL OR EXISTS (
            SELECT 1 FROM task_executions
            WHERE id = time_entries.task_execution_id AND completed_at IS NULL
@@ -95,11 +100,16 @@ timeEntriesRouter.put('/:id', async (req, res) => {
     )
     if (result.rowCount === 0) {
       const exists = await pool.query(
-        'SELECT 1 FROM time_entries WHERE id = $1',
+        'SELECT estimated FROM time_entries WHERE id = $1',
         [req.params.id],
       )
       if (exists.rowCount === 0) {
         return res.status(404).json({ error: 'Sessão não encontrada' })
+      }
+      if (exists.rows[0].estimated) {
+        return res.status(400).json({
+          error: 'Sessão estimada: ajuste a duração no registro',
+        })
       }
       return res.status(400).json({
         error: 'Só dá pra reabrir sessão de uma execução em andamento',

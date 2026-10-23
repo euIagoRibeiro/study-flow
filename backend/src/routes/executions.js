@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { pool } from '../db.js'
 import { isoDateTime, isUuid, validate } from '../validation.js'
+import { TIME_ENTRY_COLUMNS } from './timeEntries.js'
 
 export const executionsRouter = Router()
 
@@ -62,11 +63,26 @@ const phase = z
   .nullable()
   .optional()
 
+// Duração estimada em minutos inteiros. Ausente: no POST, sem estimativa;
+// no PUT, mantém (e acompanha o "Quando"). null remove
+const estimatedMinutes = z
+  .number('estimatedMinutes precisa ser um número de minutos ou null')
+  .int('estimatedMinutes precisa ser um número inteiro de minutos')
+  .min(1, 'estimatedMinutes precisa ser de 1 a 1440')
+  .max(1440, 'estimatedMinutes precisa ser de 1 a 1440')
+  .nullable()
+  .optional()
+
 function withTagRule(schema) {
-  return schema.refine(
-    (data) => !(data.tagIds?.length > 0 && !data.rootTagId),
-    'tagIds precisa de rootTagId',
-  )
+  return schema
+    .refine(
+      (data) => !(data.tagIds?.length > 0 && !data.rootTagId),
+      'tagIds precisa de rootTagId',
+    )
+    .refine(
+      (data) => !(data.estimatedMinutes && data.completedAt === null),
+      'Duração estimada só em registro concluído',
+    )
 }
 
 function hasTags(data) {
@@ -80,13 +96,55 @@ const newExecutionSchema = withTagRule(
     description: description.default(null),
     completedAt,
     phase,
+    estimatedMinutes,
     ...tagFields,
   }),
 )
 
 const executionChangesSchema = withTagRule(
-  z.object({ description, completedAt, phase, ...tagFields }),
+  z.object({ description, completedAt, phase, estimatedMinutes, ...tagFields }),
 )
+
+// A estimativa é uma sessão marcada: termina no "Quando" do registro e
+// começa X minutos antes. Trocar = apagar e criar (nunca duas ao mesmo tempo)
+async function setEstimate(client, executionId, minutes) {
+  await client.query(
+    'DELETE FROM time_entries WHERE task_execution_id = $1 AND estimated',
+    [executionId],
+  )
+  if (minutes === null) return
+  await client.query(
+    `INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated)
+     SELECT id, completed_at - make_interval(mins => $2), completed_at, true
+     FROM task_executions WHERE id = $1`,
+    [executionId, minutes],
+  )
+}
+
+// "Quando" mudou: a estimativa vai junto, mantendo a duração. As sessões
+// de cronômetro não se movem (são horários reais)
+async function followCompletedAt(client, executionId) {
+  await client.query(
+    `UPDATE time_entries te
+     SET started_at = e.completed_at - (te.ended_at - te.started_at),
+         ended_at = e.completed_at
+     FROM task_executions e
+     WHERE e.id = te.task_execution_id
+       AND te.task_execution_id = $1
+       AND te.estimated`,
+    [executionId],
+  )
+}
+
+// A tela guarda as sessões separadas: a resposta leva as do registro
+async function entriesOf(client, executionId) {
+  const result = await client.query(
+    `SELECT ${TIME_ENTRY_COLUMNS} FROM time_entries
+     WHERE task_execution_id = $1 ORDER BY started_at`,
+    [executionId],
+  )
+  return result.rows
+}
 
 // Recusas da fase (migration 0007), pelo nome da regra
 function phaseError(err) {
@@ -243,9 +301,13 @@ executionsRouter.post('/', async (req, res) => {
       // Sem tag: o banco recusa (fase precisa de contexto)
       await setPhase(client, id, execution.phase)
     }
+    if (execution.estimatedMinutes) {
+      await setEstimate(client, id, execution.estimatedMinutes)
+    }
     const created = await findExecution(client, id)
+    const timeEntries = await entriesOf(client, id)
     await client.query('COMMIT')
-    res.status(201).json(created)
+    res.status(201).json({ ...created, timeEntries })
   } catch (err) {
     await client.query('ROLLBACK')
     if (err instanceof TagError) {
@@ -285,6 +347,19 @@ executionsRouter.put('/:id', async (req, res) => {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Execução não encontrada' })
     }
+    if (changes.completedAt === null) {
+      // Reabrir deixaria a estimativa sem âncora (o "Quando")
+      const estimate = await client.query(
+        'SELECT 1 FROM time_entries WHERE task_execution_id = $1 AND estimated',
+        [req.params.id],
+      )
+      if (estimate.rowCount > 0) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({
+          error: 'Registro com duração estimada não pode ser reaberto',
+        })
+      }
+    }
     if (changes.completedAt !== null) {
       await client.query(
         `UPDATE time_entries
@@ -322,7 +397,15 @@ executionsRouter.put('/:id', async (req, res) => {
     } else if (changes.phase !== undefined) {
       await setPhase(client, req.params.id, changes.phase)
     }
-    const updated = await findExecution(client, req.params.id)
+    if (changes.estimatedMinutes !== undefined) {
+      await setEstimate(client, req.params.id, changes.estimatedMinutes)
+    } else {
+      await followCompletedAt(client, req.params.id)
+    }
+    const updated = {
+      ...(await findExecution(client, req.params.id)),
+      timeEntries: await entriesOf(client, req.params.id),
+    }
     await client.query('COMMIT')
     res.json(updated)
   } catch (err) {
