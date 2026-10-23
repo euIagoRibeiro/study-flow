@@ -4,12 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --env-file=.env src/index.js"
+    "dev": "nodemon --watch src --ext js --exec \"node --env-file=.env src/index.js\""
   },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "pg": "^8.23.0",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }
