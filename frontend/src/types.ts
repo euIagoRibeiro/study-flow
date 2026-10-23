@@ -27,6 +27,15 @@ export type TaskExecution = {
   tagIds: string[]
   // Só sob contexto com fases (tracksPhase); null = sem fase
   phase: Phase | null
+  // "2 exercícios", "5,5 km": sempre os dois juntos, ou os dois null
+  quantity: number | null
+  quantityUnit: string | null
+}
+
+// Quantidade que vai pro servidor (null nos dois = sem quantidade)
+export type QuantityChoice = {
+  quantity: number | null
+  quantityUnit: string | null
 }
 
 // Fase de trabalho: ordem do enum do banco
@@ -77,6 +86,7 @@ export type ExecutionChanges = {
   completedAt: string
   // Ausente: mantém (e acompanha o "Quando"). null remove
   estimatedMinutes?: number | null
-} & Partial<TagChoice>
+} & Partial<TagChoice> &
+  Partial<QuantityChoice>
 
 export type LoadStatus = 'loading' | 'error' | 'ready'

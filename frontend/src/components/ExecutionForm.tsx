@@ -4,11 +4,12 @@ import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice } from '../tags'
-import type { Phase, Tag, TagChoice } from '../types'
-import { MINUTES_ERROR, parseMinutes } from '../numbers'
+import type { Phase, QuantityChoice, Tag, TagChoice } from '../types'
+import { MINUTES_ERROR, parseMinutes, parseQuantity } from '../numbers'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import PhaseField from './PhaseField'
+import QuantityFields from './QuantityFields'
 import TagFields from './TagFields'
 
 // Registrar sem cronômetro: botão secundário — na mesma tela, o amarelo é
@@ -17,11 +18,14 @@ function ExecutionForm(props: {
   tags: Tag[]
   initialPath: string[] // pré-seleção: o contexto do último registro
   suggestPhase: (path: string[]) => Phase | null
+  suggestUnit: (path: string[]) => string | null
+  units: string[]
   onSubmit: (
     description: string,
     completedAt: string,
     tags: TagChoice,
     estimatedMinutes: number | null,
+    quantity: QuantityChoice,
   ) => Promise<unknown>
 }) {
   const [description, setDescription] = useState('')
@@ -34,6 +38,11 @@ function ExecutionForm(props: {
   const [minutes, setMinutes] = useState('')
   const [path, setPath] = useState(props.initialPath)
   const [phase, setPhase] = useState(() => props.suggestPhase(path))
+  const [quantity, setQuantity] = useState('')
+  // Só a unidade é pré-preenchida, nunca o número. Depois que a pessoa mexe
+  // nela, trocar o caminho não apaga o que foi digitado
+  const [unit, setUnit] = useState(() => props.suggestUnit(path) ?? '')
+  const [unitTouched, setUnitTouched] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const showPhase = phaseApplies(path, indexTags(props.tags))
@@ -42,6 +51,7 @@ function ExecutionForm(props: {
   function changePath(next: string[]) {
     setPath(next)
     setPhase(props.suggestPhase(next))
+    if (!unitTouched) setUnit(props.suggestUnit(next) ?? '')
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -49,6 +59,11 @@ function ExecutionForm(props: {
     const estimate = parseMinutes(minutes)
     if (estimate === null) {
       setError(MINUTES_ERROR)
+      return
+    }
+    const parsed = parseQuantity(quantity, unit, !unitTouched)
+    if ('error' in parsed) {
+      setError(parsed.error)
       return
     }
     setSubmitting(true)
@@ -60,6 +75,7 @@ function ExecutionForm(props: {
           : fromDatetimeLocalValue(when),
         pathToChoice(path, showPhase ? phase : null),
         estimate === '' ? null : estimate,
+        parsed.value ?? { quantity: null, quantityUnit: null },
       )
     } catch (err) {
       // 400: o servidor recusou com motivo (ex.: tag arquivada em outra aba)
@@ -101,6 +117,16 @@ function ExecutionForm(props: {
       <EstimateField value={minutes} onChange={setMinutes} />
       <TagFields tags={props.tags} value={path} onChange={changePath} />
       {showPhase && <PhaseField value={phase} onChange={setPhase} />}
+      <QuantityFields
+        quantity={quantity}
+        unit={unit}
+        units={props.units}
+        onQuantityChange={setQuantity}
+        onUnitChange={(value) => {
+          setUnit(value)
+          setUnitTouched(true)
+        }}
+      />
       <button
         type="submit"
         disabled={submitting}

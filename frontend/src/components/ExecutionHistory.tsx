@@ -6,7 +6,9 @@ import {
   localDayKey,
 } from '../dates'
 import { frequencyLabels } from '../frequency'
+import { formatQuantity } from '../numbers'
 import { phaseLabels } from '../phases'
+import { usedUnits } from '../quantities'
 import { cardClass, chipClass, tagChipClass, textButtonClass } from '../styles'
 import { indexTags, leafTags, tagLineage } from '../tags'
 import type {
@@ -60,6 +62,7 @@ function ExecutionHistory(props: {
   }
 
   const tagsById = indexTags(props.tags)
+  const units = usedUnits(props.executions)
 
   const sorted = [...props.executions].sort((a, b) =>
     a.completedAt < b.completedAt ? 1 : -1,
@@ -160,6 +163,11 @@ function ExecutionHistory(props: {
                 {frequencyLabels[execution.taskFrequencyAtTime]}
               </span>
             )}
+            {execution.quantity !== null && (
+              <span className={chipClass}>
+                {formatQuantity(execution.quantity)} {execution.quantityUnit}
+              </span>
+            )}
             {entries.length > 0 && (
               <button
                 type="button"
@@ -193,6 +201,7 @@ function ExecutionHistory(props: {
                 ? Math.round(entryMs(estimate, execution) / 60_000)
                 : null
             }
+            units={units}
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)
               setEditingId(null)

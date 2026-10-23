@@ -14,6 +14,7 @@ import type {
   ExecutionChanges,
   LoadStatus,
   NewTask,
+  QuantityChoice,
   SavedExecution,
   Tag,
   TagChoice,
@@ -112,6 +113,7 @@ function App() {
     completedAt: string,
     tags: TagChoice,
     estimatedMinutes: number | null,
+    quantity: QuantityChoice,
   ) {
     keepSaved(
       await executionsApi.createExecution(
@@ -120,6 +122,7 @@ function App() {
         completedAt,
         tags,
         estimatedMinutes,
+        quantity,
       ),
     )
   }
@@ -218,9 +221,15 @@ function App() {
     executionId: string,
     description: string,
     tags: Partial<TagChoice>,
+    quantity: QuantityChoice,
   ) {
     keepSaved(
-      await executionsApi.finishExecution(executionId, description, tags),
+      await executionsApi.finishExecution(
+        executionId,
+        description,
+        tags,
+        quantity,
+      ),
     )
   }
 
@@ -229,6 +238,7 @@ function App() {
     executionId: string,
     previousDescription: string | null,
     previousTags: TagChoice,
+    previousQuantity: QuantityChoice,
     resumeEntryId: string | null,
   ) {
     try {
@@ -237,6 +247,7 @@ function App() {
           executionId,
           previousDescription,
           previousTags,
+          previousQuantity,
         ),
       )
     } catch (error) {

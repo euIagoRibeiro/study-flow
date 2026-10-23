@@ -5,16 +5,23 @@ import { fieldClass, primaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
 import type { CompletedExecution, ExecutionChanges, Tag } from '../types'
-import { MINUTES_ERROR, parseMinutes } from '../numbers'
+import {
+  MINUTES_ERROR,
+  parseMinutes,
+  parseQuantity,
+  quantityInputValue,
+} from '../numbers'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import PhaseField from './PhaseField'
+import QuantityFields from './QuantityFields'
 import TagFields from './TagFields'
 
 function ExecutionEditForm(props: {
   execution: CompletedExecution
   tags: Tag[]
   estimateMinutes: number | null // a estimativa que o registro já tem
+  units: string[] // sugestões de unidade: as já usadas
   onSubmit: (changes: ExecutionChanges) => Promise<unknown>
 }) {
   const { execution } = props
@@ -24,6 +31,10 @@ function ExecutionEditForm(props: {
   )
   const initialMinutes = props.estimateMinutes?.toString() ?? ''
   const [minutes, setMinutes] = useState(initialMinutes)
+  const initialQuantity = quantityInputValue(execution.quantity)
+  const initialUnit = execution.quantityUnit ?? ''
+  const [quantity, setQuantity] = useState(initialQuantity)
+  const [unit, setUnit] = useState(initialUnit)
   const byId = indexTags(props.tags)
   const [selection, setSelection] = useState(() =>
     executionSelection(execution, byId),
@@ -48,6 +59,13 @@ function ExecutionEditForm(props: {
       setError(MINUTES_ERROR)
       return
     }
+    // Aqui a unidade nunca é sugestão: é a do registro ou a digitada
+    const parsed = parseQuantity(quantity, unit, false)
+    if ('error' in parsed) {
+      setError(parsed.error)
+      return
+    }
+    const quantityChanged = quantity !== initialQuantity || unit !== initialUnit
     setSubmitting(true)
     try {
       await props.onSubmit({
@@ -62,6 +80,10 @@ function ExecutionEditForm(props: {
         ...(minutes === initialMinutes
           ? {}
           : { estimatedMinutes: estimate === '' ? null : estimate }),
+        // Idem: sem mexer não vai; os dois vazios limpam
+        ...(quantityChanged
+          ? (parsed.value ?? { quantity: null, quantityUnit: null })
+          : {}),
       })
     } catch (err) {
       setError(
@@ -116,6 +138,13 @@ function ExecutionEditForm(props: {
           legacyCount={selection.legacyCount}
         />
         {showPhase && <PhaseField value={phase} onChange={setPhase} />}
+        <QuantityFields
+          quantity={quantity}
+          unit={unit}
+          units={props.units}
+          onQuantityChange={setQuantity}
+          onUnitChange={setUnit}
+        />
         <button
           type="submit"
           disabled={submitting}
