@@ -246,4 +246,25 @@ INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES
   ('5eed0000-0000-4000-8000-000000001204', (SELECT t FROM ancora) - interval '1 day 40 minutes',           (SELECT t FROM ancora) - interval '1 day'),
   ('5eed0000-0000-4000-8000-000000001205', (SELECT t FROM ancora) - interval '60 days 1 hour 40 minutes',  (SELECT t FROM ancora) - interval '60 days');
 
+-- Duração estimada (sessão marcada, como a API grava: termina no "Quando",
+-- começa X min antes). 1301 e 1302 na mesma noite, SOBREPOSTOS de
+-- propósito (1302 cabe dentro do 1301): tempo dedicado 130 min, relógio
+-- 90 min. 1303: cronômetro 50 min + 20 estimados (esqueceu de ligar no
+-- começo) = 70 min. Estimadas no total: 150 min.
+CREATE TEMP TABLE noite ON COMMIT DROP AS
+SELECT (SELECT t FROM ancora) - interval '1 day' + interval '12 hours' AS t;
+
+INSERT INTO task_executions
+  (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at)
+VALUES
+  ('5eed0000-0000-4000-8000-000000001301', '5eed0000-0000-4000-8000-000000000002', 'Gameplay em inglês (listening)',  'Revisar inglês',         'daily',  (SELECT t FROM noite)),
+  ('5eed0000-0000-4000-8000-000000001302', '5eed0000-0000-4000-8000-000000000006', 'Alongamento vendo série',         'Exercício físico',       'none',   (SELECT t FROM noite) - interval '30 minutes'),
+  ('5eed0000-0000-4000-8000-000000001303', '5eed0000-0000-4000-8000-000000000003', 'Window functions',                'Estudar SQL e Postgres', 'weekly', (SELECT t FROM ancora) - interval '4 days');
+
+INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated) VALUES
+  ('5eed0000-0000-4000-8000-000000001301', (SELECT t FROM noite) - interval '90 minutes', (SELECT t FROM noite), true),
+  ('5eed0000-0000-4000-8000-000000001302', (SELECT t FROM noite) - interval '70 minutes', (SELECT t FROM noite) - interval '30 minutes', true),
+  ('5eed0000-0000-4000-8000-000000001303', (SELECT t FROM ancora) - interval '4 days 20 minutes', (SELECT t FROM ancora) - interval '4 days', true),
+  ('5eed0000-0000-4000-8000-000000001303', (SELECT t FROM ancora) - interval '4 days 1 hour 30 minutes', (SELECT t FROM ancora) - interval '4 days 40 minutes', false);
+
 COMMIT;
