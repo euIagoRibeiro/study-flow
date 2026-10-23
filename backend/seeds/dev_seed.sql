@@ -251,8 +251,11 @@ INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES
 -- propósito (1302 cabe dentro do 1301): tempo dedicado 130 min, relógio
 -- 90 min. 1303: cronômetro 50 min + 20 estimados (esqueceu de ligar no
 -- começo) = 70 min. Estimadas no total: 150 min.
+-- 22:00 de ontem, hora local (fixo: a âncora varia entre 6h e 12h, e
+-- "âncora - 1 dia + 12h" caía à meia-noite de HOJE quando ela era 12h)
 CREATE TEMP TABLE noite ON COMMIT DROP AS
-SELECT (SELECT t FROM ancora) - interval '1 day' + interval '12 hours' AS t;
+SELECT (date_trunc('day', (SELECT t FROM ancora) AT TIME ZONE 'America/Sao_Paulo')
+        AT TIME ZONE 'America/Sao_Paulo') - interval '2 hours' AS t;
 
 INSERT INTO task_executions
   (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at)
