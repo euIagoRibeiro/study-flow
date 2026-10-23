@@ -15,6 +15,8 @@ const SELECT_EXECUTION = `SELECT e.id,
   e.task_frequency_at_time AS "taskFrequencyAtTime",
   e.root_tag_id AS "rootTagId",
   e.phase,
+  e.quantity::float8 AS quantity,
+  e.quantity_unit AS "quantityUnit",
   COALESCE(
     array_agg(et.tag_id ORDER BY et.tag_id) FILTER (WHERE et.tag_id IS NOT NULL),
     '{}'
@@ -73,6 +75,28 @@ const estimatedMinutes = z
   .nullable()
   .optional()
 
+// Quantidade: até 2 casas (o banco arredondaria a 3ª em silêncio) e no
+// máximo o que numeric(10,2) guarda (acima, seria estouro = 500). A
+// tolerância cobre 5,55 * 100 = 554,999… em ponto flutuante
+const quantity = z
+  .number('quantity precisa ser um número ou null')
+  .positive('quantity precisa ser maior que zero')
+  .max(99999999.99, 'quantity pode ir até 99.999.999,99')
+  .refine(
+    (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6,
+    'quantity pode ter no máximo 2 casas decimais',
+  )
+  .nullable()
+  .optional()
+
+const quantityUnit = z
+  .string('quantityUnit precisa ser um texto ou null')
+  .trim()
+  .min(1, 'quantityUnit não pode ser vazio')
+  .max(30, 'quantityUnit pode ter no máximo 30 caracteres')
+  .nullable()
+  .optional()
+
 function withTagRule(schema) {
   return schema
     .refine(
@@ -82,6 +106,13 @@ function withTagRule(schema) {
     .refine(
       (data) => !(data.estimatedMinutes && data.completedAt === null),
       'Duração estimada só em registro concluído',
+    )
+    .refine(
+      // Os dois juntos: ausentes, null ou preenchidos ao mesmo tempo
+      (data) =>
+        (data.quantity === undefined) === (data.quantityUnit === undefined) &&
+        (data.quantity === null) === (data.quantityUnit === null),
+      'quantity e quantityUnit vão juntos (os dois preenchidos ou os dois null)',
     )
 }
 
@@ -97,13 +128,31 @@ const newExecutionSchema = withTagRule(
     completedAt,
     phase,
     estimatedMinutes,
+    quantity,
+    quantityUnit,
     ...tagFields,
   }),
 )
 
 const executionChangesSchema = withTagRule(
-  z.object({ description, completedAt, phase, estimatedMinutes, ...tagFields }),
+  z.object({
+    description,
+    completedAt,
+    phase,
+    estimatedMinutes,
+    quantity,
+    quantityUnit,
+    ...tagFields,
+  }),
 )
+
+// No PUT: ausente mantém, null nos dois limpa
+async function setQuantity(client, executionId, value, unit) {
+  await client.query(
+    'UPDATE task_executions SET quantity = $1, quantity_unit = $2 WHERE id = $3',
+    [value, unit, executionId],
+  )
+}
 
 // A estimativa é uma sessão marcada: termina no "Quando" do registro e
 // começa X minutos antes. Trocar = apagar e criar (nunca duas ao mesmo tempo)
@@ -274,12 +323,19 @@ executionsRouter.post('/', async (req, res) => {
     // Snapshot copiado da própria tarefa, na mesma query — o cliente não manda
     const result = await client.query(
       `INSERT INTO task_executions
-         (task_id, description, completed_at, task_title_at_time, task_frequency_at_time)
-       SELECT id, $2, $3, title, frequency
+         (task_id, description, completed_at, task_title_at_time, task_frequency_at_time,
+          quantity, quantity_unit)
+       SELECT id, $2, $3, title, frequency, $4, $5
        FROM tasks
        WHERE id = $1 AND active
        RETURNING id`,
-      [execution.taskId, execution.description, execution.completedAt],
+      [
+        execution.taskId,
+        execution.description,
+        execution.completedAt,
+        execution.quantity ?? null,
+        execution.quantityUnit ?? null,
+      ],
     )
     if (result.rowCount === 0) {
       await client.query('ROLLBACK')
@@ -401,6 +457,14 @@ executionsRouter.put('/:id', async (req, res) => {
       await setEstimate(client, req.params.id, changes.estimatedMinutes)
     } else {
       await followCompletedAt(client, req.params.id)
+    }
+    if (changes.quantity !== undefined) {
+      await setQuantity(
+        client,
+        req.params.id,
+        changes.quantity,
+        changes.quantityUnit,
+      )
     }
     const updated = {
       ...(await findExecution(client, req.params.id)),
