@@ -3,6 +3,7 @@ import ActionMenu, { type MenuAction } from '../components/ActionMenu'
 import {
   ArchiveIcon,
   ChevronDownIcon,
+  DumbbellIcon,
   PencilIcon,
   PhasesIcon,
   PlusIcon,
@@ -10,11 +11,19 @@ import {
   TrashIcon,
   UnarchiveIcon,
 } from '../components/icons'
+import ExerciseCatalog from '../components/ExerciseCatalog'
 import MeasureForm from '../components/MeasureForm'
 import TagForm from '../components/TagForm'
 import { cardClass, chipClass, focusRing } from '../styles'
 import { compareNames, indexTags, tagPath } from '../tags'
-import type { Measure, MeasureActions, Tag, TaskExecution } from '../types'
+import type {
+  Exercise,
+  ExerciseActions,
+  Measure,
+  MeasureActions,
+  Tag,
+  TaskExecution,
+} from '../types'
 
 // Quais tags estão abertas: conveniência de quem olha a tela (só neste
 // navegador), não dado do app — por isso localStorage, não o banco. Se o
@@ -60,12 +69,15 @@ function TagsPage(props: {
   tags: Tag[]
   measures: Measure[]
   measureActions: MeasureActions
+  exercises: Exercise[]
+  exerciseActions: ExerciseActions
   executions: TaskExecution[]
   onCreate: (name: string, parentId: string | null) => Promise<void>
   onRename: (id: string, name: string) => Promise<void>
   onArchive: (id: string) => void
   onReactivate: (id: string) => void
   onSetPhases: (id: string, tracksPhase: boolean) => void
+  onSetWorkout: (id: string, tracksWorkout: boolean) => void
   onDelete: (id: string) => void
 }) {
   const [showArchived, setShowArchived] = useState(false)
@@ -101,6 +113,9 @@ function TagsPage(props: {
   const used = new Map<string, number>()
   // Registros com fase por contexto: com algum, "Parar de usar fases" trava
   const phased = new Map<string, number>()
+  // Registros com treino por tag marcadora: com algum, "Parar de usar
+  // treino" trava
+  const trained = new Map<string, number>()
   // Medidas e tipos usados: com uso, apagar vira arquivar
   const usedMeasures = new Set<string>()
   const usedKinds = new Set<string>()
@@ -110,6 +125,13 @@ function TagsPage(props: {
       for (const value of execution.measure.values) {
         if (value.kindId) usedKinds.add(value.kindId)
       }
+    }
+    if (execution.workout) {
+      const marker = [execution.rootTagId, ...execution.tagIds]
+        .map((id) => (id ? byId.get(id) : undefined))
+        .filter((tag) => tag?.tracksWorkout)
+        .sort((a, b) => (b?.level ?? 0) - (a?.level ?? 0))[0]
+      if (marker) trained.set(marker.id, (trained.get(marker.id) ?? 0) + 1)
     }
     if (execution.phase && execution.rootTagId) {
       phased.set(
@@ -235,6 +257,42 @@ function TagsPage(props: {
             },
       )
     }
+    // Treino: qualquer nível; as subtags herdam
+    if (tag.active) {
+      const inUse = trained.get(tag.id) ?? 0
+      const parent = tag.parentId ? byId.get(tag.parentId) : undefined
+      const grandparent = parent?.parentId
+        ? byId.get(parent.parentId)
+        : undefined
+      const inherited = [parent, grandparent].find((t) => t?.tracksWorkout)
+      actions.push(
+        tag.tracksWorkout
+          ? {
+              label: 'Parar de usar treino',
+              icon: <DumbbellIcon />,
+              onSelect: () => props.onSetWorkout(tag.id, false),
+              disabled: inUse > 0,
+              hint:
+                inUse > 0
+                  ? `Em uso em ${registros(inUse)} com treino.`
+                  : undefined,
+            }
+          : inherited
+            ? {
+                label: 'Usar treino',
+                icon: <DumbbellIcon />,
+                onSelect: () => {},
+                disabled: true,
+                hint: `Já usa treino por ${inherited.name}.`,
+              }
+            : {
+                label: 'Usar treino',
+                icon: <DumbbellIcon />,
+                onSelect: () => props.onSetWorkout(tag.id, true),
+                hint: 'Vale também para as subtags.',
+              },
+      )
+    }
     // Qualquer nível (neto também: Código › Empresa › X pode medir diferente)
     if (tag.active) {
       actions.push({
@@ -345,6 +403,7 @@ function TagsPage(props: {
                   folga até a linha "Medida" (que sobe com -mt-1.5) */}
               <span className="flex items-center gap-2 py-2.5">
                 {tag.tracksPhase && <span className={chipClass}>Fases</span>}
+                {tag.tracksWorkout && <span className={chipClass}>Treino</span>}
                 {!tag.active && <span className={chipClass}>Arquivada</span>}
                 <span className="shrink-0 font-dados text-meta text-tinta-suave tabular-nums">
                   {registros(counts.get(tag.id) ?? 0)}
@@ -456,6 +515,11 @@ function TagsPage(props: {
           ))}
         </ul>
       )}
+      <ExerciseCatalog
+        exercises={props.exercises}
+        executions={props.executions}
+        actions={props.exerciseActions}
+      />
     </div>
   )
 }

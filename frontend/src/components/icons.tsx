@@ -152,6 +152,15 @@ export function PhasesIcon() {
   )
 }
 
+// Haltere: treino (exercícios e séries)
+export function DumbbellIcon() {
+  return (
+    <svg {...commonProps}>
+      <path d="M8 12h8M5.5 8v8M8 6.5v11M16 6.5v11M18.5 8v8M3 10.5v3M21 10.5v3" />
+    </svg>
+  )
+}
+
 export function TrashIcon() {
   return (
     <svg {...commonProps}>

@@ -107,11 +107,22 @@ function ActionMenu(props: {
                   setOpen(false)
                   action.onSelect()
                 }}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap hover:bg-tinta/[0.07] ${focusRing}`}
+                className={`flex w-full ${action.hint ? 'items-start' : 'items-center whitespace-nowrap'} gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-tinta/[0.07] ${focusRing}`}
               >
                 {/* Sobre vidro, ícone também em `tinta` */}
                 <span className="text-tinta">{action.icon}</span>
-                {action.label}
+                {action.hint ? (
+                  // Liberado com explicação (ex.: "Usar treino" vale pras
+                  // subtags): mesmo arranjo do item travado
+                  <span className="flex flex-col gap-0.5">
+                    {action.label}
+                    <span className="max-w-48 font-texto text-xs leading-snug">
+                      {action.hint}
+                    </span>
+                  </span>
+                ) : (
+                  action.label
+                )}
               </button>
             ),
           )}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { ApiError } from './api/client'
 import * as executionsApi from './api/executions'
+import * as exercisesApi from './api/exercises'
 import * as measuresApi from './api/measures'
 import * as tagsApi from './api/tags'
 import * as tasksApi from './api/tasks'
@@ -13,11 +14,13 @@ import TagsPage from './pages/TagsPage'
 import TaskListPage from './pages/TaskListPage'
 import type {
   ExecutionChanges,
+  Exercise,
+  ExerciseActions,
   LoadStatus,
   Measure,
   MeasureActions,
-  NewTask,
   MeasureValue,
+  NewTask,
   SavedExecution,
   Tag,
   TagChoice,
@@ -42,6 +45,7 @@ function App() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [measures, setMeasures] = useState<Measure[]>([])
+  const [exercises, setExercises] = useState<Exercise[]>([])
 
   useEffect(() => {
     let ignore = false
@@ -52,15 +56,24 @@ function App() {
       timeEntriesApi.listTimeEntries(),
       tagsApi.listTags(),
       measuresApi.listMeasures(),
+      exercisesApi.listExercises(),
     ])
       .then(
-        ([taskList, executionList, timeEntryList, tagList, measureList]) => {
+        ([
+          taskList,
+          executionList,
+          timeEntryList,
+          tagList,
+          measureList,
+          exerciseList,
+        ]) => {
           if (ignore) return
           setTasks(taskList)
           setExecutions(executionList)
           setTimeEntries(timeEntryList)
           setTags(tagList)
           setMeasures(measureList)
+          setExercises(exerciseList)
           setStatus('ready')
         },
       )
@@ -319,6 +332,7 @@ function App() {
       level: updated.level,
       active: updated.active,
       tracksPhase: updated.tracksPhase,
+      tracksWorkout: updated.tracksWorkout,
     }
     setTags((current) => current.map((t) => (t.id === tag.id ? tag : t)))
   }
@@ -371,6 +385,14 @@ function App() {
     }
   }
 
+  async function setTagWorkout(id: string, tracksWorkout: boolean) {
+    try {
+      replaceTag(await tagsApi.setTracksWorkout(id, tracksWorkout))
+    } catch (error) {
+      tagError(error, 'Não foi possível mudar o treino. Tente de novo.')
+    }
+  }
+
   async function deleteTag(id: string) {
     try {
       await tagsApi.deleteTag(id)
@@ -378,6 +400,34 @@ function App() {
     } catch (error) {
       tagError(error, 'Não foi possível apagar a tag. Tente de novo.')
     }
+  }
+
+  // Catálogo de exercícios: renomear sobe o erro pro formulário; arquivar,
+  // reativar e apagar avisam no Layout, como as tags
+  function replaceExercise(updated: Exercise) {
+    setExercises((current) =>
+      current.map((x) => (x.id === updated.id ? updated : x)),
+    )
+  }
+  const exerciseActions: ExerciseActions = {
+    async rename(id, name) {
+      replaceExercise(await exercisesApi.updateExercise(id, { name }))
+    },
+    async setActive(id, active) {
+      try {
+        replaceExercise(await exercisesApi.updateExercise(id, { active }))
+      } catch (error) {
+        tagError(error, 'Não foi possível mudar o exercício. Tente de novo.')
+      }
+    },
+    async remove(id) {
+      try {
+        await exercisesApi.deleteExercise(id)
+        setExercises((current) => current.filter((x) => x.id !== id))
+      } catch (error) {
+        tagError(error, 'Não foi possível apagar o exercício. Tente de novo.')
+      }
+    },
   }
 
   // Medidas: os erros sobem pro formulário de medida (mostra o motivo)
@@ -497,12 +547,15 @@ function App() {
               tags={tags}
               measures={measures}
               measureActions={measureActions}
+              exercises={exercises}
+              exerciseActions={exerciseActions}
               executions={executions}
               onCreate={addTag}
               onRename={renameTag}
               onArchive={archiveTag}
               onReactivate={reactivateTag}
               onSetPhases={setTagPhases}
+              onSetWorkout={setTagWorkout}
               onDelete={deleteTag}
             />
           }

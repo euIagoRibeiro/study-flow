@@ -29,6 +29,24 @@ export type TaskExecution = {
   phase: Phase | null
   // Medida por contexto (qual medida e os valores); null = sem medida
   measure: ExecutionMeasure | null
+  // Treino (A3), em ordem; null = sem treino
+  workout: WorkoutExercise[] | null
+}
+
+// Uma série: repetições e peso (null = peso do corpo)
+export type WorkoutSet = { reps: number; weightKg: number | null }
+
+export type WorkoutExercise = { exerciseId: string; sets: WorkoutSet[] }
+
+// Catálogo único; o equipamento faz parte do nome ("Rosca direta barra")
+export type Exercise = { id: string; name: string; active: boolean }
+
+// O que a tela de tags faz com o catálogo. Renomear: o erro sobe pro
+// formulário (mostra o motivo); o resto avisa no Layout
+export type ExerciseActions = {
+  rename: (id: string, name: string) => Promise<void>
+  setActive: (id: string, active: boolean) => void
+  remove: (id: string) => void
 }
 
 // Um valor de medida: "3 refatoração" (kindId) ou "12 exercícios" (null)
@@ -105,6 +123,7 @@ export type Tag = {
   level: 1 | 2 | 3
   active: boolean
   tracksPhase: boolean // só contexto (nível 1) pode ser true
+  tracksWorkout: boolean // qualquer nível; as subtags herdam
 }
 
 // O que a tela manda pro servidor: a raiz e, no máximo, a tag mais

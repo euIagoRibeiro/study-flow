@@ -3,12 +3,14 @@ import { ApiError } from '../api/client'
 import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import FormError from './FormError'
 
-// Criar (raiz ou subtag) e renomear. Sempre empilhado: mora dentro de
-// cartão (a lição do TaskForm)
+// Criar (raiz ou subtag) e renomear; também renomeia exercício (A3d).
+// Sempre empilhado: mora dentro de cartão (a lição do TaskForm)
 function TagForm(props: {
   label: string
   submitLabel: string
   initialName?: string
+  maxLength?: number // padrão: o das tags (50)
+  emptyError?: string
   onSubmit: (name: string) => Promise<unknown>
   onCancel: () => void
 }) {
@@ -20,7 +22,7 @@ function TagForm(props: {
     event.preventDefault()
     const trimmed = name.trim()
     if (trimmed === '') {
-      setError('Escreva um nome para a tag.')
+      setError(props.emptyError ?? 'Escreva um nome para a tag.')
       return
     }
     setSubmitting(true)
@@ -45,7 +47,7 @@ function TagForm(props: {
         <input
           type="text"
           value={name}
-          maxLength={50}
+          maxLength={props.maxLength ?? 50}
           onChange={(event) => {
             setName(event.target.value)
             setError('')

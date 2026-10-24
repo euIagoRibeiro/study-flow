@@ -19,7 +19,12 @@ type UpdatedTag = Tag & { archivedDescendants: string[] }
 
 function updateTag(
   id: string,
-  changes: { name?: string; active?: boolean; tracksPhase?: boolean },
+  changes: {
+    name?: string
+    active?: boolean
+    tracksPhase?: boolean
+    tracksWorkout?: boolean
+  },
 ): Promise<UpdatedTag> {
   return request<UpdatedTag>(`/tags/${id}`, {
     method: 'PATCH',
@@ -42,6 +47,10 @@ export function reactivateTag(id: string) {
 // Só contexto; desligar com registro que tem fase o servidor recusa (409)
 export function setTracksPhase(id: string, tracksPhase: boolean) {
   return updateTag(id, { tracksPhase })
+}
+
+export function setTracksWorkout(id: string, tracksWorkout: boolean) {
+  return updateTag(id, { tracksWorkout })
 }
 
 export function deleteTag(id: string): Promise<void> {
