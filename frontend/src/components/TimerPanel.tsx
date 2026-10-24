@@ -8,8 +8,14 @@ import {
   secondaryButtonClass,
 } from '../styles'
 import { phaseApplies } from '../phases'
-import { indexTags, pathToChoice, type TagSelection } from '../tags'
+import {
+  executionSelection,
+  indexTags,
+  pathToChoice,
+  type TagSelection,
+} from '../tags'
 import type {
+  Exercise,
   Measure,
   MeasureValue,
   Phase,
@@ -17,13 +23,17 @@ import type {
   TagChoice,
   TaskExecution,
   TimeEntry,
+  WorkoutExercise,
 } from '../types'
 import { useMeasure } from '../useMeasure'
+import { useWorkoutSync, type WorkoutTarget } from '../useWorkoutSync'
+import { describeWorkout, workoutMarker } from '../workouts'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
 import PhaseField from './PhaseField'
 import TagFields from './TagFields'
+import WorkoutSection from './WorkoutSection'
 
 function TimerPanel(props: {
   execution: TaskExecution
@@ -31,6 +41,15 @@ function TimerPanel(props: {
   runningEntry: TimeEntry | undefined // undefined = pausado
   tags: Tag[]
   measures: Measure[]
+  exercises: Exercise[]
+  // Recentes no contexto (pela tag marcadora)
+  recentExerciseIds: (markerId: string) => string[]
+  // tags null = caminho já gravado, só o treino
+  onSaveWorkout: (
+    executionId: string,
+    workout: WorkoutExercise[],
+    tags: TagChoice | null,
+  ) => Promise<unknown>
   // Tags que o registro já tem (ex.: voltou pelo Desfazer) ou, sem elas,
   // a pré-seleção do contexto
   initial: TagSelection
@@ -53,9 +72,40 @@ function TimerPanel(props: {
   const [phase, setPhase] = useState(
     () => execution.phase ?? props.suggestPhase(props.initial.path),
   )
-  const showPhase = phaseApplies(selection.path, indexTags(props.tags))
+  const tagsById = indexTags(props.tags)
+  const showPhase = phaseApplies(selection.path, tagsById)
   // Voltou pelo Desfazer com medida: os campos começam nos valores dela
-  const measure = useMeasure(selection.path, props.measures, execution.measure)
+  // A medida do registro como estava ao abrir: a gravação do caminho (treino
+  // ao vivo) pode tirá-la do servidor, e voltar o caminho tem que trazê-la
+  const [openedMeasure] = useState(execution.measure)
+  const measure = useMeasure(selection.path, props.measures, openedMeasure)
+  // Treino ao vivo: o caminho GRAVADO (o servidor) pode ficar diferente do
+  // da tela até o 1º exercício
+  const serverPathKey = executionSelection(execution, tagsById).path.join('/')
+  const [mountedPathKey] = useState(serverPathKey)
+  const targetFor = (path: string[], phaseValue: Phase | null) =>
+    ({
+      pathKey: path.join('/'),
+      tags: pathToChoice(
+        path,
+        phaseApplies(path, tagsById) ? phaseValue : null,
+      ),
+      marked: workoutMarker(path, tagsById) !== null,
+    }) satisfies WorkoutTarget
+  const workout = useWorkoutSync(
+    execution.workout ?? [],
+    mountedPathKey,
+    (exercises, tags) => props.onSaveWorkout(execution.id, exercises, tags),
+  )
+  const marker = workoutMarker(selection.path, tagsById)
+  // Treino gravado + caminho sem treino: nada sai agora, o Finalizar remove
+  const workoutWarning =
+    marker === null && execution.workout
+      ? `Finalizar com esse caminho vai remover o treino (${describeWorkout(execution.workout)}).`
+      : undefined
+  const workoutBlocks =
+    workout.status === 'saving' ||
+    (workout.status === 'error' && marker !== null)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // Pausar/Retomar esperando o servidor: sem isso, clique duplo mandaria
@@ -86,7 +136,9 @@ function TimerPanel(props: {
   // Se falhar, o cronômetro continua rodando: nada parou ainda
   async function handleFinish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const sent = measure.toSend()
+    if (workoutBlocks) return
+    // O caminho gravado mudou durante a sessão: a medida vai explícita
+    const sent = measure.toSend(serverPathKey !== mountedPathKey)
     if ('error' in sent) {
       setError(sent.error)
       return
@@ -159,50 +211,84 @@ function TimerPanel(props: {
           {runningEntry ? 'Pausar' : 'Retomar'}
         </button>
       </div>
-      <form onSubmit={handleFinish} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm text-tinta-suave">
-            O que foi feito (opcional)
-          </span>
-          <input
-            type="text"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className={fieldClass}
+      {/* O Finalizar fica fora do <form>, ligado por form=: o treino entra
+          entre os campos e o botão sem ficar dentro do formulário */}
+      <div className="flex flex-col gap-3">
+        <form
+          id={`finalizar-${execution.id}`}
+          onSubmit={handleFinish}
+          className="flex flex-col gap-3"
+        >
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm text-tinta-suave">
+              O que foi feito (opcional)
+            </span>
+            <input
+              type="text"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <TagFields
+            tags={props.tags}
+            value={selection.path}
+            onChange={(path) => {
+              const nextPhase = props.suggestPhase(path)
+              setSelection({ path, legacyCount: 0 })
+              setPhase(nextPhase)
+              measure.changePath(path)
+              workout.retarget(targetFor(path, nextPhase))
+            }}
+            keep={[
+              ...(execution.rootTagId ? [execution.rootTagId] : []),
+              ...execution.tagIds,
+            ]}
+            legacyCount={selection.legacyCount}
           />
-        </label>
-        <TagFields
-          tags={props.tags}
-          value={selection.path}
-          onChange={(path) => {
-            setSelection({ path, legacyCount: 0 })
-            setPhase(props.suggestPhase(path))
-            measure.changePath(path)
-          }}
-          keep={[
-            ...(execution.rootTagId ? [execution.rootTagId] : []),
-            ...execution.tagIds,
-          ]}
-          legacyCount={selection.legacyCount}
-        />
-        {showPhase && <PhaseField value={phase} onChange={setPhase} />}
-        <MeasureFields
-          measure={measure.measure}
-          texts={measure.texts}
-          onChange={measure.change}
-          keptKindIds={measure.keptKindIds}
-          oldValues={measure.oldValues}
-        />
-        <MeasureWarning text={measure.warning} />
+          {showPhase && <PhaseField value={phase} onChange={setPhase} />}
+          <MeasureFields
+            measure={measure.measure}
+            texts={measure.texts}
+            onChange={measure.change}
+            keptKindIds={measure.keptKindIds}
+            oldValues={measure.oldValues}
+          />
+          <MeasureWarning text={measure.warning} />
+          <MeasureWarning text={workoutWarning} />
+        </form>
+        {marker !== null && (
+          <WorkoutSection
+            draft={workout.draft}
+            exercises={props.exercises}
+            recentIds={props.recentExerciseIds(marker)}
+            markerName={tagsById.get(marker)?.name ?? ''}
+            status={workout.status}
+            error={workout.error}
+            savedExercises={workout.savedExercises}
+            onChange={(next) =>
+              workout.update(next, targetFor(selection.path, phase))
+            }
+            onRetry={workout.retry}
+          />
+        )}
         <button
           type="submit"
-          disabled={submitting}
+          form={`finalizar-${execution.id}`}
+          disabled={submitting || workoutBlocks}
           className={`w-full ${primaryButtonClass}`}
         >
           Finalizar
         </button>
+        {workoutBlocks && (
+          <p className="text-center text-sm text-tinta-suave">
+            {workout.status === 'saving'
+              ? 'Salvando o treino…'
+              : 'Salve o treino antes de finalizar.'}
+          </p>
+        )}
         {error && <FormError>{error}</FormError>}
-      </form>
+      </div>
     </div>
   )
 }

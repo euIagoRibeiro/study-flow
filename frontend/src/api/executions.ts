@@ -4,6 +4,7 @@ import type {
   SavedExecution,
   TagChoice,
   TaskExecution,
+  WorkoutExercise,
 } from '../types'
 import { request } from './client'
 
@@ -36,6 +37,7 @@ function putExecution(
     completedAt: string | null
     estimatedMinutes?: number | null
     measureValues?: MeasureValue[]
+    workout?: WorkoutExercise[]
   } & Partial<TagChoice>,
 ): Promise<SavedExecution> {
   return request<SavedExecution>(`/executions/${id}`, {
@@ -84,19 +86,49 @@ export function finishExecution(
   })
 }
 
-// Desfazer volta tudo ao que era: descrição, tags e medida de antes
-// (ausente, o servidor manteria a do Finalizar)
+// Desfazer volta tudo ao que era: descrição, tags, medida e treino de antes
+// (ausentes, o servidor manteria os do Finalizar)
 export function reopenExecution(
   id: string,
   previousDescription: string | null,
   previousTags: TagChoice,
   previousMeasureValues: MeasureValue[],
+  previousWorkout: WorkoutExercise[],
 ): Promise<SavedExecution> {
   return putExecution(id, {
     description: previousDescription,
     completedAt: null,
     ...previousTags,
     measureValues: previousMeasureValues,
+    workout: previousWorkout,
+  })
+}
+
+// Treino ao vivo, com o caminho já gravado: só o treino (o PUT do registro
+// regravaria a descrição que está sendo digitada)
+export function saveWorkout(
+  id: string,
+  workout: WorkoutExercise[],
+): Promise<SavedExecution> {
+  return request<SavedExecution>(`/executions/${id}/workout`, {
+    method: 'PUT',
+    body: JSON.stringify({ workout }),
+  })
+}
+
+// Caminho ainda não gravado (1º exercício, ou Academia → Casa): caminho e
+// treino num pedido só, com a descrição JÁ gravada, não a do campo
+export function saveWorkoutWithPath(
+  id: string,
+  savedDescription: string | null,
+  tags: TagChoice,
+  workout: WorkoutExercise[],
+): Promise<SavedExecution> {
+  return putExecution(id, {
+    description: savedDescription,
+    completedAt: null,
+    ...tags,
+    workout,
   })
 }
 

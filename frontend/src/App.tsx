@@ -27,6 +27,7 @@ import type {
   Task,
   TaskExecution,
   TimeEntry,
+  WorkoutExercise,
 } from './types'
 
 // 409: o banco recusou por conflito com um estado que essa página não
@@ -125,6 +126,36 @@ function App() {
       ...current.filter((entry) => entry.taskExecutionId !== execution.id),
       ...entries,
     ])
+  }
+
+  // Treino ao vivo: troca só a execução. As sessões da resposta podem ser de
+  // antes de um Pausar que respondeu primeiro (pedidos independentes)
+  function keepExecution(saved: SavedExecution) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { timeEntries: _entries, ...execution } = saved
+    setExecutions((current) =>
+      current.map((e) => (e.id === execution.id ? execution : e)),
+    )
+  }
+
+  // Erro sobe pro TimerPanel (mostra "Não salvo" + Tentar de novo). Caminho
+  // ainda não gravado: vai junto, com a descrição JÁ gravada
+  async function saveWorkout(
+    executionId: string,
+    workout: WorkoutExercise[],
+    tags: TagChoice | null,
+  ) {
+    const saved = executions.find((e) => e.id === executionId)
+    keepExecution(
+      tags
+        ? await executionsApi.saveWorkoutWithPath(
+            executionId,
+            saved?.description ?? null,
+            tags,
+            workout,
+          )
+        : await executionsApi.saveWorkout(executionId, workout),
+    )
   }
 
   // Erro sobe pro ExecutionForm, que mostra a mensagem
@@ -260,6 +291,7 @@ function App() {
     previousDescription: string | null,
     previousTags: TagChoice,
     previousMeasureValues: MeasureValue[],
+    previousWorkout: WorkoutExercise[],
     resumeEntryId: string | null,
   ) {
     try {
@@ -269,6 +301,7 @@ function App() {
           previousDescription,
           previousTags,
           previousMeasureValues,
+          previousWorkout,
         ),
       )
     } catch (error) {
@@ -517,6 +550,8 @@ function App() {
               timeEntries={timeEntries}
               tags={tags}
               measures={measures}
+              exercises={exercises}
+              onSaveWorkout={saveWorkout}
               onCreate={addTask}
               onExecute={addExecution}
               onStartTimer={startTimer}

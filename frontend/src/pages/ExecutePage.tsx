@@ -19,6 +19,7 @@ import {
 } from '../styles'
 import { executionSelection, indexTags, lastRootPath } from '../tags'
 import type {
+  Exercise,
   Frequency,
   NewTask,
   Measure,
@@ -28,7 +29,9 @@ import type {
   Task,
   TaskExecution,
   TimeEntry,
+  WorkoutExercise,
 } from '../types'
+import { recentExerciseIds } from '../workouts'
 
 const UNDO_SECONDS = 6
 
@@ -41,6 +44,12 @@ function ExecutePage(props: {
   timeEntries: TimeEntry[]
   tags: Tag[]
   measures: Measure[]
+  exercises: Exercise[]
+  onSaveWorkout: (
+    executionId: string,
+    workout: WorkoutExercise[],
+    tags: TagChoice | null,
+  ) => Promise<void>
   onCreate: (task: NewTask) => Promise<string>
   onExecute: (
     taskId: string,
@@ -64,6 +73,7 @@ function ExecutePage(props: {
     previousDescription: string | null,
     previousTags: TagChoice,
     previousMeasureValues: MeasureValue[],
+    previousWorkout: WorkoutExercise[],
     resumeEntryId: string | null,
   ) => Promise<void>
 }) {
@@ -79,6 +89,7 @@ function ExecutePage(props: {
     previousDescription: string | null
     previousTags: TagChoice
     previousMeasureValues: MeasureValue[]
+    previousWorkout: WorkoutExercise[]
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
@@ -155,6 +166,8 @@ function ExecutePage(props: {
       },
       // [] = sem medida: ausente, o servidor manteria a do Finalizar
       previousMeasureValues: execution?.measure?.values ?? [],
+      // O Finalizar só sai com o treino gravado: o do estado é o da tela
+      previousWorkout: execution?.workout ?? [],
       resumeEntryId: resumeEntry?.id ?? null,
     })
   }
@@ -167,6 +180,7 @@ function ExecutePage(props: {
       pendingUndo.previousDescription,
       pendingUndo.previousTags,
       pendingUndo.previousMeasureValues,
+      pendingUndo.previousWorkout,
       pendingUndo.resumeEntryId,
     )
     setUndoing(false)
@@ -361,6 +375,11 @@ function ExecutePage(props: {
           tags={props.tags}
           suggestPhase={suggestPhase}
           measures={props.measures}
+          exercises={props.exercises}
+          recentExerciseIds={(markerId) =>
+            recentExerciseIds(props.executions, markerId, tagsById)
+          }
+          onSaveWorkout={props.onSaveWorkout}
           initial={
             openSelection && openSelection.path.length > 0
               ? openSelection

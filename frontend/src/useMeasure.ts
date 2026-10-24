@@ -66,9 +66,13 @@ export function useMeasure(
     changePath(next: string[]) {
       setTexts(recorded && restores(next) ? valuesToTexts(recorded.values) : {})
     },
-    // values undefined = não mandar (o servidor mantém o que está gravado)
-    toSend(): { values: MeasureValue[] | undefined } | { error: string } {
-      if (!pathChanged && !touched) return { values: undefined }
+    // values undefined = não mandar (o servidor mantém o que está gravado).
+    // force: o caminho gravado mudou no meio (treino ao vivo) e o servidor
+    // pode ter tirado a medida; manda o que está na tela
+    toSend(
+      force = false,
+    ): { values: MeasureValue[] | undefined } | { error: string } {
+      if (!force && !pathChanged && !touched) return { values: undefined }
       if (oldValues !== undefined && !filled) return { values: undefined }
       return textsToValues(texts, measure)
     },
