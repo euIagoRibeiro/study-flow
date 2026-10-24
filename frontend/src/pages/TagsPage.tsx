@@ -315,33 +315,42 @@ function TagsPage(props: {
           />
         ) : (
           <div className="flex min-h-11 items-center gap-2">
-            {children.length > 0 ? (
-              // Nome + seta = um botão só (mesmo padrão do "2 sessões ⌄"):
-              // alvo grande no celular, e o estado vai no aria-expanded
-              <button
-                type="button"
-                onClick={() => toggle(tag.id)}
-                aria-expanded={isOpen}
-                aria-controls={listId}
-                aria-label={`Subtags de ${tag.name}`}
-                className={`flex min-h-11 min-w-0 items-center gap-1 rounded-md text-left break-words ${nameStyle} ${focusRing}`}
-              >
-                {tag.name}
-                <ChevronDownIcon
-                  className={`h-4 w-4 shrink-0 text-tinta-suave transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-            ) : (
-              <span className={`min-w-0 break-words ${nameStyle}`}>
-                {tag.name}
+            {/* Sem espaço numa linha, chips e contagem descem pra baixo do
+                nome (antes, o nome encolhia e a seta caía em cima do chip) */}
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-2">
+              {children.length > 0 ? (
+                // Nome + seta = um botão só (mesmo padrão do "2 sessões ⌄"):
+                // alvo grande no celular, e o estado vai no aria-expanded
+                <button
+                  type="button"
+                  onClick={() => toggle(tag.id)}
+                  aria-expanded={isOpen}
+                  aria-controls={listId}
+                  aria-label={`Subtags de ${tag.name}`}
+                  className={`flex min-h-11 min-w-0 items-center gap-1 rounded-md text-left ${nameStyle} ${focusRing}`}
+                >
+                  {/* Span próprio: texto solto num flex não encolhe abaixo
+                      da palavra, e a seta vazava do botão */}
+                  <span className="min-w-0 break-words">{tag.name}</span>
+                  <ChevronDownIcon
+                    className={`h-4 w-4 shrink-0 text-tinta-suave transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+              ) : (
+                <span className={`min-w-0 break-words ${nameStyle}`}>
+                  {tag.name}
+                </span>
+              )}
+              {/* py-2.5: numa linha, centralizado igual; embaixo do nome,
+                  folga até a linha "Medida" (que sobe com -mt-1.5) */}
+              <span className="flex items-center gap-2 py-2.5">
+                {tag.tracksPhase && <span className={chipClass}>Fases</span>}
+                {!tag.active && <span className={chipClass}>Arquivada</span>}
+                <span className="shrink-0 font-dados text-meta text-tinta-suave tabular-nums">
+                  {registros(counts.get(tag.id) ?? 0)}
+                </span>
               </span>
-            )}
-            <span className="flex-1" />
-            {tag.tracksPhase && <span className={chipClass}>Fases</span>}
-            {!tag.active && <span className={chipClass}>Arquivada</span>}
-            <span className="shrink-0 font-dados text-meta text-tinta-suave tabular-nums">
-              {registros(counts.get(tag.id) ?? 0)}
-            </span>
+            </div>
             <ActionMenu
               label={`Mais ações de ${path(tag)}`}
               actions={actionsFor(tag)}
