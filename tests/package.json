@@ -1,0 +1,19 @@
+{
+  "name": "studyflow-tests",
+  "private": true,
+  "type": "module",
+  "description": "Baterias de banco, API, tela e layout do StudyFlow (ver README)",
+  "scripts": {
+    "tudo": "node --env-file=../backend/.env run.mjs tudo",
+    "banco": "node --env-file=../backend/.env run.mjs banco",
+    "api": "node --env-file=../backend/.env run.mjs api",
+    "telas": "node --env-file=../backend/.env run.mjs telas",
+    "layout": "node --env-file=../backend/.env run.mjs layout"
+  },
+  "devDependencies": {
+    "pg": "^8.23.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.43.1"
+  }
+}

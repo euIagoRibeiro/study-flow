@@ -47,9 +47,10 @@ editar a tarefa depois não reescreve o histórico.
 study-flow/
 ├── docker-compose.yml   # Postgres para desenvolvimento
 ├── frontend/            # app React (Vite)
-└── backend/             # API Express
-    ├── migrations/      # arquivos .sql numerados, aplicados em ordem
-    └── src/
+├── backend/             # API Express
+│   ├── migrations/      # arquivos .sql numerados, aplicados em ordem
+│   └── src/
+└── tests/               # baterias de banco, API, tela e layout (ver tests/README.md)
 ```
 
 ## Modelo de dados
