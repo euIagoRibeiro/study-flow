@@ -59,11 +59,15 @@ function WorkoutSection(props: {
   exercises: Exercise[]
   recentIds: string[]
   markerName: string
-  status: 'saved' | 'saving' | 'error'
-  error: string
-  savedExercises: number
+  // Gravação ao vivo (registro aberto). Ausente = edição: nada vai até o
+  // Salvar do registro, e a linha "Salvo / Não salvo" não aparece
+  live?: {
+    status: 'saved' | 'saving' | 'error'
+    error: string
+    savedExercises: number
+    onRetry: () => void
+  }
   onChange: (next: WorkoutExercise[]) => void
-  onRetry: () => void
   // Devolve o criado, ou o existente se o nome já existia (409)
   onCreateExercise: (name: string) => Promise<Exercise>
 }) {
@@ -89,7 +93,12 @@ function WorkoutSection(props: {
   } | null>(null)
 
   const byId = new Map(props.exercises.map((x) => [x.id, x]))
-  const nameOf = (id: string) => byId.get(id)?.name ?? 'Exercício'
+  // Arquivado só aparece se já estava no registro (a escolha não oferece)
+  const nameOf = (id: string) => {
+    const exercise = byId.get(id)
+    if (!exercise) return 'Exercício'
+    return exercise.active ? exercise.name : `${exercise.name} (arquivado)`
+  }
   const current = draft.find((item) => item.exerciseId === currentId)
 
   function replaceSets(exerciseId: string, sets: WorkoutSet[]) {
@@ -229,11 +238,11 @@ function WorkoutSection(props: {
   }
 
   const statusText =
-    props.status === 'saving'
+    props.live?.status === 'saving'
       ? 'Salvando…'
-      : props.status === 'error'
+      : props.live?.status === 'error'
         ? 'Não salvo'
-        : props.savedExercises > 0
+        : props.live && props.live.savedExercises > 0
           ? 'Salvo'
           : ''
 
@@ -255,19 +264,21 @@ function WorkoutSection(props: {
     <section aria-label="Treino" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <h3 className="font-titulo text-base font-bold">Treino</h3>
-        <p
-          role="status"
-          className={`font-dados text-meta ${props.status === 'error' ? 'text-alerta' : 'text-tinta-suave'}`}
-        >
-          {statusText}
-        </p>
+        {props.live && (
+          <p
+            role="status"
+            className={`font-dados text-meta ${props.live.status === 'error' ? 'text-alerta' : 'text-tinta-suave'}`}
+          >
+            {statusText}
+          </p>
+        )}
       </div>
-      {props.status === 'error' && (
+      {props.live?.status === 'error' && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <FormError>{props.error}</FormError>
+          <FormError>{props.live.error}</FormError>
           <button
             type="button"
-            onClick={props.onRetry}
+            onClick={props.live.onRetry}
             className={secondaryButtonClass}
           >
             Tentar de novo

@@ -16,7 +16,9 @@ import type {
   Measure,
   Tag,
   TimeEntry,
+  WorkoutCatalog,
 } from '../types'
+import { formatSets } from '../workouts'
 import CompactIconButton from './CompactIconButton'
 import ExecutionEditForm from './ExecutionEditForm'
 import { ChevronDownIcon, PencilIcon } from './icons'
@@ -40,6 +42,7 @@ function ExecutionHistory(props: {
   timeEntries: TimeEntry[]
   tags: Tag[]
   measures: Measure[]
+  workoutCatalog: WorkoutCatalog
   onEdit: (executionId: string, changes: ExecutionChanges) => Promise<void>
   onEditTimeEntry: (
     entryId: string,
@@ -52,15 +55,22 @@ function ExecutionHistory(props: {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   // Sessões começam recolhidas: guarda só as execuções abertas
   const [openSessions, setOpenSessions] = useState<Set<string>>(() => new Set())
+  // Treino também começa recolhido ("3 exercícios ⌄"), independente das sessões
+  const [openWorkouts, setOpenWorkouts] = useState<Set<string>>(() => new Set())
 
-  function toggleSessions(id: string) {
-    setOpenSessions((current) => {
+  function toggle(setter: typeof setOpenSessions, id: string) {
+    setter((current) => {
       const next = new Set(current)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
   }
+  const toggleSessions = (id: string) => toggle(setOpenSessions, id)
+  // Nome de hoje (renomear é dinâmico, como as tags); arquivado sem marca:
+  // o registro é do passado
+  const exerciseName = (id: string) =>
+    props.workoutCatalog.exercises.find((x) => x.id === id)?.name ?? 'Exercício'
 
   const tagsById = indexTags(props.tags)
 
@@ -97,6 +107,8 @@ function ExecutionHistory(props: {
     )
     const editing = editingId === execution.id
     const sessionsOpen = openSessions.has(execution.id)
+    const workoutOpen = openWorkouts.has(execution.id)
+    const workout = execution.workout
     const leaves = leafTags(execution, tagsById)
     const estimate = entries.find((entry) => entry.estimated)
     const recordedMeasure = props.measures.find(
@@ -173,6 +185,21 @@ function ExecutionHistory(props: {
                   {describeValue(value, recordedMeasure)}
                 </span>
               ))}
+            {workout && (
+              <button
+                type="button"
+                onClick={() => toggle(setOpenWorkouts, execution.id)}
+                aria-expanded={workoutOpen}
+                className={textButtonClass}
+              >
+                {workout.length === 1
+                  ? '1 exercício'
+                  : `${workout.length} exercícios`}
+                <ChevronDownIcon
+                  className={`h-4 w-4 transition-transform ${workoutOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+            )}
             {entries.length > 0 && (
               <button
                 type="button"
@@ -207,11 +234,31 @@ function ExecutionHistory(props: {
                 : null
             }
             measures={props.measures}
+            workoutCatalog={props.workoutCatalog}
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)
               setEditingId(null)
             }}
           />
+        )}
+        {/* Nome e séries em duas linhas: nome longo é a regra (equipamento
+            no nome) */}
+        {workout && workoutOpen && (
+          <ul
+            aria-label="Treino"
+            className="mt-1 flex flex-col gap-2 border-t border-dashed border-linha pt-2"
+          >
+            {workout.map((item) => (
+              <li key={item.exerciseId} className="flex flex-col">
+                <span className="text-conteudo break-words">
+                  {exerciseName(item.exerciseId)}
+                </span>
+                <span className="font-dados text-meta text-tinta-suave tabular-nums">
+                  {formatSets(item.sets)}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
         {entries.length > 0 && sessionsOpen && (
           <ul className="mt-1 flex flex-col border-t border-dashed border-linha pt-1">

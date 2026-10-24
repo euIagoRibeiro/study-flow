@@ -43,6 +43,15 @@ export type Exercise = { id: string; name: string; active: boolean }
 
 // O que a tela de tags faz com o catálogo. Renomear: o erro sobe pro
 // formulário (mostra o motivo); o resto avisa no Layout
+// O que a edição de um registro precisa pro treino, montado no App: o
+// catálogo, os recentes (de TODOS os registros, não só os da tarefa do
+// cartão) e criar na hora
+export type WorkoutCatalog = {
+  exercises: Exercise[]
+  recentIds: (markerId: string) => string[]
+  create: (name: string) => Promise<Exercise>
+}
+
 export type ExerciseActions = {
   rename: (id: string, name: string) => Promise<void>
   setActive: (id: string, active: boolean) => void
@@ -145,6 +154,8 @@ export type ExecutionChanges = {
   estimatedMinutes?: number | null
   // Ausente: mantém. [] remove a medida do registro
   measureValues?: MeasureValue[]
+  // Ausente: mantém (mas a marcadora fora do caminho apaga). [] remove
+  workout?: WorkoutExercise[]
 } & Partial<TagChoice>
 
 export type LoadStatus = 'loading' | 'error' | 'ready'

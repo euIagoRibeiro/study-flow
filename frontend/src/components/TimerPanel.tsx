@@ -27,7 +27,7 @@ import type {
 } from '../types'
 import { useMeasure } from '../useMeasure'
 import { useWorkoutSync, type WorkoutTarget } from '../useWorkoutSync'
-import { describeWorkout, workoutMarker } from '../workouts'
+import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
@@ -138,6 +138,13 @@ function TimerPanel(props: {
   async function handleFinish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (workoutBlocks) return
+    // Exercício sem série não seria gravado: avisa em vez de descartar
+    const empty =
+      marker !== null && emptyExerciseError(workout.draft, props.exercises)
+    if (empty) {
+      setError(empty)
+      return
+    }
     // O caminho gravado mudou durante a sessão: a medida vai explícita
     const sent = measure.toSend(serverPathKey !== mountedPathKey)
     if ('error' in sent) {
@@ -264,13 +271,15 @@ function TimerPanel(props: {
             exercises={props.exercises}
             recentIds={props.recentExerciseIds(marker)}
             markerName={tagsById.get(marker)?.name ?? ''}
-            status={workout.status}
-            error={workout.error}
-            savedExercises={workout.savedExercises}
+            live={{
+              status: workout.status,
+              error: workout.error,
+              savedExercises: workout.savedExercises,
+              onRetry: workout.retry,
+            }}
             onChange={(next) =>
               workout.update(next, targetFor(selection.path, phase))
             }
-            onRetry={workout.retry}
             onCreateExercise={props.onCreateExercise}
           />
         )}

@@ -27,8 +27,11 @@ import type {
   Task,
   TaskExecution,
   TimeEntry,
+  WorkoutCatalog,
   WorkoutExercise,
 } from './types'
+import { indexTags } from './tags'
+import { recentExerciseIds } from './workouts'
 
 // 409: o banco recusou por conflito com um estado que essa página não
 // conhece (ex.: algo iniciado em outro aparelho depois que ela carregou)
@@ -454,6 +457,15 @@ function App() {
     return exercise
   }
 
+  // Pro treino na edição do registro (Histórico e cartão da Lista): os
+  // recentes saem de TODOS os registros, não só os da tarefa do cartão
+  const workoutCatalog: WorkoutCatalog = {
+    exercises,
+    recentIds: (markerId) =>
+      recentExerciseIds(executions, markerId, indexTags(tags)),
+    create: createExercise,
+  }
+
   const exerciseActions: ExerciseActions = {
     async rename(id, name) {
       replaceExercise(await exercisesApi.updateExercise(id, { name }))
@@ -544,6 +556,7 @@ function App() {
               timeEntries={timeEntries}
               tags={tags}
               measures={measures}
+              workoutCatalog={workoutCatalog}
               onCreate={addTask}
               onEdit={editTask}
               onArchive={archiveTask}
@@ -583,6 +596,7 @@ function App() {
               timeEntries={timeEntries}
               tags={tags}
               measures={measures}
+              workoutCatalog={workoutCatalog}
               onEditExecution={editExecution}
               onEditTimeEntry={editTimeEntry}
             />

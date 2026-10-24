@@ -13,6 +13,7 @@ import { cardClass, focusRing, inlineButtonClass } from '../styles'
 import { compareNames, indexTags, lastRootPath } from '../tags'
 import type {
   Measure,
+  WorkoutCatalog,
   ExecutionChanges,
   NewTask,
   Tag,
@@ -31,6 +32,7 @@ function TaskListPage(props: {
   timeEntries: TimeEntry[]
   tags: Tag[]
   measures: Measure[]
+  workoutCatalog: WorkoutCatalog
   onCreate: (task: NewTask) => Promise<string>
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
@@ -208,6 +210,7 @@ function TaskListPage(props: {
             timeEntries={props.timeEntries}
             tags={props.tags}
             measures={props.measures}
+            workoutCatalog={props.workoutCatalog}
             onEdit={props.onEdit}
             onArchive={props.onArchive}
             onReactivate={props.onReactivate}

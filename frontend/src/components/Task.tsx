@@ -9,6 +9,7 @@ import {
 } from '../styles'
 import type {
   Measure,
+  WorkoutCatalog,
   CompletedExecution,
   ExecutionChanges,
   NewTask,
@@ -55,6 +56,7 @@ function Task(props: {
   timeEntries: TimeEntry[]
   tags: Tag[]
   measures: Measure[]
+  workoutCatalog: WorkoutCatalog
   openForm: OpenForm
   onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
@@ -223,6 +225,7 @@ function Task(props: {
               timeEntries={props.timeEntries}
               tags={props.tags}
               measures={props.measures}
+              workoutCatalog={props.workoutCatalog}
               onEdit={props.onEditExecution}
               onEditTimeEntry={props.onEditTimeEntry}
             />

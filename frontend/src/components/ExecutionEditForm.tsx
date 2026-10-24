@@ -9,20 +9,25 @@ import type {
   ExecutionChanges,
   Measure,
   Tag,
+  WorkoutCatalog,
+  WorkoutExercise,
 } from '../types'
 import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import { useMeasure } from '../useMeasure'
+import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
 import PhaseField from './PhaseField'
 import TagFields from './TagFields'
+import WorkoutSection from './WorkoutSection'
 
 function ExecutionEditForm(props: {
   execution: CompletedExecution
   tags: Tag[]
   measures: Measure[]
   estimateMinutes: number | null // a estimativa que o registro já tem
+  workoutCatalog: WorkoutCatalog
   onSubmit: (changes: ExecutionChanges) => Promise<unknown>
 }) {
   const { execution } = props
@@ -40,6 +45,16 @@ function ExecutionEditForm(props: {
   const showPhase = phaseApplies(selection.path, byId)
   // Começa nos valores do próprio registro (não é sugestão)
   const measure = useMeasure(selection.path, props.measures, execution.measure)
+  // Treino: rascunho na tela, vai só no Salvar
+  const [draft, setDraft] = useState<WorkoutExercise[]>(execution.workout ?? [])
+  const [originalPathKey] = useState(() =>
+    executionSelection(execution, byId).path.join('/'),
+  )
+  const marker = workoutMarker(selection.path, byId)
+  const workoutWarning =
+    marker === null && execution.workout
+      ? `Salvar com esse caminho vai remover o treino (${describeWorkout(execution.workout)}).`
+      : undefined
   const [error, setError] = useState('')
 
   // Outro projeto: "Sem fase", sem chutar o passado com dado de hoje. De
@@ -64,6 +79,19 @@ function ExecutionEditForm(props: {
       setError(sent.error)
       return
     }
+    const empty =
+      marker !== null &&
+      emptyExerciseError(draft, props.workoutCatalog.exercises)
+    if (empty) {
+      setError(empty)
+      return
+    }
+    // Só vai se mexeu, ou se o caminho mudou pra outro com treino: sem ele,
+    // a marcadora antiga sai do caminho e o servidor apagaria o treino
+    const sendWorkout =
+      marker !== null &&
+      (JSON.stringify(draft) !== JSON.stringify(execution.workout ?? []) ||
+        selection.path.join('/') !== originalPathKey)
     setSubmitting(true)
     try {
       await props.onSubmit({
@@ -80,6 +108,7 @@ function ExecutionEditForm(props: {
           : { estimatedMinutes: estimate === '' ? null : estimate }),
         // Idem: sem mexer (nem no caminho), o servidor mantém a medida
         ...(sent.values ? { measureValues: sent.values } : {}),
+        ...(sendWorkout ? { workout: draft } : {}),
       })
     } catch (err) {
       setError(
@@ -95,55 +124,75 @@ function ExecutionEditForm(props: {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-2">
+    <div className="mt-3 flex flex-col gap-2">
       {/* Sempre empilhado: o form vive dentro de um cartão, e na linha única
           (antes, a partir de sm) os campos de data não encolhiam e empurravam
-          o Salvar pra fora do cartão */}
+          o Salvar pra fora do cartão. O Salvar fica fora do <form>, ligado
+          por form=: o treino (que tem formulários próprios) entra entre os
+          campos e o botão */}
       <div className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm text-tinta-suave">
-            O que foi feito (opcional)
-          </span>
-          <input
-            type="text"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className={fieldClass}
+        <form
+          id={`editar-${execution.id}`}
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-3"
+        >
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm text-tinta-suave">
+              O que foi feito (opcional)
+            </span>
+            <input
+              type="text"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm text-tinta-suave">Quando</span>
+            <input
+              type="datetime-local"
+              value={completedAt}
+              onChange={(event) => setCompletedAt(event.target.value)}
+              required
+              className={fieldClass}
+            />
+          </label>
+          <EstimateField value={minutes} onChange={setMinutes} />
+          <TagFields
+            tags={props.tags}
+            value={selection.path}
+            onChange={changePath}
+            // Tudo que o registro já tem continua escolhível, mesmo arquivado
+            keep={[
+              ...(execution.rootTagId ? [execution.rootTagId] : []),
+              ...execution.tagIds,
+            ]}
+            legacyCount={selection.legacyCount}
           />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm text-tinta-suave">Quando</span>
-          <input
-            type="datetime-local"
-            value={completedAt}
-            onChange={(event) => setCompletedAt(event.target.value)}
-            required
-            className={fieldClass}
+          {showPhase && <PhaseField value={phase} onChange={setPhase} />}
+          <MeasureFields
+            measure={measure.measure}
+            texts={measure.texts}
+            onChange={measure.change}
+            keptKindIds={measure.keptKindIds}
+            oldValues={measure.oldValues}
           />
-        </label>
-        <EstimateField value={minutes} onChange={setMinutes} />
-        <TagFields
-          tags={props.tags}
-          value={selection.path}
-          onChange={changePath}
-          // Tudo que o registro já tem continua escolhível, mesmo arquivado
-          keep={[
-            ...(execution.rootTagId ? [execution.rootTagId] : []),
-            ...execution.tagIds,
-          ]}
-          legacyCount={selection.legacyCount}
-        />
-        {showPhase && <PhaseField value={phase} onChange={setPhase} />}
-        <MeasureFields
-          measure={measure.measure}
-          texts={measure.texts}
-          onChange={measure.change}
-          keptKindIds={measure.keptKindIds}
-          oldValues={measure.oldValues}
-        />
-        <MeasureWarning text={measure.warning} />
+          <MeasureWarning text={measure.warning} />
+          <MeasureWarning text={workoutWarning} />
+        </form>
+        {marker !== null && (
+          <WorkoutSection
+            draft={draft}
+            exercises={props.workoutCatalog.exercises}
+            recentIds={props.workoutCatalog.recentIds(marker)}
+            markerName={byId.get(marker)?.name ?? ''}
+            onChange={setDraft}
+            onCreateExercise={props.workoutCatalog.create}
+          />
+        )}
         <button
           type="submit"
+          form={`editar-${execution.id}`}
           disabled={submitting}
           className={`w-full ${primaryButtonClass}`}
         >
@@ -151,7 +200,7 @@ function ExecutionEditForm(props: {
         </button>
       </div>
       {error && <FormError>{error}</FormError>}
-    </form>
+    </div>
   )
 }
 

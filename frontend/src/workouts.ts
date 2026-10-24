@@ -62,6 +62,35 @@ export function formatSet(set: WorkoutSet) {
     : `${set.reps} × ${formatQuantity(set.weightKg)} kg`
 }
 
+// Histórico: todas com peso, "kg" uma vez no fim; todas no corpo, "15, 12
+// reps, peso do corpo"; misturado, cada série completa (o "kg" do fim
+// ficaria ambíguo). Sem compactar repetidas: lê como foi anotado
+export function formatSets(sets: WorkoutSet[]) {
+  if (sets.every((set) => set.weightKg !== null)) {
+    const all = sets.map(
+      (set) => `${set.reps} × ${formatQuantity(set.weightKg ?? 0)}`,
+    )
+    return `${all.join(', ')} kg`
+  }
+  if (sets.every((set) => set.weightKg === null)) {
+    return `${sets.map((set) => set.reps).join(', ')} reps, peso do corpo`
+  }
+  return sets.map(formatSet).join(', ')
+}
+
+// Exercício escolhido e sem série: o servidor recusaria (400). Quem salva
+// trava com o motivo em vez de descartar em silêncio
+export function emptyExerciseError(
+  draft: WorkoutExercise[],
+  exercises: Exercise[],
+): string | null {
+  const empty = draft.find((item) => item.sets.length === 0)
+  if (!empty) return null
+  const name =
+    exercises.find((x) => x.id === empty.exerciseId)?.name ?? 'Um exercício'
+  return `${name} está sem séries: adicione uma ou tire do treino.`
+}
+
 export function countSets(count: number) {
   return count === 0
     ? 'sem séries'
