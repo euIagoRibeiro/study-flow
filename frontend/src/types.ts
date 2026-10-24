@@ -27,16 +27,16 @@ export type TaskExecution = {
   tagIds: string[]
   // Só sob contexto com fases (tracksPhase); null = sem fase
   phase: Phase | null
-  // "2 exercícios", "5,5 km": sempre os dois juntos, ou os dois null
-  quantity: number | null
-  quantityUnit: string | null
   // Medida por contexto (qual medida e os valores); null = sem medida
   measure: ExecutionMeasure | null
 }
 
+// Um valor de medida: "3 refatoração" (kindId) ou "12 exercícios" (null)
+export type MeasureValue = { kindId: string | null; quantity: number }
+
 export type ExecutionMeasure = {
   measureId: string
-  values: { kindId: string | null; quantity: number }[]
+  values: MeasureValue[]
 }
 
 // A medida que uma tag declara (descendentes herdam; subtag substitui)
@@ -74,12 +74,6 @@ export type MeasureActions = {
     changes: { name?: string; active?: boolean },
   ) => Promise<void>
   removeKind: (measureId: string, kindId: string) => Promise<void>
-}
-
-// Quantidade que vai pro servidor (null nos dois = sem quantidade)
-export type QuantityChoice = {
-  quantity: number | null
-  quantityUnit: string | null
 }
 
 // Fase de trabalho: ordem do enum do banco
@@ -130,7 +124,8 @@ export type ExecutionChanges = {
   completedAt: string
   // Ausente: mantém (e acompanha o "Quando"). null remove
   estimatedMinutes?: number | null
-} & Partial<TagChoice> &
-  Partial<QuantityChoice>
+  // Ausente: mantém. [] remove a medida do registro
+  measureValues?: MeasureValue[]
+} & Partial<TagChoice>
 
 export type LoadStatus = 'loading' | 'error' | 'ready'

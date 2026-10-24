@@ -12,6 +12,7 @@ import { frequencyLabels } from '../frequency'
 import { cardClass, focusRing, inlineButtonClass } from '../styles'
 import { compareNames, indexTags, lastRootPath } from '../tags'
 import type {
+  Measure,
   ExecutionChanges,
   NewTask,
   Tag,
@@ -29,6 +30,7 @@ function TaskListPage(props: {
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
   tags: Tag[]
+  measures: Measure[]
   onCreate: (task: NewTask) => Promise<string>
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
@@ -205,6 +207,7 @@ function TaskListPage(props: {
             executions={props.executions}
             timeEntries={props.timeEntries}
             tags={props.tags}
+            measures={props.measures}
             onEdit={props.onEdit}
             onArchive={props.onArchive}
             onReactivate={props.onReactivate}

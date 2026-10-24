@@ -7,21 +7,22 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
-import { parseQuantity, quantityInputValue } from '../numbers'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice, type TagSelection } from '../tags'
 import type {
+  Measure,
+  MeasureValue,
   Phase,
-  QuantityChoice,
   Tag,
   TagChoice,
   TaskExecution,
   TimeEntry,
 } from '../types'
+import { useMeasure } from '../useMeasure'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
+import MeasureFields, { MeasureWarning } from './MeasureFields'
 import PhaseField from './PhaseField'
-import QuantityFields from './QuantityFields'
 import TagFields from './TagFields'
 
 function TimerPanel(props: {
@@ -29,19 +30,18 @@ function TimerPanel(props: {
   entries: TimeEntry[] // todas as sessões dessa execução
   runningEntry: TimeEntry | undefined // undefined = pausado
   tags: Tag[]
+  measures: Measure[]
   // Tags que o registro já tem (ex.: voltou pelo Desfazer) ou, sem elas,
   // a pré-seleção do contexto
   initial: TagSelection
   suggestPhase: (path: string[]) => Phase | null
-  suggestUnit: (path: string[]) => string | null
-  units: string[]
   onStop: (entryId: string) => Promise<unknown>
   onResume: (executionId: string) => Promise<unknown>
   onFinish: (
     executionId: string,
     description: string,
     tags: Partial<TagChoice>,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[] | undefined,
   ) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
@@ -54,17 +54,8 @@ function TimerPanel(props: {
     () => execution.phase ?? props.suggestPhase(props.initial.path),
   )
   const showPhase = phaseApplies(selection.path, indexTags(props.tags))
-  // Voltou pelo Desfazer com quantidade: começa nela (unidade real, não
-  // sugestão). Senão, número vazio e a unidade sugerida pelo caminho
-  const [quantity, setQuantity] = useState(
-    quantityInputValue(execution.quantity),
-  )
-  const [unit, setUnit] = useState(
-    () => execution.quantityUnit ?? props.suggestUnit(props.initial.path) ?? '',
-  )
-  const [unitTouched, setUnitTouched] = useState(
-    execution.quantityUnit !== null,
-  )
+  // Voltou pelo Desfazer com medida: os campos começam nos valores dela
+  const measure = useMeasure(selection.path, props.measures, execution.measure)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // Pausar/Retomar esperando o servidor: sem isso, clique duplo mandaria
@@ -95,9 +86,9 @@ function TimerPanel(props: {
   // Se falhar, o cronômetro continua rodando: nada parou ainda
   async function handleFinish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const parsed = parseQuantity(quantity, unit, !unitTouched)
-    if ('error' in parsed) {
-      setError(parsed.error)
+    const sent = measure.toSend()
+    if ('error' in sent) {
+      setError(sent.error)
       return
     }
     setSubmitting(true)
@@ -109,7 +100,7 @@ function TimerPanel(props: {
         selection.legacyCount > 0
           ? {}
           : pathToChoice(selection.path, showPhase ? phase : null),
-        parsed.value ?? { quantity: null, quantityUnit: null },
+        sent.values,
       )
     } catch (err) {
       setError(
@@ -186,7 +177,7 @@ function TimerPanel(props: {
           onChange={(path) => {
             setSelection({ path, legacyCount: 0 })
             setPhase(props.suggestPhase(path))
-            if (!unitTouched) setUnit(props.suggestUnit(path) ?? '')
+            measure.changePath(path)
           }}
           keep={[
             ...(execution.rootTagId ? [execution.rootTagId] : []),
@@ -195,16 +186,14 @@ function TimerPanel(props: {
           legacyCount={selection.legacyCount}
         />
         {showPhase && <PhaseField value={phase} onChange={setPhase} />}
-        <QuantityFields
-          quantity={quantity}
-          unit={unit}
-          units={props.units}
-          onQuantityChange={setQuantity}
-          onUnitChange={(value) => {
-            setUnit(value)
-            setUnitTouched(true)
-          }}
+        <MeasureFields
+          measure={measure.measure}
+          texts={measure.texts}
+          onChange={measure.change}
+          keptKindIds={measure.keptKindIds}
+          oldValues={measure.oldValues}
         />
+        <MeasureWarning text={measure.warning} />
         <button
           type="submit"
           disabled={submitting}

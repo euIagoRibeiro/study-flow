@@ -4,28 +4,28 @@ import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice } from '../tags'
-import type { Phase, QuantityChoice, Tag, TagChoice } from '../types'
-import { MINUTES_ERROR, parseMinutes, parseQuantity } from '../numbers'
+import type { Measure, MeasureValue, Phase, Tag, TagChoice } from '../types'
+import { MINUTES_ERROR, parseMinutes } from '../numbers'
+import { useMeasure } from '../useMeasure'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
+import MeasureFields from './MeasureFields'
 import PhaseField from './PhaseField'
-import QuantityFields from './QuantityFields'
 import TagFields from './TagFields'
 
 // Registrar sem cronômetro: botão secundário — na mesma tela, o amarelo é
 // do "Iniciar cronômetro" (um botão principal por estado)
 function ExecutionForm(props: {
   tags: Tag[]
+  measures: Measure[]
   initialPath: string[] // pré-seleção: o contexto do último registro
   suggestPhase: (path: string[]) => Phase | null
-  suggestUnit: (path: string[]) => string | null
-  units: string[]
   onSubmit: (
     description: string,
     completedAt: string,
     tags: TagChoice,
     estimatedMinutes: number | null,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[],
   ) => Promise<unknown>
 }) {
   const [description, setDescription] = useState('')
@@ -38,20 +38,17 @@ function ExecutionForm(props: {
   const [minutes, setMinutes] = useState('')
   const [path, setPath] = useState(props.initialPath)
   const [phase, setPhase] = useState(() => props.suggestPhase(path))
-  const [quantity, setQuantity] = useState('')
-  // Só a unidade é pré-preenchida, nunca o número. Depois que a pessoa mexe
-  // nela, trocar o caminho não apaga o que foi digitado
-  const [unit, setUnit] = useState(() => props.suggestUnit(path) ?? '')
-  const [unitTouched, setUnitTouched] = useState(false)
+  // Registro novo: nada gravado, nada pré-preenchido
+  const measure = useMeasure(path, props.measures, null)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const showPhase = phaseApplies(path, indexTags(props.tags))
 
-  // Caminho novo, pré-seleção nova
+  // Caminho novo, pré-seleção nova (e os campos da medida do caminho)
   function changePath(next: string[]) {
     setPath(next)
     setPhase(props.suggestPhase(next))
-    if (!unitTouched) setUnit(props.suggestUnit(next) ?? '')
+    measure.changePath(next)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -61,9 +58,9 @@ function ExecutionForm(props: {
       setError(MINUTES_ERROR)
       return
     }
-    const parsed = parseQuantity(quantity, unit, !unitTouched)
-    if ('error' in parsed) {
-      setError(parsed.error)
+    const sent = measure.toSend()
+    if ('error' in sent) {
+      setError(sent.error)
       return
     }
     setSubmitting(true)
@@ -75,7 +72,7 @@ function ExecutionForm(props: {
           : fromDatetimeLocalValue(when),
         pathToChoice(path, showPhase ? phase : null),
         estimate === '' ? null : estimate,
-        parsed.value ?? { quantity: null, quantityUnit: null },
+        sent.values ?? [],
       )
     } catch (err) {
       // 400: o servidor recusou com motivo (ex.: tag arquivada em outra aba)
@@ -117,15 +114,10 @@ function ExecutionForm(props: {
       <EstimateField value={minutes} onChange={setMinutes} />
       <TagFields tags={props.tags} value={path} onChange={changePath} />
       {showPhase && <PhaseField value={phase} onChange={setPhase} />}
-      <QuantityFields
-        quantity={quantity}
-        unit={unit}
-        units={props.units}
-        onQuantityChange={setQuantity}
-        onUnitChange={(value) => {
-          setUnit(value)
-          setUnitTouched(true)
-        }}
+      <MeasureFields
+        measure={measure.measure}
+        texts={measure.texts}
+        onChange={measure.change}
       />
       <button
         type="submit"

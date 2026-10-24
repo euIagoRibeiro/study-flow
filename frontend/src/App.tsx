@@ -17,7 +17,7 @@ import type {
   Measure,
   MeasureActions,
   NewTask,
-  QuantityChoice,
+  MeasureValue,
   SavedExecution,
   Tag,
   TagChoice,
@@ -121,7 +121,7 @@ function App() {
     completedAt: string,
     tags: TagChoice,
     estimatedMinutes: number | null,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[],
   ) {
     keepSaved(
       await executionsApi.createExecution(
@@ -130,7 +130,7 @@ function App() {
         completedAt,
         tags,
         estimatedMinutes,
-        quantity,
+        measureValues,
       ),
     )
   }
@@ -229,14 +229,14 @@ function App() {
     executionId: string,
     description: string,
     tags: Partial<TagChoice>,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[] | undefined,
   ) {
     keepSaved(
       await executionsApi.finishExecution(
         executionId,
         description,
         tags,
-        quantity,
+        measureValues,
       ),
     )
   }
@@ -246,7 +246,7 @@ function App() {
     executionId: string,
     previousDescription: string | null,
     previousTags: TagChoice,
-    previousQuantity: QuantityChoice,
+    previousMeasureValues: MeasureValue[],
     resumeEntryId: string | null,
   ) {
     try {
@@ -255,7 +255,7 @@ function App() {
           executionId,
           previousDescription,
           previousTags,
-          previousQuantity,
+          previousMeasureValues,
         ),
       )
     } catch (error) {
@@ -448,6 +448,7 @@ function App() {
               executions={executions}
               timeEntries={timeEntries}
               tags={tags}
+              measures={measures}
               onCreate={addTask}
               onEdit={editTask}
               onArchive={archiveTask}
@@ -465,6 +466,7 @@ function App() {
               executions={executions}
               timeEntries={timeEntries}
               tags={tags}
+              measures={measures}
               onCreate={addTask}
               onExecute={addExecution}
               onStartTimer={startTimer}
@@ -482,6 +484,7 @@ function App() {
               executions={executions}
               timeEntries={timeEntries}
               tags={tags}
+              measures={measures}
               onEditExecution={editExecution}
               onEditTimeEntry={editTimeEntry}
             />

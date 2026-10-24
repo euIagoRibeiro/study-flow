@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type {
+  Measure,
   ExecutionChanges,
   NewTask,
   Tag,
@@ -14,6 +15,7 @@ function Tasks(props: {
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
   tags: Tag[]
+  measures: Measure[]
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
   onReactivate: (taskId: string) => void
@@ -53,6 +55,7 @@ function Tasks(props: {
           onToggle={(form) => toggle(task.id, form)}
           timeEntries={props.timeEntries}
           tags={props.tags}
+          measures={props.measures}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
           onReactivate={props.onReactivate}

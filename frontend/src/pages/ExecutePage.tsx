@@ -8,7 +8,6 @@ import UndoNotice from '../components/UndoNotice'
 import { frequencyLabels } from '../frequency'
 import { PlayIcon } from '../components/icons'
 import { lastPhase } from '../phases'
-import { suggestUnit, usedUnits } from '../quantities'
 import {
   cardClass,
   chipAndamentoClass,
@@ -22,7 +21,8 @@ import { executionSelection, indexTags, lastRootPath } from '../tags'
 import type {
   Frequency,
   NewTask,
-  QuantityChoice,
+  Measure,
+  MeasureValue,
   Tag,
   TagChoice,
   Task,
@@ -40,6 +40,7 @@ function ExecutePage(props: {
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
   tags: Tag[]
+  measures: Measure[]
   onCreate: (task: NewTask) => Promise<string>
   onExecute: (
     taskId: string,
@@ -47,7 +48,7 @@ function ExecutePage(props: {
     completedAt: string,
     tags: TagChoice,
     estimatedMinutes: number | null,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[],
   ) => Promise<void>
   onStartTimer: (taskId: string) => Promise<string | null>
   onStopTimer: (timeEntryId: string) => Promise<void>
@@ -56,13 +57,13 @@ function ExecutePage(props: {
     executionId: string,
     description: string,
     tags: Partial<TagChoice>,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[] | undefined,
   ) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,
     previousDescription: string | null,
     previousTags: TagChoice,
-    previousQuantity: QuantityChoice,
+    previousMeasureValues: MeasureValue[],
     resumeEntryId: string | null,
   ) => Promise<void>
 }) {
@@ -77,7 +78,7 @@ function ExecutePage(props: {
     executionId: string
     previousDescription: string | null
     previousTags: TagChoice
-    previousQuantity: QuantityChoice
+    previousMeasureValues: MeasureValue[]
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
@@ -110,7 +111,7 @@ function ExecutePage(props: {
     completedAt: string,
     tags: TagChoice,
     estimatedMinutes: number | null,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[],
   ) {
     if (selectedTask === undefined) return
     await props.onExecute(
@@ -119,7 +120,7 @@ function ExecutePage(props: {
       completedAt,
       tags,
       estimatedMinutes,
-      quantity,
+      measureValues,
     )
     navigate('/')
   }
@@ -136,14 +137,14 @@ function ExecutePage(props: {
     executionId: string,
     description: string,
     tags: Partial<TagChoice>,
-    quantity: QuantityChoice,
+    measureValues: MeasureValue[] | undefined,
   ) {
     const execution = props.executions.find((e) => e.id === executionId)
     const resumeEntry = props.timeEntries.find(
       (entry) =>
         entry.taskExecutionId === executionId && entry.endedAt === null,
     )
-    await props.onFinishExecution(executionId, description, tags, quantity)
+    await props.onFinishExecution(executionId, description, tags, measureValues)
     setPendingUndo({
       executionId,
       previousDescription: execution?.description ?? null,
@@ -152,10 +153,8 @@ function ExecutePage(props: {
         tagIds: execution?.tagIds ?? [],
         phase: execution?.phase ?? null,
       },
-      previousQuantity: {
-        quantity: execution?.quantity ?? null,
-        quantityUnit: execution?.quantityUnit ?? null,
-      },
+      // [] = sem medida: ausente, o servidor manteria a do Finalizar
+      previousMeasureValues: execution?.measure?.values ?? [],
       resumeEntryId: resumeEntry?.id ?? null,
     })
   }
@@ -167,7 +166,7 @@ function ExecutePage(props: {
       pendingUndo.executionId,
       pendingUndo.previousDescription,
       pendingUndo.previousTags,
-      pendingUndo.previousQuantity,
+      pendingUndo.previousMeasureValues,
       pendingUndo.resumeEntryId,
     )
     setUndoing(false)
@@ -298,10 +297,6 @@ function ExecutePage(props: {
   // Fase: pelo caminho (de qualquer tarefa), não pela tarefa como o contexto
   const suggestPhase = (path: string[]) =>
     lastPhase(props.executions, path, tagsById)
-  // Unidade: pelo caminho; sem tag, pelos registros sem tag desta tarefa
-  const unitFor = (path: string[]) =>
-    suggestUnit(props.executions, path, selectedTask.id, tagsById)
-  const units = usedUnits(props.executions)
   // Registro aberto que já tem tags (voltou pelo Desfazer): começa nelas
   const openSelection = openExecution
     ? executionSelection(openExecution, tagsById)
@@ -365,8 +360,7 @@ function ExecutePage(props: {
           onFinish={handleFinish}
           tags={props.tags}
           suggestPhase={suggestPhase}
-          suggestUnit={unitFor}
-          units={units}
+          measures={props.measures}
           initial={
             openSelection && openSelection.path.length > 0
               ? openSelection
@@ -421,8 +415,7 @@ function ExecutePage(props: {
             tags={props.tags}
             initialPath={preselected}
             suggestPhase={suggestPhase}
-            suggestUnit={unitFor}
-            units={units}
+            measures={props.measures}
             onSubmit={handleExecute}
           />
         </>

@@ -8,6 +8,7 @@ import {
   secondaryButtonClass,
 } from '../styles'
 import type {
+  Measure,
   CompletedExecution,
   ExecutionChanges,
   NewTask,
@@ -53,6 +54,7 @@ function Task(props: {
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
   tags: Tag[]
+  measures: Measure[]
   openForm: OpenForm
   onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
@@ -220,6 +222,7 @@ function Task(props: {
               executions={completed}
               timeEntries={props.timeEntries}
               tags={props.tags}
+              measures={props.measures}
               onEdit={props.onEditExecution}
               onEditTimeEntry={props.onEditTimeEntry}
             />

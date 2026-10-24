@@ -6,14 +6,14 @@ import {
   localDayKey,
 } from '../dates'
 import { frequencyLabels } from '../frequency'
-import { formatQuantity } from '../numbers'
+import { describeValue } from '../measures'
 import { phaseLabels } from '../phases'
-import { usedUnits } from '../quantities'
 import { cardClass, chipClass, tagChipClass, textButtonClass } from '../styles'
 import { indexTags, leafTags, tagLineage } from '../tags'
 import type {
   CompletedExecution,
   ExecutionChanges,
+  Measure,
   Tag,
   TimeEntry,
 } from '../types'
@@ -39,6 +39,7 @@ function ExecutionHistory(props: {
   executions: CompletedExecution[]
   timeEntries: TimeEntry[]
   tags: Tag[]
+  measures: Measure[]
   onEdit: (executionId: string, changes: ExecutionChanges) => Promise<void>
   onEditTimeEntry: (
     entryId: string,
@@ -62,7 +63,6 @@ function ExecutionHistory(props: {
   }
 
   const tagsById = indexTags(props.tags)
-  const units = usedUnits(props.executions)
 
   const sorted = [...props.executions].sort((a, b) =>
     a.completedAt < b.completedAt ? 1 : -1,
@@ -99,6 +99,9 @@ function ExecutionHistory(props: {
     const sessionsOpen = openSessions.has(execution.id)
     const leaves = leafTags(execution, tagsById)
     const estimate = entries.find((entry) => entry.estimated)
+    const recordedMeasure = props.measures.find(
+      (measure) => measure.id === execution.measure?.measureId,
+    )
     // Tempo todo estimado: o cabeçalho diz. Misto (cronômetro + estimativa):
     // quem diz é a sessão estimada, na lista
     const allEstimated =
@@ -163,11 +166,13 @@ function ExecutionHistory(props: {
                 {frequencyLabels[execution.taskFrequencyAtTime]}
               </span>
             )}
-            {execution.quantity !== null && (
-              <span className={chipClass}>
-                {formatQuantity(execution.quantity)} {execution.quantityUnit}
-              </span>
-            )}
+            {/* Um chip por valor: cada um quebra sozinho em 320px */}
+            {recordedMeasure &&
+              execution.measure?.values.map((value) => (
+                <span key={value.kindId ?? ''} className={chipClass}>
+                  {describeValue(value, recordedMeasure)}
+                </span>
+              ))}
             {entries.length > 0 && (
               <button
                 type="button"
@@ -201,7 +206,7 @@ function ExecutionHistory(props: {
                 ? Math.round(entryMs(estimate, execution) / 60_000)
                 : null
             }
-            units={units}
+            measures={props.measures}
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)
               setEditingId(null)
