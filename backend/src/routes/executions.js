@@ -26,7 +26,14 @@ const SELECT_EXECUTION = `SELECT e.id,
                         ORDER BY v.created_at, v.id)
         FROM execution_measure_values v WHERE v.task_execution_id = e.id),
        '[]'))
-   FROM execution_measures em WHERE em.task_execution_id = e.id) AS measure
+   FROM execution_measures em WHERE em.task_execution_id = e.id) AS measure,
+  (SELECT json_agg(json_build_object(
+     'exerciseId', x.exercise_id,
+     'sets', (SELECT json_agg(json_build_object('reps', s.reps, 'weightKg', s.weight_kg::float8)
+                              ORDER BY s.position)
+              FROM exercise_sets s WHERE s.execution_exercise_id = x.id))
+     ORDER BY x.position)
+   FROM execution_exercises x WHERE x.task_execution_id = e.id) AS workout
 FROM task_executions e
 LEFT JOIN task_execution_tags et ON et.task_execution_id = e.id`
 
@@ -97,6 +104,45 @@ const measureValues = z
   .max(20, 'No máximo 20 valores por registro')
   .optional()
 
+// Treino (A3): a lista inteira, em ordem. Ausente mantém, [] remove, lista
+// substitui tudo. Os tetos são de garantia, não regra de tela. O banco
+// arredondaria a 3ª casa do peso em silêncio: recusar antes
+const workout = z
+  .array(
+    z.object({
+      exerciseId: z.uuid('exerciseId precisa ser um uuid'),
+      sets: z
+        .array(
+          z.object({
+            reps: z
+              .number('reps precisa ser um número')
+              .int('reps precisa ser um número inteiro')
+              .min(1, 'reps precisa ser pelo menos 1')
+              .max(1000, 'reps pode ir até 1000'),
+            weightKg: z
+              .number('weightKg precisa ser um número ou null')
+              .positive(
+                'weightKg precisa ser maior que zero (peso do corpo = null)',
+              )
+              .max(9999.99, 'weightKg pode ir até 9999,99')
+              .refine(
+                (kg) => Math.abs(kg * 100 - Math.round(kg * 100)) < 1e-6,
+                'weightKg pode ter no máximo 2 casas decimais',
+              )
+              .nullable()
+              .default(null),
+          }),
+          'sets precisa ser uma lista',
+        )
+        .min(1, 'Cada exercício precisa de pelo menos uma série')
+        .max(50, 'No máximo 50 séries por exercício'),
+    }),
+    'workout precisa ser uma lista',
+  )
+  .max(30, 'No máximo 30 exercícios por registro')
+
+const workoutSchema = z.object({ workout })
+
 function withTagRule(schema) {
   return schema
     .refine(
@@ -133,11 +179,123 @@ const executionChangesSchema = withTagRule(
     phase,
     estimatedMinutes,
     measureValues,
+    workout: workout.optional(),
     ...tagFields,
   }),
 )
 
 class MeasureError extends Error {}
+class WorkoutError extends Error {}
+
+// A marcadora do caminho GRAVADO: a tag mais funda que usa treino
+async function nearestMarker(client, executionId) {
+  const result = await client.query(
+    `SELECT t.id FROM tags t
+     WHERE t.tracks_workout AND t.id IN (
+       SELECT root_tag_id FROM task_executions WHERE id = $1
+       UNION SELECT tag_id FROM task_execution_tags WHERE task_execution_id = $1)
+     ORDER BY t.level DESC, t.id
+     LIMIT 1`,
+    [executionId],
+  )
+  return result.rows[0]?.id ?? null
+}
+
+// Grava o treino inteiro (dentro de uma transação, com o caminho gravado e
+// a linha do registro travada). [] remove. Arquivado: só se já estava
+async function setWorkout(client, executionId, exercises) {
+  const previous = await client.query(
+    'SELECT exercise_id FROM execution_exercises WHERE task_execution_id = $1',
+    [executionId],
+  )
+  const kept = new Set(previous.rows.map((row) => row.exercise_id))
+  await dropWorkout(client, executionId)
+  if (exercises.length === 0) return
+
+  const marker = await nearestMarker(client, executionId)
+  if (!marker) throw new WorkoutError('Este caminho não usa treino')
+  const ids = exercises.map((item) => item.exerciseId)
+  if (new Set(ids).size !== ids.length) {
+    throw new WorkoutError(
+      'Exercício repetido no mesmo registro: junte as séries num só',
+    )
+  }
+  const found = new Map(
+    (
+      await client.query(
+        'SELECT id, active FROM exercises WHERE id = ANY($1::uuid[])',
+        [ids],
+      )
+    ).rows.map((row) => [row.id, row.active]),
+  )
+  for (const id of ids) {
+    if (!found.has(id)) throw new WorkoutError('Exercício não encontrado')
+    if (!found.get(id) && !kept.has(id)) {
+      throw new WorkoutError('Exercício arquivado não pode ser adicionado')
+    }
+  }
+
+  await client.query(
+    `INSERT INTO execution_workouts (task_execution_id, tag_id, root_tag_id)
+     SELECT id, $2, root_tag_id FROM task_executions WHERE id = $1`,
+    [executionId, marker],
+  )
+  for (const [index, item] of exercises.entries()) {
+    const inserted = await client.query(
+      `INSERT INTO execution_exercises (task_execution_id, exercise_id, position)
+       VALUES ($1, $2, $3) RETURNING id`,
+      [executionId, item.exerciseId, index + 1],
+    )
+    for (const [setIndex, set] of item.sets.entries()) {
+      await client.query(
+        `INSERT INTO exercise_sets (execution_exercise_id, position, reps, weight_kg)
+         VALUES ($1, $2, $3, $4)`,
+        [inserted.rows[0].id, setIndex + 1, set.reps, set.weightKg],
+      )
+    }
+  }
+}
+
+async function dropWorkout(client, executionId) {
+  await client.query(
+    `DELETE FROM exercise_sets WHERE execution_exercise_id IN
+       (SELECT id FROM execution_exercises WHERE task_execution_id = $1)`,
+    [executionId],
+  )
+  await client.query(
+    'DELETE FROM execution_exercises WHERE task_execution_id = $1',
+    [executionId],
+  )
+  await client.query(
+    'DELETE FROM execution_workouts WHERE task_execution_id = $1',
+    [executionId],
+  )
+}
+
+// Caminho trocado sem mandar o treino: sai o treino cuja marcadora deixou
+// o caminho (a tela avisa antes; aqui é a garantia)
+async function dropWorkoutIfOffPath(client, executionId) {
+  const off = await client.query(
+    `SELECT 1 FROM execution_workouts w
+     WHERE w.task_execution_id = $1
+       AND w.tag_id <> w.root_tag_id
+       AND NOT EXISTS (SELECT 1 FROM task_execution_tags et
+                       WHERE et.task_execution_id = w.task_execution_id
+                         AND et.tag_id = w.tag_id)`,
+    [executionId],
+  )
+  if (off.rowCount > 0) await dropWorkout(client, executionId)
+}
+
+// Rede de segurança: recusas do banco (migration 0012), pelo nome
+function workoutConstraintError(err) {
+  return (
+    ['23503', '23505', '23514'].includes(err.code) &&
+    ['execution_workouts_', 'execution_exercises_', 'exercise_sets_'].some(
+      (prefix) => err.constraint?.startsWith(prefix),
+    )
+  )
+}
 
 // A medida que vale pro caminho GRAVADO: a da tag mais funda que declara
 // uma. Arquivada continua sendo a mais próxima (não volta pro ancestral:
@@ -566,9 +724,10 @@ executionsRouter.put('/:id', async (req, res) => {
           : rootTagId === current.rootTagId
             ? current.phase
             : null
-      // Raiz nova: a medida sai ANTES (a FK da raiz não é adiável)
+      // Raiz nova: medida e treino saem ANTES (a FK da raiz não é adiável)
       if (rootTagId !== current.rootTagId) {
         await dropMeasure(client, req.params.id)
+        await dropWorkout(client, req.params.id)
       }
       await applyTags(
         client,
@@ -586,6 +745,9 @@ executionsRouter.put('/:id', async (req, res) => {
       if (changes.measureValues === undefined) {
         await dropMeasureIfOffPath(client, req.params.id)
       }
+      if (changes.workout === undefined) {
+        await dropWorkoutIfOffPath(client, req.params.id)
+      }
     } else if (changes.phase !== undefined) {
       await setPhase(client, req.params.id, changes.phase)
     }
@@ -597,6 +759,9 @@ executionsRouter.put('/:id', async (req, res) => {
     if (changes.measureValues !== undefined) {
       await setMeasure(client, req.params.id, changes.measureValues)
     }
+    if (changes.workout !== undefined) {
+      await setWorkout(client, req.params.id, changes.workout)
+    }
     const updated = {
       ...(await findExecution(client, req.params.id)),
       timeEntries: await entriesOf(client, req.params.id),
@@ -605,12 +770,19 @@ executionsRouter.put('/:id', async (req, res) => {
     res.json(updated)
   } catch (err) {
     await client.query('ROLLBACK')
-    if (err instanceof TagError || err instanceof MeasureError) {
+    if (
+      err instanceof TagError ||
+      err instanceof MeasureError ||
+      err instanceof WorkoutError
+    ) {
       return res.status(400).json({ error: err.message })
     }
-    // Inclui a FK adiável do caminho, que só é conferida no COMMIT
+    // Inclui as FKs adiáveis do caminho, que só são conferidas no COMMIT
     if (measureConstraintError(err)) {
       return res.status(400).json({ error: 'Medida não confere com o caminho' })
+    }
+    if (workoutConstraintError(err)) {
+      return res.status(400).json({ error: 'Treino não confere com o caminho' })
     }
     if (isOpenExecutionConflict(err)) {
       return res.status(409).json({ error: CONFLICT_ERROR })
@@ -626,6 +798,49 @@ executionsRouter.put('/:id', async (req, res) => {
   } finally {
     // Sem isso, cada requisição prenderia uma conexão, e o pool (10) se
     // esgotaria
+    client.release()
+  }
+})
+
+// Treino ao vivo, série a série: só o treino (o PUT do registro regravaria a
+// descrição que ainda está sendo digitada). Mesmo contrato: a lista inteira
+executionsRouter.put('/:id/workout', async (req, res) => {
+  if (!isUuid(req.params.id)) {
+    return res.status(404).json({ error: 'Execução não encontrada' })
+  }
+  const { error, data } = validate(workoutSchema, req.body)
+  if (error) return res.status(400).json({ error })
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    // Trava a linha: dois salvamentos ao mesmo tempo esperam um o outro, em
+    // vez de apagar e regravar juntos
+    const locked = await client.query(
+      'SELECT id FROM task_executions WHERE id = $1 FOR UPDATE',
+      [req.params.id],
+    )
+    if (locked.rowCount === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Execução não encontrada' })
+    }
+    await setWorkout(client, req.params.id, data.workout)
+    const updated = {
+      ...(await findExecution(client, req.params.id)),
+      timeEntries: await entriesOf(client, req.params.id),
+    }
+    await client.query('COMMIT')
+    res.json(updated)
+  } catch (err) {
+    await client.query('ROLLBACK')
+    if (err instanceof WorkoutError) {
+      return res.status(400).json({ error: err.message })
+    }
+    if (workoutConstraintError(err)) {
+      return res.status(400).json({ error: 'Treino não confere com o caminho' })
+    }
+    throw err
+  } finally {
     client.release()
   }
 })

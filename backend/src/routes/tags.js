@@ -6,7 +6,7 @@ import { isUuid, validate } from '../validation.js'
 export const tagsRouter = Router()
 
 const COLUMNS =
-  'id, name, parent_id AS "parentId", level, active, tracks_phase AS "tracksPhase"'
+  'id, name, parent_id AS "parentId", level, active, tracks_phase AS "tracksPhase", tracks_workout AS "tracksWorkout"'
 const NOT_FOUND = 'Tag não encontrada'
 const DUPLICATE = 'Já existe uma tag com esse nome aqui'
 
@@ -26,10 +26,13 @@ const tagChangesSchema = z
     name: name.optional(),
     active: z.boolean('active precisa ser true ou false').optional(),
     tracksPhase: z.boolean('tracksPhase precisa ser true ou false').optional(),
+    tracksWorkout: z
+      .boolean('tracksWorkout precisa ser true ou false')
+      .optional(),
   })
   .refine(
     (changes) => Object.keys(changes).length > 0,
-    'Nenhum campo pra atualizar (name, active, tracksPhase)',
+    'Nenhum campo pra atualizar (name, active, tracksPhase, tracksWorkout)',
   )
 
 function isDuplicateName(err) {
@@ -49,13 +52,21 @@ function isPhaseInUse(err) {
   )
 }
 
+// Tag marcadora de registros com treino (migration 0012). A FK da marca
+// recusa desmarcar; as outras, apagar (junto com as das ligações, 0005)
+function isWorkoutInUse(err) {
+  return (
+    err.code === '23503' && err.constraint?.startsWith('execution_workouts_')
+  )
+}
+
 // Árvore achatada: cada raiz, logo depois os filhos dela, e depois de cada
 // filho os netos — ordem feita aqui, o frontend só monta. Profundidade
 // fixa (3): dois LEFT JOIN bastam, sem WITH RECURSIVE
 tagsRouter.get('/', async (req, res) => {
   const result = await pool.query(
     `SELECT t.id, t.name, t.parent_id AS "parentId", t.level, t.active,
-            t.tracks_phase AS "tracksPhase"
+            t.tracks_phase AS "tracksPhase", t.tracks_workout AS "tracksWorkout"
      FROM tags t
      LEFT JOIN tags p ON p.id = t.parent_id
      LEFT JOIN tags g ON g.id = p.parent_id
@@ -132,7 +143,7 @@ tagsRouter.patch('/:id', async (req, res) => {
   try {
     await client.query('BEGIN')
     const current = await client.query(
-      `SELECT t.id, t.level, p.active AS "parentActive"
+      `SELECT t.id, t.level, t.active, p.active AS "parentActive"
        FROM tags t LEFT JOIN tags p ON p.id = t.parent_id
        WHERE t.id = $1
        FOR UPDATE OF t`,
@@ -148,6 +159,14 @@ tagsRouter.patch('/:id', async (req, res) => {
         .status(400)
         .json({ error: 'Reative a tag-pai antes de reativar esta' })
     }
+    // Tag arquivada não aparece nos formulários: marcar não teria efeito
+    const activeAfter = changes.active ?? current.rows[0].active
+    if (changes.tracksWorkout === true && !activeAfter) {
+      await client.query('ROLLBACK')
+      return res
+        .status(400)
+        .json({ error: 'Só uma tag ativa pode passar a usar treino' })
+    }
     if (changes.tracksPhase === true && current.rows[0].level !== 1) {
       await client.query('ROLLBACK')
       return res.status(400).json({ error: 'Só um contexto pode usar fase' })
@@ -157,13 +176,15 @@ tagsRouter.patch('/:id', async (req, res) => {
       `UPDATE tags
        SET name         = COALESCE($1, name),
            active       = COALESCE($2, active),
-           tracks_phase = COALESCE($3, tracks_phase)
-       WHERE id = $4
+           tracks_phase = COALESCE($3, tracks_phase),
+           tracks_workout = COALESCE($4, tracks_workout)
+       WHERE id = $5
        RETURNING ${COLUMNS}`,
       [
         changes.name ?? null,
         changes.active ?? null,
         changes.tracksPhase ?? null,
+        changes.tracksWorkout ?? null,
         req.params.id,
       ],
     )
@@ -193,6 +214,12 @@ tagsRouter.patch('/:id', async (req, res) => {
           'Há registros com fase neste contexto: tire a fase deles antes de desligar',
       })
     }
+    if (isWorkoutInUse(err)) {
+      return res.status(409).json({
+        error:
+          'Há registros com treino nesta tag: tire o treino deles antes de desligar',
+      })
+    }
     throw err
   } finally {
     client.release()
@@ -214,10 +241,12 @@ tagsRouter.delete('/:id', async (req, res) => {
     }
     res.status(204).end()
   } catch (err) {
-    // Usada: como raiz de uma execução, ligada a uma (0005) ou com fase (0007).
+    // Usada: como raiz de uma execução, ligada a uma (0005), com fase (0007)
+    // ou marcadora de treino (0012).
     // Qual FK recusa primeiro muda depois de pg_dump/restore: traduzir todas
     if (
       isPhaseInUse(err) ||
+      isWorkoutInUse(err) ||
       (err.code === '23503' &&
         (err.constraint === 'task_executions_root_tag_is_root' ||
           err.constraint?.startsWith('task_execution_tags_')))
