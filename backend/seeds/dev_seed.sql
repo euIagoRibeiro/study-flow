@@ -328,4 +328,81 @@ INSERT INTO execution_measure_values (task_execution_id, measure_id, kind_id, qu
   ('5eed0000-0000-4000-8000-000000001301', '5eed0000-0000-4000-a000-000000000002', '5eed0000-0000-4000-a100-000000000021', 1),
   ('5eed0000-0000-4000-8000-000000000202', '5eed0000-0000-4000-a000-000000000002', '5eed0000-0000-4000-a100-000000000021', 2);
 
+-- Treino (A3). Academia e Casa usam treino; o equipamento faz parte do nome
+-- do exercício. 1401 e 1402 são as duas sessões das notas (cronômetro com os
+-- segundos: 49:25 e 1:15); 602 (já existia) e 1403 dão a evolução da puxada
+-- com barra: carga máxima 40 (há 11 dias) → 45 (há 4) → 50 (ontem).
+-- Totais: 4 treinos, 8 exercícios nas sessões, 22 séries; volume (reps × kg)
+-- 1401 2132, 602 2040, 1403 1400, 1402 0 (peso do corpo, 15 reps).
+-- Rosca direta: usada no 1403 e arquivada depois; Remada baixa nunca usada.
+-- Horários pelo dia LOCAL (lição da A1c). Ids: exercícios 5eed…b000,
+-- exercícios das sessões 5eed…b100
+UPDATE tags SET tracks_workout = true
+WHERE id IN ('5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000320');
+
+CREATE TEMP TABLE dia_local ON COMMIT DROP AS
+SELECT date_trunc('day', (SELECT t FROM ancora) AT TIME ZONE 'America/Sao_Paulo') AS d;
+
+INSERT INTO exercises (id, name, active) VALUES
+  ('5eed0000-0000-4000-b000-000000000001', 'Puxada alta com barra',                 true),
+  ('5eed0000-0000-4000-b000-000000000002', 'Puxada alta com triângulo',             true),
+  ('5eed0000-0000-4000-b000-000000000003', 'Rosca martelo unilateral com halteres', true),
+  ('5eed0000-0000-4000-b000-000000000004', 'Supino reto com barra',                 true),
+  ('5eed0000-0000-4000-b000-000000000005', 'Agachamento livre',                     true),
+  ('5eed0000-0000-4000-b000-000000000006', 'Rosca direta com barra',                false),
+  ('5eed0000-0000-4000-b000-000000000007', 'Remada baixa',                          true);
+
+-- 1401 ontem 17:00, 1402 anteontem 16:00, 1403 há 11 dias 18:00 (hora local)
+INSERT INTO task_executions
+  (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id)
+SELECT v.id::uuid, '5eed0000-0000-4000-8000-000000000006', v.description, 'Exercício físico', 'none',
+       ((SELECT d FROM dia_local) + v.offset_local) AT TIME ZONE 'America/Sao_Paulo',
+       '5eed0000-0000-4000-9000-000000000300'
+FROM (VALUES
+  ('5eed0000-0000-4000-8000-000000001401', 'Costas e bíceps',                                interval '-1 day 17 hours'),
+  ('5eed0000-0000-4000-8000-000000001402', 'Agachamento com máxima amplitude, até a falha', interval '-2 days 16 hours'),
+  ('5eed0000-0000-4000-8000-000000001403', 'Costas e bíceps',                                interval '-11 days 18 hours')
+) AS v (id, description, offset_local);
+
+INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id) VALUES
+  ('5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-9000-000000000320', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300');
+
+INSERT INTO time_entries (task_execution_id, started_at, ended_at)
+SELECT e.id, e.completed_at - v.duration, e.completed_at
+FROM task_executions e
+JOIN (VALUES
+  ('5eed0000-0000-4000-8000-000000001401'::uuid, interval '49 minutes 25 seconds'),
+  ('5eed0000-0000-4000-8000-000000001402'::uuid, interval '1 minute 15 seconds'),
+  ('5eed0000-0000-4000-8000-000000001403'::uuid, interval '45 minutes')
+) AS v (id, duration) ON v.id = e.id;
+
+-- A marcadora é a tag mais funda do caminho que usa treino (como a API resolve)
+INSERT INTO execution_workouts (task_execution_id, tag_id, root_tag_id) VALUES
+  ('5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-9000-000000000320', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000000602', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300');
+
+INSERT INTO execution_exercises (id, task_execution_id, exercise_id, position) VALUES
+  ('5eed0000-0000-4000-b100-000000000011', '5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-b000-000000000001', 1),
+  ('5eed0000-0000-4000-b100-000000000012', '5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-b000-000000000002', 2),
+  ('5eed0000-0000-4000-b100-000000000013', '5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-b000-000000000003', 3),
+  ('5eed0000-0000-4000-b100-000000000021', '5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-b000-000000000005', 1),
+  ('5eed0000-0000-4000-b100-000000000031', '5eed0000-0000-4000-8000-000000000602', '5eed0000-0000-4000-b000-000000000001', 1),
+  ('5eed0000-0000-4000-b100-000000000032', '5eed0000-0000-4000-8000-000000000602', '5eed0000-0000-4000-b000-000000000004', 2),
+  ('5eed0000-0000-4000-b100-000000000041', '5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-b000-000000000001', 1),
+  ('5eed0000-0000-4000-b100-000000000042', '5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-b000-000000000006', 2);
+
+INSERT INTO exercise_sets (execution_exercise_id, position, reps, weight_kg) VALUES
+  ('5eed0000-0000-4000-b100-000000000011', 1, 12, 25), ('5eed0000-0000-4000-b100-000000000011', 2, 8, 35), ('5eed0000-0000-4000-b100-000000000011', 3, 8, 50),
+  ('5eed0000-0000-4000-b100-000000000012', 1, 8, 40),  ('5eed0000-0000-4000-b100-000000000012', 2, 8, 40), ('5eed0000-0000-4000-b100-000000000012', 3, 8, 40),
+  ('5eed0000-0000-4000-b100-000000000013', 1, 8, 8),   ('5eed0000-0000-4000-b100-000000000013', 2, 8, 8),  ('5eed0000-0000-4000-b100-000000000013', 3, 8, 8),
+  ('5eed0000-0000-4000-b100-000000000021', 1, 15, NULL),
+  ('5eed0000-0000-4000-b100-000000000031', 1, 12, 20), ('5eed0000-0000-4000-b100-000000000031', 2, 8, 30), ('5eed0000-0000-4000-b100-000000000031', 3, 8, 45),
+  ('5eed0000-0000-4000-b100-000000000032', 1, 10, 40), ('5eed0000-0000-4000-b100-000000000032', 2, 10, 40), ('5eed0000-0000-4000-b100-000000000032', 3, 10, 40),
+  ('5eed0000-0000-4000-b100-000000000041', 1, 12, 20), ('5eed0000-0000-4000-b100-000000000041', 2, 8, 30), ('5eed0000-0000-4000-b100-000000000041', 3, 8, 40),
+  ('5eed0000-0000-4000-b100-000000000042', 1, 10, 20), ('5eed0000-0000-4000-b100-000000000042', 2, 10, 20), ('5eed0000-0000-4000-b100-000000000042', 3, 10, 20);
+
 COMMIT;

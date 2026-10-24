@@ -1,6 +1,7 @@
 -- Remove só os dados do dev_seed.sql (ids começando com 5eed), sem tocar
--- nos seus. A ordem importa por causa dos ON DELETE RESTRICT: medidas dos
--- registros, sessões e ligações de tags, depois execuções, depois tarefas;
+-- nos seus. A ordem importa por causa dos ON DELETE RESTRICT: treinos e
+-- medidas dos registros (e o catálogo de exercícios), sessões e ligações
+-- de tags, depois execuções, depois tarefas;
 -- o cadastro de medidas antes das tags; tags dos netos pras raízes.
 --
 -- Se você registrou uma execução de verdade numa tarefa fictícia (ou criou
@@ -8,6 +9,19 @@
 -- inteira é desfeita: nada some pela metade.
 
 BEGIN;
+
+DELETE FROM exercise_sets
+WHERE execution_exercise_id IN
+  (SELECT id FROM execution_exercises WHERE task_execution_id::text LIKE '5eed%');
+
+DELETE FROM execution_exercises
+WHERE task_execution_id::text LIKE '5eed%';
+
+DELETE FROM execution_workouts
+WHERE task_execution_id::text LIKE '5eed%';
+
+DELETE FROM exercises
+WHERE id::text LIKE '5eed%';
 
 DELETE FROM execution_measure_values
 WHERE task_execution_id::text LIKE '5eed%';
