@@ -275,7 +275,8 @@ INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated) VA
 -- dado só de seed, pra testar a herança). Linguagens é raiz nova.
 -- Totais: Código 9 exercícios (3 refatoração, 2 leitura, 4 questões),
 -- Linguagens 3 de escuta, Matemática 12, Vestibular 6 questões, Corrida 5,2 km
--- (7 registros, 8 valores). Ids: medidas 5eed…a000, tipos 5eed…a100
+-- (7 registros, 8 valores). Natação: metros, decimal, sem tipos, sem uso
+-- (a tag continua arquivada). Ids: medidas 5eed…a000, tipos 5eed…a100
 INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
   ('5eed0000-0000-4000-9000-000000000500', 'Linguagens', 1, NULL, NULL);
 INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
@@ -287,7 +288,8 @@ INSERT INTO measures (id, tag_id, name, singular, allows_decimal) VALUES
   ('5eed0000-0000-4000-a000-000000000002', '5eed0000-0000-4000-9000-000000000500', 'exercícios', 'exercício', false), -- Linguagens
   ('5eed0000-0000-4000-a000-000000000003', '5eed0000-0000-4000-9000-000000000100', 'questões',   'questão',   false), -- Vestibular
   ('5eed0000-0000-4000-a000-000000000004', '5eed0000-0000-4000-9000-000000000110', 'exercícios', 'exercício', false), -- Vestibular › Matemática
-  ('5eed0000-0000-4000-a000-000000000005', '5eed0000-0000-4000-9000-000000000330', 'km',         'km',        true);  -- Exercícios › Corrida
+  ('5eed0000-0000-4000-a000-000000000005', '5eed0000-0000-4000-9000-000000000330', 'km',         'km',        true),  -- Exercícios › Corrida
+  ('5eed0000-0000-4000-a000-000000000006', '5eed0000-0000-4000-9000-000000000340', 'metros',     'metro',     true);  -- Exercícios › Natação (arquivada, sem uso)
 
 INSERT INTO measure_kinds (id, measure_id, name) VALUES
   ('5eed0000-0000-4000-a100-000000000011', '5eed0000-0000-4000-a000-000000000001', 'refatoração'),
