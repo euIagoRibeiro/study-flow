@@ -8,10 +8,14 @@ if (!API_URL) {
 // (conflito com o estado atual) de uma falha qualquer
 export class ApiError extends Error {
   status: number
+  // O corpo da resposta, quando o servidor manda mais que o motivo (ex.: o
+  // 409 do exercício traz o existente)
+  body: unknown
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body?: unknown) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -30,8 +34,9 @@ export async function request<T>(
     // O servidor manda { error } com o motivo (ex.: nome repetido); sem
     // ele, fica a mensagem genérica
     let message = `${method} ${path} falhou com status ${response.status}`
+    let body: unknown
     try {
-      const body: unknown = await response.json()
+      body = await response.json()
       if (
         typeof body === 'object' &&
         body !== null &&
@@ -43,7 +48,7 @@ export async function request<T>(
     } catch {
       // Resposta sem JSON: fica a genérica
     }
-    throw new ApiError(response.status, message)
+    throw new ApiError(response.status, message, body)
   }
   // 204 não tem corpo (ex.: DELETE): response.json() quebraria
   if (response.status === 204) return undefined as T

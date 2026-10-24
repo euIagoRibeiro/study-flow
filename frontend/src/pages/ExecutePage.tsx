@@ -50,6 +50,7 @@ function ExecutePage(props: {
     workout: WorkoutExercise[],
     tags: TagChoice | null,
   ) => Promise<void>
+  onCreateExercise: (name: string) => Promise<Exercise>
   onCreate: (task: NewTask) => Promise<string>
   onExecute: (
     taskId: string,
@@ -380,6 +381,7 @@ function ExecutePage(props: {
             recentExerciseIds(props.executions, markerId, tagsById)
           }
           onSaveWorkout={props.onSaveWorkout}
+          onCreateExercise={props.onCreateExercise}
           initial={
             openSelection && openSelection.path.length > 0
               ? openSelection

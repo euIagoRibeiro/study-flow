@@ -442,6 +442,18 @@ function App() {
       current.map((x) => (x.id === updated.id ? updated : x)),
     )
   }
+  // Criado no treino ao vivo (ou o existente, se o nome já existia): entra
+  // no catálogo da tela. O erro sobe pra confirmação na seção Treino
+  async function createExercise(name: string): Promise<Exercise> {
+    const exercise = await exercisesApi.createExercise(name)
+    setExercises((current) =>
+      current.some((x) => x.id === exercise.id)
+        ? current.map((x) => (x.id === exercise.id ? exercise : x))
+        : [...current, exercise],
+    )
+    return exercise
+  }
+
   const exerciseActions: ExerciseActions = {
     async rename(id, name) {
       replaceExercise(await exercisesApi.updateExercise(id, { name }))
@@ -552,6 +564,7 @@ function App() {
               measures={measures}
               exercises={exercises}
               onSaveWorkout={saveWorkout}
+              onCreateExercise={createExercise}
               onCreate={addTask}
               onExecute={addExecution}
               onStartTimer={startTimer}

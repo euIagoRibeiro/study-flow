@@ -50,6 +50,7 @@ function TimerPanel(props: {
     workout: WorkoutExercise[],
     tags: TagChoice | null,
   ) => Promise<unknown>
+  onCreateExercise: (name: string) => Promise<Exercise>
   // Tags que o registro já tem (ex.: voltou pelo Desfazer) ou, sem elas,
   // a pré-seleção do contexto
   initial: TagSelection
@@ -270,6 +271,7 @@ function TimerPanel(props: {
               workout.update(next, targetFor(selection.path, phase))
             }
             onRetry={workout.retry}
+            onCreateExercise={props.onCreateExercise}
           />
         )}
         <button

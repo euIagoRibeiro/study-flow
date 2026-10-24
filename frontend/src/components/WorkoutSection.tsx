@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { ApiError } from '../api/client'
 import { compareNames } from '../tags'
 import {
   cardClass,
@@ -63,6 +64,8 @@ function WorkoutSection(props: {
   savedExercises: number
   onChange: (next: WorkoutExercise[]) => void
   onRetry: () => void
+  // Devolve o criado, ou o existente se o nome já existia (409)
+  onCreateExercise: (name: string) => Promise<Exercise>
 }) {
   const { draft, onChange } = props
   const [currentId, setCurrentId] = useState<string | null>(
@@ -70,6 +73,10 @@ function WorkoutSection(props: {
   )
   const [picking, setPicking] = useState(false)
   const [filter, setFilter] = useState('')
+  // Criar na hora: o nome esperando confirmação, e o erro dela
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [createError, setCreateError] = useState('')
+  const [creating, setCreating] = useState(false)
   const [reps, setReps] = useState('')
   const [kg, setKg] = useState('')
   const [fieldError, setFieldError] = useState('')
@@ -98,6 +105,8 @@ function WorkoutSection(props: {
     setCurrentId(exerciseId)
     setPicking(false)
     setFilter('')
+    setConfirming(null)
+    setCreateError('')
     setReps('')
     setKg('')
     setFieldError('')
@@ -182,13 +191,42 @@ function WorkoutSection(props: {
   const others = available
     .filter((x) => !props.recentIds.includes(x.id))
     .sort((a, b) => compareNames(a.name, b.name))
-  const typedInSession =
-    filter.trim() !== '' &&
-    props.exercises.some(
-      (x) =>
-        inSession.has(x.id) &&
-        x.name.trim().toLowerCase() === filter.trim().toLowerCase(),
-    )
+  // Nome igual ao de um do catálogo, como o servidor compara (sem
+  // maiúscula, sem espaço nas pontas): não oferece criar
+  const sameName = (name: string) =>
+    name.trim().toLowerCase() === filter.trim().toLowerCase()
+  const exact = props.exercises.find((x) => sameName(x.name))
+  const blocked = (exercise: Exercise) =>
+    !exercise.active
+      ? `${exercise.name} está arquivado. Reative na tela de tags.`
+      : inSession.has(exercise.id)
+        ? 'Já está no treino.'
+        : null
+
+  async function create() {
+    if (confirming === null) return
+    setCreating(true)
+    let exercise: Exercise
+    try {
+      exercise = await props.onCreateExercise(confirming)
+    } catch (err) {
+      setCreateError(
+        err instanceof ApiError && err.status === 400
+          ? err.message
+          : 'Não foi possível criar o exercício. Tente de novo.',
+      )
+      return
+    } finally {
+      setCreating(false)
+    }
+    // O nome já existia (catálogo da tela desatualizado): vale o existente
+    const reason = blocked(exercise)
+    if (reason) {
+      setCreateError(reason)
+      return
+    }
+    choose(exercise.id)
+  }
 
   const statusText =
     props.status === 'saving'
@@ -386,6 +424,8 @@ function WorkoutSection(props: {
         onClick={() => {
           setPicking((open) => !open)
           setFilter('')
+          setConfirming(null)
+          setCreateError('')
         }}
         aria-expanded={picking}
         className={`w-full ${secondaryButtonClass}`}
@@ -393,7 +433,36 @@ function WorkoutSection(props: {
         <PlusIcon />
         Exercício
       </button>
-      {picking && (
+      {picking && confirming !== null && (
+        <div className="flex flex-col gap-3 rounded-[14px] border border-linha bg-superficie px-4 py-3.5">
+          <p className="text-sm break-words">
+            Criar o exercício "{confirming}"? O equipamento faz parte do nome
+            (com barra, com halteres).
+          </p>
+          {createError && <FormError>{createError}</FormError>}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={create}
+              disabled={creating}
+              className={secondaryButtonClass}
+            >
+              Criar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(null)
+                setCreateError('')
+              }}
+              className={secondaryButtonClass}
+            >
+              Voltar
+            </button>
+          </div>
+        </div>
+      )}
+      {picking && confirming === null && (
         <div className="flex flex-col gap-2">
           <label className="flex flex-col gap-1.5">
             <span className="text-sm text-tinta-suave">Buscar exercício</span>
@@ -401,6 +470,7 @@ function WorkoutSection(props: {
               type="text"
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
+              maxLength={60}
               className={fieldClass}
             />
           </label>
@@ -431,11 +501,23 @@ function WorkoutSection(props: {
                 </ul>
               </>
             )}
-            {available.length === 0 && (
+            {exact && blocked(exact) && (
               <p className="px-0.5 text-sm text-tinta-suave">
-                {typedInSession
-                  ? 'Já está no treino.'
-                  : 'Nenhum exercício com esse nome.'}
+                {blocked(exact)}
+              </p>
+            )}
+            {!exact && filter.trim() !== '' && (
+              <button
+                type="button"
+                onClick={() => setConfirming(filter.trim())}
+                className={`${pickerButtonClass} break-words`}
+              >
+                Criar "{filter.trim()}"
+              </button>
+            )}
+            {filter.trim() === '' && available.length === 0 && (
+              <p className="px-0.5 text-sm text-tinta-suave">
+                Digite o nome para criar um exercício.
               </p>
             )}
           </div>
