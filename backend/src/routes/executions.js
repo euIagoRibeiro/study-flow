@@ -22,9 +22,14 @@ const SELECT_EXECUTION = `SELECT e.id,
   (SELECT json_build_object(
      'measureId', em.measure_id,
      'values', COALESCE(
+       -- Pelo nome do tipo (o desempate por created_at caía no uuid aleatório:
+       -- valores do mesmo pedido têm o mesmo now()). A tela reordena com a
+       -- regra dela, sem depender da collation do banco
        (SELECT json_agg(json_build_object('kindId', v.kind_id, 'quantity', v.quantity::float8)
-                        ORDER BY v.created_at, v.id)
-        FROM execution_measure_values v WHERE v.task_execution_id = e.id),
+                        ORDER BY lower(k.name), v.kind_id)
+        FROM execution_measure_values v
+        LEFT JOIN measure_kinds k ON k.id = v.kind_id
+        WHERE v.task_execution_id = e.id),
        '[]'))
    FROM execution_measures em WHERE em.task_execution_id = e.id) AS measure,
   (SELECT json_agg(json_build_object(

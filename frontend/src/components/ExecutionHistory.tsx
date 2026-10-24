@@ -6,7 +6,7 @@ import {
   localDayKey,
 } from '../dates'
 import { frequencyLabels } from '../frequency'
-import { describeValue } from '../measures'
+import { describeValue, sortValues } from '../measures'
 import { phaseLabels } from '../phases'
 import { cardClass, chipClass, tagChipClass, textButtonClass } from '../styles'
 import { indexTags, leafTags, tagLineage } from '../tags'
@@ -180,11 +180,14 @@ function ExecutionHistory(props: {
             )}
             {/* Um chip por valor: cada um quebra sozinho em 320px */}
             {recordedMeasure &&
-              execution.measure?.values.map((value) => (
-                <span key={value.kindId ?? ''} className={chipClass}>
-                  {describeValue(value, recordedMeasure)}
-                </span>
-              ))}
+              execution.measure &&
+              sortValues(execution.measure.values, recordedMeasure).map(
+                (value) => (
+                  <span key={value.kindId ?? ''} className={chipClass}>
+                    {describeValue(value, recordedMeasure)}
+                  </span>
+                ),
+              )}
             {workout && (
               <button
                 type="button"

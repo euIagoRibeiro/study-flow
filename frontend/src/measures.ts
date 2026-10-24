@@ -4,6 +4,7 @@ import {
   parseMeasureValue,
   quantityInputValue,
 } from './numbers'
+import { compareNames } from './tags'
 import type { ExecutionMeasure, Measure, MeasureValue } from './types'
 
 // A mesma regra do servidor: vale a medida da tag mais funda do caminho
@@ -63,11 +64,24 @@ export function describeValue(value: MeasureValue, measure: Measure): string {
   return `${formatQuantity(value.quantity)} ${label}`
 }
 
+// Tipos em ordem alfabética, como nos campos (compareNames): a ordem não
+// depende da que a API mandou
+export function sortValues(
+  values: MeasureValue[],
+  measure: Measure,
+): MeasureValue[] {
+  const name = (value: MeasureValue) =>
+    measure.kinds.find((k) => k.id === value.kindId)?.name ?? ''
+  return [...values].sort((a, b) => compareNames(name(a), name(b)))
+}
+
 export function describeValues(
   recorded: ExecutionMeasure,
   measures: Measure[],
 ): string {
   const measure = measures.find((m) => m.id === recorded.measureId)
   if (!measure) return ''
-  return recorded.values.map((v) => describeValue(v, measure)).join(', ')
+  return sortValues(recorded.values, measure)
+    .map((v) => describeValue(v, measure))
+    .join(', ')
 }
