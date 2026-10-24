@@ -270,23 +270,6 @@ INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated) VA
   ('5eed0000-0000-4000-8000-000000001303', (SELECT t FROM ancora) - interval '4 days 20 minutes', (SELECT t FROM ancora) - interval '4 days', true),
   ('5eed0000-0000-4000-8000-000000001303', (SELECT t FROM ancora) - interval '4 days 1 hour 30 minutes', (SELECT t FROM ancora) - interval '4 days 40 minutes', false);
 
--- Quantidade (A2). Pré-preenchimento da unidade: em Vestibular › Matemática
--- › Álgebra o 901 (mais recente) não tem quantidade, então a sugestão cai
--- no 906; 1302 é sem tag (sugestão pela tarefa); 1001 usa o singular
--- ("exercício"), pra lista de sugestões ter as duas grafias.
--- Totais: exercícios 40, exercício 1, km 5,2, séries 3 (6 registros).
-UPDATE task_executions AS e
-SET quantity = q.quantity, quantity_unit = q.unit
-FROM (VALUES
-  ('5eed0000-0000-4000-8000-000000000902'::uuid, 12::numeric, 'exercícios'),
-  ('5eed0000-0000-4000-8000-000000000907', 20,  'exercícios'),
-  ('5eed0000-0000-4000-8000-000000000906', 8,   'exercícios'),
-  ('5eed0000-0000-4000-8000-000000000601', 5.2, 'km'),
-  ('5eed0000-0000-4000-8000-000000001302', 3,   'séries'),
-  ('5eed0000-0000-4000-8000-000000001001', 1,   'exercício')
-) AS q (id, quantity, unit)
-WHERE e.id = q.id;
-
 -- Medidas por contexto (etapa M). A tag declara o que se mede; descendentes
 -- herdam; subtag substitui (Vestibular "questões" → Matemática "exercícios",
 -- dado só de seed, pra testar a herança). Linguagens é raiz nova.

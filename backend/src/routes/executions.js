@@ -15,8 +15,6 @@ const SELECT_EXECUTION = `SELECT e.id,
   e.task_frequency_at_time AS "taskFrequencyAtTime",
   e.root_tag_id AS "rootTagId",
   e.phase,
-  e.quantity::float8 AS quantity,
-  e.quantity_unit AS "quantityUnit",
   COALESCE(
     array_agg(et.tag_id ORDER BY et.tag_id) FILTER (WHERE et.tag_id IS NOT NULL),
     '{}'
@@ -83,20 +81,6 @@ const estimatedMinutes = z
   .nullable()
   .optional()
 
-// Quantidade: até 2 casas (o banco arredondaria a 3ª em silêncio) e no
-// máximo o que numeric(10,2) guarda (acima, seria estouro = 500). A
-// tolerância cobre 5,55 * 100 = 554,999… em ponto flutuante
-const quantity = z
-  .number('quantity precisa ser um número ou null')
-  .positive('quantity precisa ser maior que zero')
-  .max(99999999.99, 'quantity pode ir até 99.999.999,99')
-  .refine(
-    (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6,
-    'quantity pode ter no máximo 2 casas decimais',
-  )
-  .nullable()
-  .optional()
-
 // Medida por contexto: o servidor descobre QUAL medida pelo caminho; a
 // tela manda só os valores. No PUT, ausente mantém e [] remove
 const measureValues = z
@@ -113,14 +97,6 @@ const measureValues = z
   .max(20, 'No máximo 20 valores por registro')
   .optional()
 
-const quantityUnit = z
-  .string('quantityUnit precisa ser um texto ou null')
-  .trim()
-  .min(1, 'quantityUnit não pode ser vazio')
-  .max(30, 'quantityUnit pode ter no máximo 30 caracteres')
-  .nullable()
-  .optional()
-
 function withTagRule(schema) {
   return schema
     .refine(
@@ -130,13 +106,6 @@ function withTagRule(schema) {
     .refine(
       (data) => !(data.estimatedMinutes && data.completedAt === null),
       'Duração estimada só em registro concluído',
-    )
-    .refine(
-      // Os dois juntos: ausentes, null ou preenchidos ao mesmo tempo
-      (data) =>
-        (data.quantity === undefined) === (data.quantityUnit === undefined) &&
-        (data.quantity === null) === (data.quantityUnit === null),
-      'quantity e quantityUnit vão juntos (os dois preenchidos ou os dois null)',
     )
 }
 
@@ -152,8 +121,6 @@ const newExecutionSchema = withTagRule(
     completedAt,
     phase,
     estimatedMinutes,
-    quantity,
-    quantityUnit,
     measureValues,
     ...tagFields,
   }),
@@ -165,8 +132,6 @@ const executionChangesSchema = withTagRule(
     completedAt,
     phase,
     estimatedMinutes,
-    quantity,
-    quantityUnit,
     measureValues,
     ...tagFields,
   }),
@@ -252,6 +217,8 @@ async function setMeasure(client, executionId, values) {
       throw new MeasureError('Tipo repetido no mesmo registro')
     }
     seen.add(value.kindId)
+    // O banco arredondaria a 3ª casa em silêncio; a tolerância cobre
+    // 5,55 * 100 = 554,999… em ponto flutuante
     const hundredths =
       Math.abs(value.quantity * 100 - Math.round(value.quantity * 100)) < 1e-6
     if (
@@ -311,14 +278,6 @@ function measureConstraintError(err) {
     ['23503', '23505', '23514'].includes(err.code) &&
     (err.constraint?.startsWith('execution_measures_') ||
       err.constraint?.startsWith('execution_measure_values_'))
-  )
-}
-
-// No PUT: ausente mantém, null nos dois limpa
-async function setQuantity(client, executionId, value, unit) {
-  await client.query(
-    'UPDATE task_executions SET quantity = $1, quantity_unit = $2 WHERE id = $3',
-    [value, unit, executionId],
   )
 }
 
@@ -491,19 +450,12 @@ executionsRouter.post('/', async (req, res) => {
     // Snapshot copiado da própria tarefa, na mesma query — o cliente não manda
     const result = await client.query(
       `INSERT INTO task_executions
-         (task_id, description, completed_at, task_title_at_time, task_frequency_at_time,
-          quantity, quantity_unit)
-       SELECT id, $2, $3, title, frequency, $4, $5
+         (task_id, description, completed_at, task_title_at_time, task_frequency_at_time)
+       SELECT id, $2, $3, title, frequency
        FROM tasks
        WHERE id = $1 AND active
        RETURNING id`,
-      [
-        execution.taskId,
-        execution.description,
-        execution.completedAt,
-        execution.quantity ?? null,
-        execution.quantityUnit ?? null,
-      ],
+      [execution.taskId, execution.description, execution.completedAt],
     )
     if (result.rowCount === 0) {
       await client.query('ROLLBACK')
@@ -641,14 +593,6 @@ executionsRouter.put('/:id', async (req, res) => {
       await setEstimate(client, req.params.id, changes.estimatedMinutes)
     } else {
       await followCompletedAt(client, req.params.id)
-    }
-    if (changes.quantity !== undefined) {
-      await setQuantity(
-        client,
-        req.params.id,
-        changes.quantity,
-        changes.quantityUnit,
-      )
     }
     if (changes.measureValues !== undefined) {
       await setMeasure(client, req.params.id, changes.measureValues)
