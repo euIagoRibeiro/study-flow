@@ -13,7 +13,7 @@ import { API, APP, TESTS } from './config.mjs'
 const groups = {
   banco: ['phase-cases.sql', 'a1-cases.sql', 'm1-cases.sql', 'a3-cases.sql', 'dashboard-cases.sql',
     'seed-dashboard.sql'],
-  api: ['p2-test.mjs', 'a1b-test.mjs', 'm2-test.mjs', 'a3b-test.mjs'],
+  api: ['p2-test.mjs', 'a1b-test.mjs', 'm2-test.mjs', 'a3b-test.mjs', 'dashboard-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
