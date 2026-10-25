@@ -23,6 +23,7 @@ const groups = {
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
+    'painel-layout.mjs', 'painel-contraste.mjs',
   ],
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'

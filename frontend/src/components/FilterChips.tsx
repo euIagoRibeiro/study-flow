@@ -66,15 +66,20 @@ function FilterChips<T extends string>(props: {
     'flex h-8 w-8 items-center justify-center rounded-full border border-tinta-suave/40 bg-superficie text-tinta-suave hover:text-tinta'
 
   return (
-    // -mx-4 no celular: a linha rola até a borda da tela, sem cortar no gutter
-    <div className="relative -mx-4 sm:mx-0">
+    // -mx-4 no celular: a linha rola até a borda da tela, sem cortar no gutter.
+    // No desktop, -mx-1 com o px-1 de dentro: folga pro anel de foco do 1º e
+    // do último chip, e o degradê das setas acompanha a borda (no embrulho,
+    // não no rolável: senão 4px do chip cortado apareciam além do degradê). As
+    // setas ganham o mesmo 1 por dentro e ficam na borda da coluna, como antes
+    <div className="relative -mx-4 sm:-mx-1">
       {/* Sem barra (o chip cortado na borda já mostra que tem mais).
-          py-1/-my-1: folga pro anel de foco, que o overflow cortaria */}
+          py-1/-my-1: folga pro anel de foco, que o overflow cortaria (na
+          horizontal, o px-1 daqui com o -mx-1 do embrulho) */}
       <div
         ref={scrollerRef}
         role="group"
         aria-label={props.label}
-        className="-my-1 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden"
+        className="-my-1 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:px-1 [&::-webkit-scrollbar]:hidden"
       >
         <div ref={rowRef} className="flex w-max gap-1.5">
           {props.options.map((option) => {
@@ -104,7 +109,7 @@ function FilterChips<T extends string>(props: {
       </div>
       {hidden.left && (
         <div
-          className={`${arrowClass} left-0 bg-linear-to-r from-papel from-75% to-transparent pr-3 pl-4 pointer-fine:flex sm:pl-0`}
+          className={`${arrowClass} left-0 bg-linear-to-r from-papel from-75% to-transparent pr-3 pl-4 pointer-fine:flex sm:pl-1`}
         >
           <button
             type="button"
@@ -119,7 +124,7 @@ function FilterChips<T extends string>(props: {
       )}
       {hidden.right && (
         <div
-          className={`${arrowClass} right-0 bg-linear-to-l from-papel from-75% to-transparent pr-4 pl-3 pointer-fine:flex sm:pr-0`}
+          className={`${arrowClass} right-0 bg-linear-to-l from-papel from-75% to-transparent pr-4 pl-3 pointer-fine:flex sm:pr-1`}
         >
           <button
             type="button"
