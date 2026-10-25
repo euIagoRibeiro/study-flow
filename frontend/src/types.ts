@@ -159,3 +159,18 @@ export type ExecutionChanges = {
 } & Partial<TagChoice>
 
 export type LoadStatus = 'loading' | 'error' | 'ready'
+
+// Painel (Dashboard v1): tempo dedicado num período, por contexto. Segundos
+// inteiros; tagId null = "(sem tag)"
+export type TimeByContext = {
+  totalSeconds: number
+  overlap: boolean // há sessões sobrepostas no período (somam de propósito)
+  running: {
+    timeEntryId: string
+    executionId: string
+    taskTitle: string
+    startedAt: string
+    seconds: number // desde o início dela até o "até" (ou agora)
+  }[]
+  items: { tagId: string | null; seconds: number }[]
+}

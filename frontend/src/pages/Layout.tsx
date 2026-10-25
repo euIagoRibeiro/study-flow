@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import ThemeToggle from '../components/ThemeToggle'
-import { HistoryIcon, ListIcon, TagIcon, TimerIcon } from '../components/icons'
+import {
+  ChartIcon,
+  HistoryIcon,
+  ListIcon,
+  TagIcon,
+  TimerIcon,
+} from '../components/icons'
 import { focusRing, inlineButtonClass, secondaryButtonClass } from '../styles'
 import type { LoadStatus } from '../types'
 
@@ -50,20 +56,13 @@ function Layout(props: {
           viraria a referência dos filhos `fixed`, e a barra do celular
           (que mora aqui dentro) deixaria de grudar no rodapé da tela */}
       <div className="sm:sticky sm:top-0 sm:z-20 sm:border-b sm:border-vidro-fio sm:vidro">
-        {/* Ordem = ordem visual do desktop (e do Tab): título, nav, tags, tema */}
-        <header className="mx-auto flex max-w-xl items-center gap-4 px-4 pt-6 pb-3 sm:h-16 sm:py-0">
+        {/* Duas linhas no desktop: título, tags e tema em cima, as abas
+            embaixo (com 4 abas, numa linha só faltavam 55px na coluna de
+            544px, em qualquer largura). Ordem = ordem visual (e do Tab) */}
+        <header className="mx-auto flex max-w-xl items-center gap-4 px-4 pt-6 pb-3 sm:flex-wrap sm:gap-y-1 sm:pt-2.5 sm:pb-2">
           <h1 className="mr-auto font-titulo text-xl font-bold tracking-tight">
             StudyFlow
           </h1>
-          <nav
-            aria-label="Principal"
-            className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-3 gap-1 border-t border-vidro-fio px-3 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] max-sm:vidro sm:static sm:flex sm:gap-1 sm:border-0 sm:p-0"
-          >
-            {/* "end" evita que "/" fique marcada como ativa em "/executar" também */}
-            <NavItem to="/" end icon={<ListIcon />} label="Lista" />
-            <NavItem to="/executar" icon={<TimerIcon />} label="Executar" />
-            <NavItem to="/historico" icon={<HistoryIcon />} label="Histórico" />
-          </nav>
           {/* Configuração, não uso diário: fica no topo, fora da barra de baixo */}
           <NavLink
             to="/tags"
@@ -82,6 +81,16 @@ function Layout(props: {
             <TagIcon />
           </NavLink>
           <ThemeToggle />
+          <nav
+            aria-label="Principal"
+            className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 gap-1 border-t border-vidro-fio px-3 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] max-sm:vidro sm:static sm:flex sm:basis-full sm:gap-1 sm:border-0 sm:p-0"
+          >
+            {/* "end" evita que "/" fique marcada como ativa em "/executar" também */}
+            <NavItem to="/" end icon={<ListIcon />} label="Lista" />
+            <NavItem to="/executar" icon={<TimerIcon />} label="Executar" />
+            <NavItem to="/historico" icon={<HistoryIcon />} label="Histórico" />
+            <NavItem to="/painel" icon={<ChartIcon />} label="Painel" />
+          </nav>
         </header>
       </div>
       <div className="mx-auto max-w-xl px-4 pb-28 sm:pt-6 sm:pb-10">

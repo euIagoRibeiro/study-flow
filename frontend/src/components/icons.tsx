@@ -186,3 +186,15 @@ export function AlertIcon() {
     </svg>
   )
 }
+
+// Painel: barras de tamanhos diferentes sobre a base
+export function ChartIcon() {
+  return (
+    <svg {...commonProps}>
+      <path d="M4 20h16" />
+      <rect x="5.5" y="11" width="3" height="6.5" rx="0.75" />
+      <rect x="10.5" y="5.5" width="3" height="12" rx="0.75" />
+      <rect x="15.5" y="8.5" width="3" height="9" rx="0.75" />
+    </svg>
+  )
+}

@@ -10,6 +10,7 @@ import * as timeEntriesApi from './api/timeEntries'
 import ExecutePage from './pages/ExecutePage'
 import HistoricoPage from './pages/HistoricoPage'
 import Layout from './pages/Layout'
+import PainelPage from './pages/PainelPage'
 import TagsPage from './pages/TagsPage'
 import TaskListPage from './pages/TaskListPage'
 import type {
@@ -588,6 +589,7 @@ function App() {
             />
           }
         />
+        <Route path="/painel" element={<PainelPage tags={tags} />} />
         <Route
           path="/historico"
           element={
