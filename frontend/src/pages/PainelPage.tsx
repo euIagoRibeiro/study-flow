@@ -1,59 +1,129 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { getTimeByContext } from '../api/dashboard'
+import {
+  getTimeByContext,
+  getTimeByPeriod,
+  getTimeByPhase,
+  getTimeBySubtag,
+} from '../api/dashboard'
+import BarChart from '../components/BarChart'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
 import { ChevronDownIcon } from '../components/icons'
+import PieChart from '../components/PieChart'
 import { formatDuration } from '../dates'
 import {
+  barLabel,
+  categoryAt,
   contains,
   deviceTimeZone,
+  percent,
   periodAt,
   periodFromParams,
   periodLabel,
   shift,
   toParams,
+  toSlices,
+  type Period,
   type PeriodKind,
 } from '../painel'
-import { quietIconButtonClass, secondaryButtonClass } from '../styles'
+import { phaseLabels } from '../phases'
+import {
+  quietIconButtonClass,
+  secondaryButtonClass,
+  textButtonClass,
+} from '../styles'
 import { indexTags } from '../tags'
-import type { Tag, TimeByContext } from '../types'
+import type { Phase, Tag, TimeByContext } from '../types'
 
 const kindOptions: ChipOption<PeriodKind>[] = [
   { value: 'semana', label: 'Semana' },
   { value: 'mes', label: 'Mês' },
 ]
 
-function percent(part: number, total: number) {
-  const value = (part / total) * 100
-  return value > 0 && value < 1 ? '<1%' : `${Math.round(value)}%`
+type Overview = {
+  context: TimeByContext
+  period: { start: string; seconds: number }[]
+}
+type Detail = {
+  subtags: { tagId: string | null; seconds: number }[]
+  phases: { phase: Phase | null; seconds: number }[] | null // null = contexto sem fases
+}
+type Row = {
+  key: string
+  name: string
+  seconds: number
+  dot?: string // classe da cor (legenda); sem ela, linha sem bolinha
+  onOpen?: () => void // contexto: abre o detalhe
 }
 
-// Painel: o seletor de período fica no topo, compartilhado; "Tempo" é a
-// primeira seção (medidas e treino entram depois como seções irmãs)
-function PainelPage(props: { tags: Tag[] }) {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const today = new Date()
-  const period = periodFromParams(searchParams, today)
-  const isCurrent = contains(period, today)
-  const zone = deviceTimeZone()
+// Tabela = os números exatos e a legenda dos gráficos (bolinha da cor)
+function TimeTable(props: { caption: string; head: string; rows: Row[] }) {
+  const total = props.rows.reduce((sum, row) => sum + row.seconds, 0)
+  return (
+    <table className="w-full text-left">
+      <caption className="sr-only">{props.caption}</caption>
+      <thead className="text-meta text-tinta-suave">
+        <tr>
+          <th scope="col" className="pb-1 font-normal">
+            {props.head}
+          </th>
+          <th scope="col" className="pb-1 text-right font-normal">
+            Tempo
+          </th>
+          <th scope="col" className="w-14 pb-1 text-right font-normal">
+            %
+          </th>
+        </tr>
+      </thead>
+      <tbody className="font-dados tabular-nums">
+        {props.rows.map((row) => (
+          <tr key={row.key} className="border-t border-linha">
+            <td className="py-1 pr-2 break-words">
+              <span className="flex min-h-9 items-center gap-2">
+                {row.dot && (
+                  <span
+                    aria-hidden="true"
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${row.dot}`}
+                  />
+                )}
+                {row.onOpen ? (
+                  <button
+                    type="button"
+                    onClick={row.onOpen}
+                    className={`text-left underline decoration-dotted underline-offset-2 ${textButtonClass}`}
+                  >
+                    {row.name}
+                  </button>
+                ) : (
+                  row.name
+                )}
+              </span>
+            </td>
+            <td className="py-1 text-right whitespace-nowrap">
+              {formatDuration(row.seconds * 1000)}
+            </td>
+            <td className="py-1 text-right text-tinta-suave">
+              {percent(row.seconds, total)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
 
-  // A resposta guarda de qual pedido ela é (key): enquanto a do período da
-  // tela não chega, é "carregando". Mudar `attempt` refaz o pedido
-  const [attempt, setAttempt] = useState(0)
-  const key = `${period.start.toISOString()}|${period.end.toISOString()}|${zone}|${attempt}`
+// Busca marcada com a chave do pedido: resposta velha (de outro período, ou
+// que chegou depois da nova) é descartada pela limpeza e pela chave
+function useFetched<T>(key: string | null, load: () => Promise<T>) {
   const [result, setResult] = useState<{
     key: string
-    data?: TimeByContext
+    data?: T
     failed?: boolean
   } | null>(null)
-
-  // Busca quando o período muda (os dados dependem dele, então não dá pra
-  // carregar tudo no início, como o App faz com o resto). A limpeza marca a
-  // resposta como velha: trocando de semana rápido, a de uma semana anterior
-  // pode chegar depois da nova e não pode sobrescrevê-la
   useEffect(() => {
+    if (key === null) return
     let ignore = false
-    getTimeByContext(period.start, period.end, zone).then(
+    load().then(
       (data) => {
         if (!ignore) setResult({ key, data })
       },
@@ -65,20 +135,65 @@ function PainelPage(props: { tags: Tag[] }) {
     return () => {
       ignore = true
     }
-    // period.start/end mudam de objeto a cada renderização; a key resume os dois
+    // `load` é uma função nova a cada renderização; a key resume o pedido
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
+  return result?.key === key ? result : null
+}
 
-  // Só vale a resposta do período da tela
-  const current = result?.key === key ? result : null
-  const data = current?.data
+// Painel: o seletor de período fica no topo, compartilhado; "Tempo" é a
+// primeira seção (medidas e treino entram depois como seções irmãs)
+function PainelPage(props: { tags: Tag[] }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const today = new Date()
+  const period = periodFromParams(searchParams, today)
+  const isCurrent = contains(period, today)
+  const zone = deviceTimeZone()
   const tagsById = indexTags(props.tags)
-  const nameOf = (tagId: string | null) =>
-    tagId === null ? '(sem tag)' : (tagsById.get(tagId)?.name ?? 'Tag removida')
+  const [attempt, setAttempt] = useState(0)
+  const base = `${period.start.toISOString()}|${period.end.toISOString()}|${zone}|${attempt}`
+
+  const overview = useFetched<Overview>(base, async () => {
+    const [context, byPeriod] = await Promise.all([
+      getTimeByContext(period.start, period.end, zone),
+      getTimeByPeriod(
+        period.start,
+        period.end,
+        zone,
+        period.kind === 'semana' ? 'dia' : 'semana',
+      ),
+    ])
+    return { context, period: byPeriod.items }
+  })
+
+  // Detalhe de um contexto (?contexto=), na mesma página: só raiz que existe
+  const contextId = searchParams.get('contexto')
+  const contextTag =
+    contextId && tagsById.get(contextId)?.level === 1
+      ? tagsById.get(contextId)
+      : undefined
+  const detail = useFetched<Detail>(
+    contextTag ? `${base}|${contextTag.id}` : null,
+    async () => {
+      if (!contextTag) throw new Error('sem contexto')
+      const [subtags, phases] = await Promise.all([
+        getTimeBySubtag(period.start, period.end, zone, contextTag.id),
+        contextTag.tracksPhase
+          ? getTimeByPhase(period.start, period.end, zone, contextTag.id)
+          : Promise.resolve(null),
+      ])
+      return { subtags: subtags.items, phases: phases?.items ?? null }
+    },
+  )
+
+  const data = overview?.data
+  const nameOf = (tagId: string | null, none: string) =>
+    tagId === null ? none : (tagsById.get(tagId)?.name ?? 'Tag removida')
   const noun = period.kind === 'mes' ? 'neste mês' : 'nesta semana'
 
-  function go(next: ReturnType<typeof periodAt>) {
-    setSearchParams(toParams(next))
+  // Trocar de período mantém o contexto aberto
+  function go(next: Period, contexto = contextTag?.id) {
+    setSearchParams({ ...toParams(next), ...(contexto ? { contexto } : {}) })
   }
 
   return (
@@ -130,7 +245,7 @@ function PainelPage(props: { tags: Tag[] }) {
 
       <section aria-label="Tempo" className="flex flex-col gap-3">
         <h2 className="font-titulo text-base font-semibold">Tempo</h2>
-        {current === null ? (
+        {overview === null ? (
           <p className="text-sm text-tinta-suave">Carregando…</p>
         ) : !data ? (
           <div
@@ -148,7 +263,7 @@ function PainelPage(props: { tags: Tag[] }) {
               Tentar de novo
             </button>
           </div>
-        ) : data.totalSeconds === 0 ? (
+        ) : data.context.totalSeconds === 0 ? (
           <p className="py-6 text-center text-sm text-tinta-suave">
             Nenhum tempo dedicado {noun}.
           </p>
@@ -157,59 +272,116 @@ function PainelPage(props: { tags: Tag[] }) {
             <dl>
               <dt className="text-sm text-tinta-suave">Tempo dedicado</dt>
               <dd className="font-dados text-[2.5rem] leading-tight font-bold tabular-nums">
-                {formatDuration(data.totalSeconds * 1000)}
+                {formatDuration(data.context.totalSeconds * 1000)}
               </dd>
             </dl>
-            {data.running.length > 0 && (
+            {data.context.running.length > 0 && (
               <p className="inline-flex items-start gap-2 rounded-xl bg-andamento/[0.13] px-4 py-3 text-sm">
                 <span className="mt-1.5 h-2 w-2 shrink-0 animate-pulsa rounded-full bg-andamento" />
                 <span>
-                  {data.running.length === 1
-                    ? `Inclui 1 sessão rodando há ${formatDuration(data.running[0].seconds * 1000)} (${data.running[0].taskTitle}).`
-                    : `Inclui ${data.running.length} sessões rodando (${data.running.map((r) => r.taskTitle).join(', ')}).`}
+                  {data.context.running.length === 1
+                    ? `Inclui 1 sessão rodando há ${formatDuration(data.context.running[0].seconds * 1000)} (${data.context.running[0].taskTitle}).`
+                    : `Inclui ${data.context.running.length} sessões rodando (${data.context.running.map((r) => r.taskTitle).join(', ')}).`}
                 </span>
               </p>
             )}
-            {data.overlap && (
+            {data.context.overlap && (
               <p className="font-texto text-meta text-tinta-suave">
                 Inclui atividades em paralelo: a soma pode passar das horas do
                 relógio.
               </p>
             )}
-            <table className="w-full text-left">
-              <caption className="sr-only">Tempo dedicado por contexto</caption>
-              <thead className="text-meta text-tinta-suave">
-                <tr>
-                  <th scope="col" className="pb-1 font-normal">
-                    Contexto
-                  </th>
-                  <th scope="col" className="pb-1 text-right font-normal">
-                    Tempo
-                  </th>
-                  <th scope="col" className="w-14 pb-1 text-right font-normal">
-                    %
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="font-dados tabular-nums">
-                {data.items.map((item) => (
-                  <tr
-                    key={item.tagId ?? 'sem'}
-                    className="border-t border-linha"
+            <PieChart
+              label="Pizza do tempo por contexto (os números estão na tabela abaixo)"
+              slices={toSlices(data.context.items)}
+            />
+            <TimeTable
+              caption="Tempo dedicado por contexto"
+              head="Contexto"
+              rows={data.context.items.map((item, i) => ({
+                key: item.tagId ?? 'sem',
+                name: nameOf(item.tagId, '(sem tag)'),
+                seconds: item.seconds,
+                dot: categoryAt(i).dot,
+                onOpen: item.tagId
+                  ? () => go(period, item.tagId ?? undefined)
+                  : undefined,
+              }))}
+            />
+
+            {contextTag && (
+              <section
+                aria-label={`Em ${contextTag.name}`}
+                className="flex flex-col gap-3 rounded-[14px] border border-linha bg-superficie px-4 py-3.5"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="min-w-0 font-titulo text-base font-semibold break-words">
+                    Em {contextTag.name}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setSearchParams(toParams(period))}
+                    className={`shrink-0 text-sm text-tinta-suave ${textButtonClass}`}
                   >
-                    <td className="py-2.5 pr-2 break-words">
-                      {nameOf(item.tagId)}
-                    </td>
-                    <td className="py-2.5 text-right whitespace-nowrap">
-                      {formatDuration(item.seconds * 1000)}
-                    </td>
-                    <td className="py-2.5 text-right text-tinta-suave">
-                      {percent(item.seconds, data.totalSeconds)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    Fechar
+                  </button>
+                </div>
+                {detail === null ? (
+                  <p className="text-sm text-tinta-suave">Carregando…</p>
+                ) : !detail.data ? (
+                  <p role="alert" className="text-sm font-semibold text-alerta">
+                    Não foi possível carregar {contextTag.name}.
+                  </p>
+                ) : detail.data.subtags.length === 0 ? (
+                  <p className="text-sm text-tinta-suave">
+                    Nenhum tempo em {contextTag.name} {noun}.
+                  </p>
+                ) : (
+                  <>
+                    <PieChart
+                      label={`Pizza do tempo por subtag em ${contextTag.name} (os números estão na tabela abaixo)`}
+                      slices={toSlices(detail.data.subtags)}
+                    />
+                    <TimeTable
+                      caption={`Tempo dedicado por subtag em ${contextTag.name}`}
+                      head="Subtag"
+                      rows={detail.data.subtags.map((item, i) => ({
+                        key: item.tagId ?? 'sem',
+                        name: nameOf(item.tagId, '(sem subtag)'),
+                        seconds: item.seconds,
+                        dot: categoryAt(i).dot,
+                      }))}
+                    />
+                    {detail.data.phases && detail.data.phases.length > 0 && (
+                      <TimeTable
+                        caption={`Tempo dedicado por fase em ${contextTag.name}`}
+                        head="Fase"
+                        rows={detail.data.phases.map((item) => ({
+                          key: item.phase ?? 'sem',
+                          name:
+                            item.phase === null
+                              ? '(sem fase)'
+                              : phaseLabels[item.phase],
+                          seconds: item.seconds,
+                        }))}
+                      />
+                    )}
+                  </>
+                )}
+              </section>
+            )}
+
+            <h3 className="mt-2 font-titulo text-base font-semibold">
+              {period.kind === 'semana' ? 'Por dia' : 'Por semana'}
+            </h3>
+            <BarChart
+              label={`Barras do tempo ${period.kind === 'semana' ? 'por dia' : 'por semana'} (o valor está escrito em cima de cada barra)`}
+              bars={data.period.map((item, i) => ({
+                value: item.seconds,
+                valueLabel: formatDuration(item.seconds * 1000),
+                label: barLabel(period.kind, item.start, i),
+              }))}
+            />
           </>
         )}
       </section>

@@ -103,6 +103,9 @@ try {
     const h = await page.evaluateHandle((scope, label) => [...(document.querySelector(scope)?.querySelectorAll('label span') ?? [])].find((s) => s.textContent.trim() === label)?.closest('label').querySelector('input') ?? null, scope, label)
     const el = h.asElement()
     if (!el) throw new Error(`campo ${label} não achado`)
+    // Centro da tela antes do clique: perto da borda, o topo fixo (107px no
+    // desktop) cobre o campo e o clique triplo não seleciona o texto
+    await el.evaluate((e) => e.scrollIntoView({ block: 'center' }))
     await el.click({ clickCount: 3 })
     await page.keyboard.press('Backspace')
     if (value) await el.type(value)

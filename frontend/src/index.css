@@ -15,6 +15,18 @@
   /* Uso restrito: alerta só em erro; andamento só em "rodando / em andamento" */
   --alerta: light-dark(#b42318, #f97066);
   --andamento: light-dark(#1f7a4d, #4cc38a);
+  /* Categoria (gráficos do Painel): só nos matizes livres (ciano → rosa), longe
+     das reservadas acima (ΔE ≥ 42). Na ORDEM, vizinhas alternam luminosidade
+     (claro: escura/média; escuro: média/clara): fatias que se encostam se
+     distinguem também com daltonismo (pior par vizinho ΔE 15,9, simulado).
+     Contraste com o fundo ≥ 3,5:1 nos dois temas. Texto não vai em cima delas
+     (as do meio não chegam a 4,5:1 nem com branco nem com escuro) */
+  --categoria-1: light-dark(#8e2f73, #c75aab);
+  --categoria-2: light-dark(#1a8aa1, #8fdcea);
+  --categoria-3: light-dark(#2747a8, #6f8ff0);
+  --categoria-4: light-dark(#c44d84, #ffb3cf);
+  --categoria-5: light-dark(#5a3fa6, #a382f0);
+  --categoria-outros: light-dark(#7d8591, #aeb4bc);
   /* Vidro = superficie translúcida. Opacidade mínima medida pra texto
      `tinta` manter 4.5:1 com qualquer cor do app passando por trás */
   --vidro: light-dark(rgb(255 255 255 / 0.7), rgb(43 47 55 / 0.78));
@@ -53,6 +65,12 @@
   --color-sobre-marca: var(--sobre-marca);
   --color-alerta: var(--alerta);
   --color-andamento: var(--andamento);
+  --color-categoria-1: var(--categoria-1);
+  --color-categoria-2: var(--categoria-2);
+  --color-categoria-3: var(--categoria-3);
+  --color-categoria-4: var(--categoria-4);
+  --color-categoria-5: var(--categoria-5);
+  --color-categoria-outros: var(--categoria-outros);
   --color-vidro-fio: var(--vidro-fio);
 
   --font-interface: var(--fonte-interface);

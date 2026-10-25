@@ -89,3 +89,55 @@ export function periodLabel(period: Period, today: Date): string {
       })
   return `${first} – ${last.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', ...year })}`
 }
+
+// ---- Gráficos
+
+// Cor de categoria pela ORDEM (a da tabela, do maior pro menor): a bolinha
+// da linha e a fatia sempre batem. Classes por extenso, pro Tailwind achar
+const COLORS = [
+  { color: 'var(--categoria-1)', dot: 'bg-categoria-1' },
+  { color: 'var(--categoria-2)', dot: 'bg-categoria-2' },
+  { color: 'var(--categoria-3)', dot: 'bg-categoria-3' },
+  { color: 'var(--categoria-4)', dot: 'bg-categoria-4' },
+  { color: 'var(--categoria-5)', dot: 'bg-categoria-5' },
+]
+const OTHERS = { color: 'var(--categoria-outros)', dot: 'bg-categoria-outros' }
+
+// Da 6ª em diante, "outros" (cinza): uma fatia só, somada
+export function categoryAt(index: number) {
+  return COLORS[index] ?? OTHERS
+}
+
+export function percent(part: number, total: number): string {
+  const value = (part / total) * 100
+  return value > 0 && value < 1 ? '<1%' : `${Math.round(value)}%`
+}
+
+// Fatias da pizza: as 5 maiores com cor; o resto vira "outros". O % só nas
+// fatias grandes (≥ 10%): nas pequenas não cabe, e a tabela tem todos
+export function toSlices(items: { seconds: number }[]) {
+  const total = items.reduce((sum, item) => sum + item.seconds, 0)
+  const shown = items.slice(0, COLORS.length).map((item, i) => ({
+    value: item.seconds,
+    color: COLORS[i].color,
+  }))
+  const rest = items
+    .slice(COLORS.length)
+    .reduce((sum, item) => sum + item.seconds, 0)
+  const slices =
+    rest > 0 ? [...shown, { value: rest, color: OTHERS.color }] : shown
+  return slices.map((slice) => ({
+    ...slice,
+    label: slice.value / total >= 0.1 ? percent(slice.value, total) : undefined,
+  }))
+}
+
+const WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
+
+// Rótulo de cada barra: o dia da semana (na semana) ou "dd/mm" do início da
+// semana (no mês). start = 'AAAA-MM-DD' da API
+export function barLabel(kind: PeriodKind, start: string, index: number) {
+  return kind === 'semana'
+    ? WEEKDAYS[index]
+    : `${start.slice(8)}/${start.slice(5, 7)}`
+}

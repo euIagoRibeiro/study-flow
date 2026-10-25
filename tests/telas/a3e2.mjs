@@ -69,6 +69,9 @@ try {
     if (isOpen !== 'true') await click(S, 'Exercício')
     await pause(100)
     const input = await page.evaluateHandle((s) => [...document.querySelector(s).querySelectorAll('label span')].find((x) => x.textContent.trim() === 'Buscar exercício')?.closest('label').querySelector('input'), S)
+    // Centro da tela antes do clique: perto da borda, o topo fixo (107px no
+    // desktop) cobre o campo e o clique triplo não seleciona o texto
+    await input.asElement().evaluate((e) => e.scrollIntoView({ block: 'center' }))
     await input.asElement().click({ clickCount: 3 })
     await page.keyboard.press('Backspace')
     await input.asElement().type(value)
