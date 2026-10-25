@@ -405,4 +405,86 @@ INSERT INTO exercise_sets (execution_exercise_id, position, reps, weight_kg) VAL
   ('5eed0000-0000-4000-b100-000000000041', 1, 12, 20), ('5eed0000-0000-4000-b100-000000000041', 2, 8, 30), ('5eed0000-0000-4000-b100-000000000041', 3, 8, 40),
   ('5eed0000-0000-4000-b100-000000000042', 1, 10, 20), ('5eed0000-0000-4000-b100-000000000042', 2, 10, 20), ('5eed0000-0000-4000-b100-000000000042', 3, 10, 20);
 
+-- Dashboard (D1): 12 semanas de rotina, pra conferir semana e mês à mão.
+-- Só semanas PASSADAS (k = 1..12 antes da semana atual, que começa na
+-- segunda, hora local): "hoje", "feitas hoje" e as pré-seleções não mudam.
+-- Horários reais (o resto do seed segue a âncora, de manhã cedo). Código
+-- fica de fora de propósito: os totais do P3 (675 min) não mudam.
+--   ter 19:00 Vestibular › Matemática › Álgebra, 90 min (todas as semanas)
+--   qui 19:30 Vestibular › Física, 60 min (sem nas semanas 5 e 9; na 3,
+--             23:20 → 00:40: cruza a meia-noite, 40 + 40)
+--   sáb 10:00 Linguagens › Inglês, 45 min
+--   dom 07:00 Exercícios › Corrida, 40 min (semanas pares; a 6 ESTIMADA)
+--   qua 21:00 Matemática (solta) › Álgebra, 60 min (semanas 3, 7, 11)
+--   qua 20:00 Ler livro técnico, sem tag, 40 min (semanas 2, 4, 6)
+--   + Inglês da virada pro MÊS ANTERIOR: 23:30 → 00:30 (30 + 30); sempre a
+--     28 dias ou mais de hoje
+-- Totais: Vestibular 1700 (Matemática 1080, Física 620), Linguagens 600,
+-- Exercícios 240, Matemática 180, sem tag 120 = 2840 min. Por semana k:
+-- 195 275 275 275 135 275 255 235 135 235 255 235 (+ 60 da virada do mês).
+-- Ids: 5eed…8000-0000000015kk (ter), 16kk (qui), 17kk (sáb), 18kk (dom),
+-- 19kk (Matemática), 20kk (livro), 2101 (virada do mês)
+CREATE TEMP TABLE d1_segunda ON COMMIT DROP AS
+SELECT date_trunc('week', (SELECT t FROM ancora) AT TIME ZONE 'America/Sao_Paulo') AS d;
+
+CREATE TEMP TABLE d1 ON COMMIT DROP AS
+WITH s AS (SELECT k, (SELECT d FROM d1_segunda) - k * interval '1 week' AS seg FROM generate_series(1, 12) k)
+SELECT format('5eed0000-0000-4000-8000-%s', lpad((1500 + k)::text, 12, '0'))::uuid AS id,
+       '5eed0000-0000-4000-8000-000000000009'::uuid AS task, 'Estudar para o vestibular' AS titulo, 'daily'::frequency AS freq,
+       '5eed0000-0000-4000-9000-000000000100'::uuid AS raiz, '5eed0000-0000-4000-9000-000000000111'::uuid AS folha,
+       'Álgebra: lista da semana' AS descricao, seg + interval '1 day 19 hours' AS ini, interval '90 minutes' AS dur, false AS estimada
+FROM s
+UNION ALL
+SELECT format('5eed0000-0000-4000-8000-%s', lpad((1600 + k)::text, 12, '0'))::uuid,
+       '5eed0000-0000-4000-8000-000000000009', 'Estudar para o vestibular', 'daily',
+       '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000120',
+       CASE WHEN k = 3 THEN 'Física: revisão até tarde' ELSE 'Física: exercícios' END,
+       seg + CASE WHEN k = 3 THEN interval '3 days 23 hours 20 minutes' ELSE interval '3 days 19 hours 30 minutes' END,
+       CASE WHEN k = 3 THEN interval '80 minutes' ELSE interval '60 minutes' END, false
+FROM s WHERE k NOT IN (5, 9)
+UNION ALL
+SELECT format('5eed0000-0000-4000-8000-%s', lpad((1700 + k)::text, 12, '0'))::uuid,
+       '5eed0000-0000-4000-8000-000000000002', 'Revisar inglês', 'daily',
+       '5eed0000-0000-4000-9000-000000000500', '5eed0000-0000-4000-9000-000000000510',
+       'Série em inglês sem legenda', seg + interval '5 days 10 hours', interval '45 minutes', false
+FROM s
+UNION ALL
+SELECT format('5eed0000-0000-4000-8000-%s', lpad((1800 + k)::text, 12, '0'))::uuid,
+       '5eed0000-0000-4000-8000-000000000006', 'Exercício físico', 'none',
+       '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000330',
+       'Corrida no parque', seg + interval '6 days 7 hours', interval '40 minutes', k = 6
+FROM s WHERE k % 2 = 0
+UNION ALL
+SELECT format('5eed0000-0000-4000-8000-%s', lpad((1900 + k)::text, 12, '0'))::uuid,
+       '5eed0000-0000-4000-8000-000000000010', 'Matemática por diversão', 'none',
+       '5eed0000-0000-4000-9000-000000000200', '5eed0000-0000-4000-9000-000000000210',
+       'Problemas de álgebra por diversão', seg + interval '2 days 21 hours', interval '60 minutes', false
+FROM s WHERE k IN (3, 7, 11)
+UNION ALL
+SELECT format('5eed0000-0000-4000-8000-%s', lpad((2000 + k)::text, 12, '0'))::uuid,
+       '5eed0000-0000-4000-8000-000000000004', 'Ler livro técnico', 'weekly',
+       NULL, NULL, 'Mais um capítulo', seg + interval '2 days 20 hours', interval '40 minutes', false
+FROM s WHERE k IN (2, 4, 6)
+UNION ALL
+SELECT '5eed0000-0000-4000-8000-000000002101',
+       '5eed0000-0000-4000-8000-000000000002', 'Revisar inglês', 'daily',
+       '5eed0000-0000-4000-9000-000000000500', '5eed0000-0000-4000-9000-000000000510',
+       'Podcast na virada do mês',
+       date_trunc('month', (SELECT t FROM ancora) AT TIME ZONE 'America/Sao_Paulo') - interval '1 month' - interval '30 minutes',
+       interval '60 minutes', false;
+
+-- Hora local → instante; o registro termina no fim da sessão (como a API grava)
+INSERT INTO task_executions
+  (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id)
+SELECT id, task, descricao, titulo, freq, (ini + dur) AT TIME ZONE 'America/Sao_Paulo', raiz FROM d1;
+
+INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id)
+SELECT d1.id, t.id, t.parent_id, d1.raiz
+FROM d1
+JOIN tags leaf ON leaf.id = d1.folha
+JOIN tags t ON t.id = leaf.id OR (leaf.level = 3 AND t.id = leaf.parent_id);
+
+INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated)
+SELECT id, ini AT TIME ZONE 'America/Sao_Paulo', (ini + dur) AT TIME ZONE 'America/Sao_Paulo', estimada FROM d1;
+
 COMMIT;
