@@ -11,7 +11,7 @@ import { API, APP, TESTS } from './config.mjs'
 // Ordem dentro de cada grupo = a das etapas. Argumento extra = outra rodada
 // (a3e1 com o navegador em inglês; minutes-fix e m5-forms já rodam os dois)
 const groups = {
-  banco: ['phase-cases.sql', 'a1-cases.sql', 'm1-cases.sql', 'a3-cases.sql'],
+  banco: ['phase-cases.sql', 'a1-cases.sql', 'm1-cases.sql', 'a3-cases.sql', 'dashboard-cases.sql'],
   api: ['p2-test.mjs', 'a1b-test.mjs', 'm2-test.mjs', 'a3b-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
