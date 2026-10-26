@@ -4,7 +4,10 @@
 // Texto dos gráficos (% e valores, dias): ≥ 4,5:1, pelo pixel mais forte do
 // glifo. Confere também que o pixel lido É a cor do token (não mediu o
 // lugar errado). Semana passada com o detalhe de Código (6 contextos: a
-// fatia cinza de "outros" entra).
+// fatia cinza de "outros" entra). D7c: "Comparar tags" com 5 escolhidas (as 5
+// cores): barras contra o fundo, bolinha do chip contra o fundo DO CHIP,
+// texto do chip, bolinhas da tabela. Barras e chips são HTML: print da
+// janela + coordenadas da tela (o print por elemento da seção saiu cortado).
 import puppeteer from 'puppeteer-core'
 import pngjs from 'pngjs'
 import { API, APP, CHROME } from '../config.mjs'
@@ -20,6 +23,10 @@ const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 3)
 
 const tags = await (await fetch(`${API}/tags`)).json()
 const codigo = tags.find((t) => t.name === 'Código' && t.level === 1).id
+const byId = new Map(tags.map((t) => [t.id, t]))
+const pathOf = (t) => (t.parentId ? `${pathOf(byId.get(t.parentId))} › ${t.name}` : t.name)
+const idOf = (path) => tags.find((t) => pathOf(t) === path).id
+const five = ['Vestibular › Matemática › Álgebra', 'Matemática › Álgebra', 'Vestibular', 'Código › Empresa › equipamentos-medicos', 'Linguagens'].map(idOf)
 const monday = new Date(); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) - 7)
 const ymd = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
 
@@ -116,6 +123,62 @@ try {
     check(pies === 2 && slicesMeasured >= 7, `${theme}: mediu ${slicesMeasured} fatias em ${pies} pizzas (esperado: as 6 do contexto + as do detalhe)`)
     check(barsMeasured >= 3 && textsMeasured >= 10 && dotsMeasured >= 7, `${theme}: mediu ${barsMeasured} barras, ${textsMeasured} textos, ${dotsMeasured} bolinhas`)
     console.log(`${theme}: ${slicesMeasured} fatias, ${barsMeasured} barras, ${textsMeasured} textos, ${dotsMeasured} bolinhas medidos; menor contraste: ${Object.entries(lowest).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(', ')}`)
+
+    // ---- Comparar tags (D7c): as 5 cores
+    await page.goto(`${APP}/painel?periodo=ano&inicio=${new Date().getFullYear()}-01-01&tags=${five.join(',')}`, { waitUntil: 'networkidle0' })
+    await new Promise((r) => setTimeout(r, 400))
+    const low = { barra: Infinity, chip: Infinity, textoChip: Infinity, bolinhaTabela: Infinity }
+    let measured = { barras: 0, chips: 0, textos: 0, tabela: 0 }
+    // Cada item: rola pro centro, print da JANELA, e lê pelas coordenadas da tela
+    const shot = async (selector, index) => {
+      await page.evaluate((sel, i) => document.querySelectorAll(sel)[i].scrollIntoView({ block: 'center' }), selector, index)
+      await new Promise((r) => setTimeout(r, 100))
+      const png = PNG.sync.read(await page.screenshot())
+      return (x, y) => { const i = (Math.round(y) * png.width + Math.round(x)) * 4; return [png.data[i], png.data[i + 1], png.data[i + 2]] }
+    }
+    const BAR = 'section[aria-label="Comparar tags"] [role="img"] > div'
+    for (let i = 0; i < 5; i++) {
+      const at = await shot(BAR, i)
+      const g = await page.evaluate((sel, i) => {
+        const row = document.querySelectorAll(sel)[i]
+        const fill = row.querySelector('[style]').getBoundingClientRect(), value = row.lastElementChild.lastElementChild.getBoundingClientRect()
+        return { x: fill.left + Math.min(fill.width / 2, 20), y: fill.top + fill.height / 2, bgX: value.left - 3, w: fill.width }
+      }, BAR, i)
+      if (g.w < 4) continue // barra curta demais pra ler o meio (o tempo pequeno)
+      const c = at(g.x, g.y), bg = at(g.bgX, g.y)
+      check(near(c, tokens[i]), `${theme} barra ${i + 1}: pixel ${c} não é --categoria-${i + 1} ${tokens[i]}`)
+      check(contrast(c, bg) >= 3, `${theme} barra ${i + 1}: ${c} sobre ${bg} = ${contrast(c, bg).toFixed(2)} (< 3)`)
+      low.barra = Math.min(low.barra, contrast(c, bg)); measured.barras++
+    }
+    const CHIP = 'section[aria-label="Comparar tags"] ul[aria-label="Tags escolhidas"] li'
+    for (let i = 0; i < 5; i++) {
+      const at = await shot(CHIP, i)
+      const g = await page.evaluate((sel, i) => {
+        const li = document.querySelectorAll(sel)[i]
+        const dot = li.querySelector('span[aria-hidden="true"]').getBoundingClientRect()
+        const text = li.querySelector('span:not([aria-hidden])').getBoundingClientRect()
+        return { dx: dot.left + dot.width / 2, dy: dot.top + dot.height / 2, bgX: dot.right + 3, text: { x: text.left, y: text.top, w: text.width, h: text.height } }
+      }, CHIP, i)
+      const c = at(g.dx, g.dy), bg = at(g.bgX, g.dy)
+      check(near(c, tokens[i]), `${theme} bolinha do chip ${i + 1}: pixel ${c} não é --categoria-${i + 1}`)
+      check(contrast(c, bg) >= 3, `${theme} bolinha do chip ${i + 1}: ${c} sobre o chip ${bg} = ${contrast(c, bg).toFixed(2)} (< 3)`)
+      low.chip = Math.min(low.chip, contrast(c, bg)); measured.chips++
+      let best = 1
+      for (let x = Math.floor(g.text.x); x < g.text.x + g.text.w; x++) for (let y = Math.floor(g.text.y); y < g.text.y + g.text.h; y++) best = Math.max(best, contrast(at(x, y), bg))
+      check(best >= 4.5, `${theme} texto do chip ${i + 1}: ${best.toFixed(2)} (< 4,5)`)
+      low.textoChip = Math.min(low.textoChip, best); measured.textos++
+    }
+    const TDOT = 'section[aria-label="Comparar tags"] td span[aria-hidden="true"]'
+    for (let i = 0; i < 5; i++) {
+      const at = await shot(TDOT, i)
+      const g = await page.evaluate((sel, i) => { const r = document.querySelectorAll(sel)[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, bgX: r.right + 3 } }, TDOT, i)
+      const c = at(g.x, g.y), bg = at(g.bgX, g.y)
+      check(near(c, tokens[i]), `${theme} bolinha da tabela ${i + 1}: pixel ${c} não é --categoria-${i + 1}`)
+      check(contrast(c, bg) >= 3, `${theme} bolinha da tabela ${i + 1}: ${contrast(c, bg).toFixed(2)} (< 3)`)
+      low.bolinhaTabela = Math.min(low.bolinhaTabela, contrast(c, bg)); measured.tabela++
+    }
+    check(measured.barras >= 4 && measured.chips === 5 && measured.textos === 5 && measured.tabela === 5, `${theme}: comparar tags mediu ${JSON.stringify(measured)}`)
+    console.log(`${theme} comparar tags: ${JSON.stringify(measured)}; menor contraste: ${Object.entries(low).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(', ')}`)
   }
 } catch (err) {
   check(false, `erro: ${err.message}`)
