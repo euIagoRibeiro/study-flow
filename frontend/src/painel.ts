@@ -354,3 +354,31 @@ export const periodNoun = {
   mes: 'neste mês',
   ano: 'neste ano',
 } as const
+
+// ---- Tags escolhidas pra comparar
+
+export const MAX_CHOSEN = 5
+
+// Da URL (?tags=a,b): só as que existem, sem repetir, até 5 (o resto da URL
+// é ignorado, como um período inválido)
+export function chosenTagIds(
+  raw: string | null,
+  byId: Map<string, unknown>,
+): string[] {
+  const ids = (raw ?? '').split(',').filter((id) => byId.has(id))
+  return [...new Set(ids)].slice(0, MAX_CHOSEN)
+}
+
+// Pares em que uma escolhida está dentro da outra (Vestibular e Vestibular ›
+// Matemática): cada uma está certa sozinha, mas as duas não somam
+export function nestedPairs<T extends { id: string }>(
+  chosen: T[],
+  lineage: (tag: T) => T[],
+): [T, T][] {
+  return chosen.flatMap((inner) =>
+    lineage(inner)
+      .slice(0, -1)
+      .filter((outer) => chosen.some((c) => c.id === outer.id))
+      .map((outer): [T, T] => [outer, inner]),
+  )
+}

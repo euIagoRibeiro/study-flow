@@ -60,3 +60,19 @@ export function getTimeByPeriod(
     `/dashboard/tempo-por-periodo?${query(de, ate, fuso, { por })}`,
   )
 }
+
+// Tempo sob tags escolhidas (1 a 5, qualquer nível), na ordem pedida, e o da
+// união (cada sessão uma vez: aninhadas não somam)
+export function getTimeByTags(
+  de: Date,
+  ate: Date,
+  fuso: string,
+  tags: string[],
+): Promise<{
+  items: { tagId: string; seconds: number }[]
+  unionSeconds: number
+}> {
+  return request(
+    `/dashboard/tempo-por-tags?${query(de, ate, fuso, { tags: tags.join(',') })}`,
+  )
+}

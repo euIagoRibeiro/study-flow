@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   getTimeByContext,
@@ -10,6 +10,8 @@ import BarChart from '../components/BarChart'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
 import { ChevronDownIcon } from '../components/icons'
 import PieChart from '../components/PieChart'
+import TagCompare from '../components/TagCompare'
+import TimeTable from '../components/TimeTable'
 import { formatDuration } from '../dates'
 import {
   barLabel,
@@ -21,8 +23,8 @@ import {
   daysCounted,
   deviceTimeZone,
   formatDiff,
+  chosenTagIds,
   monthName,
-  percent,
   periodAt,
   periodFromParams,
   periodLabel,
@@ -43,6 +45,7 @@ import {
 } from '../styles'
 import { indexTags } from '../tags'
 import type { Phase, Tag, TimeByContext } from '../types'
+import { useFetched } from '../useFetched'
 
 const kindOptions: ChipOption<PeriodKind>[] = [
   { value: 'dia', label: 'Dia' },
@@ -72,138 +75,8 @@ type Detail = {
   phases: PhaseTime[] | null // null = contexto sem fases
   previous: { subtags: TagTime[]; phases: PhaseTime[] }
 }
-type Row = {
-  key: string
-  name: string
-  seconds: number
-  previous?: number // com comparação: o tempo no período anterior
-  dot?: string // classe da cor (legenda); sem ela, linha sem bolinha
-  onOpen?: () => void // contexto: abre o detalhe
-}
-
 // O anterior sem pedido: "até" no começo dele (agora = meia-noite exata)
 const NOTHING = { totalSeconds: 0, items: [] }
-
-// Diferença com o anterior: o sinal e a palavra, o % embaixo
-function Diff(props: { current: number; previous: number }) {
-  const diff = formatDiff(props.current, props.previous)
-  return (
-    <>
-      <span className="block">{diff.text}</span>
-      {diff.percent && (
-        <span className="block text-meta text-tinta-suave">{diff.percent}</span>
-      )}
-    </>
-  )
-}
-
-// Tabela = os números exatos e a legenda dos gráficos (bolinha da cor). Um
-// formato só, em qualquer largura: o % do total embaixo do tempo (com a 4ª
-// coluna, "%" espremia e encostava no tempo em 320px). Com `compare`, a
-// coluna "vs. anterior". Nome quebra dentro da palavra só como último
-// recurso: até 10 caracteres não quebra (sem o mínimo, a tabela encolhia o
-// nome primeiro e partia "Vestibul/ar" em 320px); maior que isso, quebra em
-// vez de empurrar a tabela pra fora da tela. 10 = o que cabe no cartão do
-// detalhe em 320 (com a barra de rolagem clássica), com a bolinha, o tempo e
-// a diferença, e os vãos de 6px (com 8px, faltava 1,4px). O mínimo vai no
-// texto, não na caixa com a bolinha
-function TimeTable(props: {
-  caption: string
-  head: string
-  rows: Row[]
-  compare?: boolean
-}) {
-  const total = props.rows.reduce((sum, row) => sum + row.seconds, 0)
-  return (
-    <table className="w-full text-left">
-      <caption className="sr-only">{props.caption}</caption>
-      <thead className="text-meta text-tinta-suave">
-        <tr>
-          <th scope="col" className="pb-1 font-normal">
-            {props.head}
-          </th>
-          <th scope="col" className="pb-1 text-right font-normal">
-            Tempo
-          </th>
-          {props.compare && (
-            <th scope="col" className="pb-1 pl-1.5 text-right font-normal">
-              vs. anterior
-            </th>
-          )}
-        </tr>
-      </thead>
-      <tbody className="font-dados tabular-nums">
-        {props.rows.map((row) => (
-          <tr key={row.key} className="border-t border-linha">
-            <td className="py-1 pr-1.5 wrap-anywhere">
-              <span className="flex min-h-9 items-center gap-1.5">
-                {row.dot && (
-                  <span
-                    aria-hidden="true"
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${row.dot}`}
-                  />
-                )}
-                {row.onOpen ? (
-                  <button
-                    type="button"
-                    onClick={row.onOpen}
-                    className={`min-w-[10ch] text-left underline decoration-dotted underline-offset-2 ${textButtonClass}`}
-                  >
-                    {row.name}
-                  </button>
-                ) : (
-                  <span className="min-w-[10ch]">{row.name}</span>
-                )}
-              </span>
-            </td>
-            <td className="py-1 text-right whitespace-nowrap">
-              <span className="block">
-                {formatDuration(row.seconds * 1000)}
-              </span>
-              <span className="block text-meta text-tinta-suave">
-                {percent(row.seconds, total)}
-              </span>
-            </td>
-            {props.compare && (
-              <td className="py-1 pl-1.5 text-right">
-                <Diff current={row.seconds} previous={row.previous ?? 0} />
-              </td>
-            )}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-// Busca marcada com a chave do pedido: resposta velha (de outro período, ou
-// que chegou depois da nova) é descartada pela limpeza e pela chave
-function useFetched<T>(key: string | null, load: () => Promise<T>) {
-  const [result, setResult] = useState<{
-    key: string
-    data?: T
-    failed?: boolean
-  } | null>(null)
-  useEffect(() => {
-    if (key === null) return
-    let ignore = false
-    load().then(
-      (data) => {
-        if (!ignore) setResult({ key, data })
-      },
-      (error: unknown) => {
-        console.error(error)
-        if (!ignore) setResult({ key, failed: true })
-      },
-    )
-    return () => {
-      ignore = true
-    }
-    // `load` é uma função nova a cada renderização; a key resume o pedido
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
-  return result?.key === key ? result : null
-}
 
 // Painel: o seletor de período fica no topo, compartilhado; "Tempo" é a
 // primeira seção (medidas e treino entram depois como seções irmãs)
@@ -291,9 +164,25 @@ function PainelPage(props: { tags: Tag[] }) {
     </p>
   )
 
-  // Trocar de período mantém o contexto aberto
+  // Tags escolhidas pra comparar (?tags=), só as que existem, até 5
+  const chosen = chosenTagIds(searchParams.get('tags'), tagsById)
+
+  // A URL do Painel: período + contexto aberto + tags escolhidas
+  function navigate(
+    next: Period,
+    contexto: string | undefined,
+    tags: string[] = chosen,
+  ) {
+    setSearchParams({
+      ...toParams(next),
+      ...(contexto ? { contexto } : {}),
+      ...(tags.length > 0 ? { tags: tags.join(',') } : {}),
+    })
+  }
+
+  // Trocar de período mantém o contexto aberto e as tags escolhidas
   function go(next: Period, contexto = contextTag?.id) {
-    setSearchParams({ ...toParams(next), ...(contexto ? { contexto } : {}) })
+    navigate(next, contexto)
   }
 
   return (
@@ -438,7 +327,7 @@ function PainelPage(props: { tags: Tag[] }) {
                   </h3>
                   <button
                     type="button"
-                    onClick={() => setSearchParams(toParams(period))}
+                    onClick={() => navigate(period, undefined)}
                     className={`shrink-0 text-sm text-tinta-suave ${textButtonClass}`}
                   >
                     Fechar
@@ -532,6 +421,14 @@ function PainelPage(props: { tags: Tag[] }) {
           </>
         )}
       </section>
+
+      <TagCompare
+        tags={props.tags}
+        period={period}
+        zone={zone}
+        chosen={chosen}
+        onChange={(tags) => navigate(period, contextTag?.id, tags)}
+      />
     </div>
   )
 }

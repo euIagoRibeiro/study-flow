@@ -43,8 +43,9 @@ export function recentExerciseIds(
   return ids
 }
 
-// Filtro sem maiúscula nem acento: "triangulo" acha "triângulo"
-function plain(text: string) {
+// Filtro sem maiúscula nem acento: "triangulo" acha "triângulo" (também na
+// busca de tags do Painel)
+export function plain(text: string) {
   return text
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')

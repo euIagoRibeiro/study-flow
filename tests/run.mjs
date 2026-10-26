@@ -18,7 +18,7 @@ const groups = {
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
     ['a3e1.mjs', 'en-US'], 'a3e2.mjs', 'a3f.mjs', 'chips-medida.mjs', 'painel.mjs',
-    'painel-graficos.mjs', 'painel-periodos.mjs', 'painel-comparacao.mjs',
+    'painel-graficos.mjs', 'painel-periodos.mjs', 'painel-comparacao.mjs', 'painel-tags.mjs',
   ],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
