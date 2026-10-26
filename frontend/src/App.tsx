@@ -23,6 +23,7 @@ import type {
   MeasureValue,
   NewTask,
   SavedExecution,
+  StartDraft,
   Tag,
   TagChoice,
   Task,
@@ -191,7 +192,10 @@ function App() {
   // Devolve o id da execução criada, ou null se recusar (nenhum caso deveria
   // acontecer se a UI usar "Retomar" no lugar certo, mas a função não confia
   // só nisso — protege as duas invariantes sozinha)
-  async function startTimer(taskId: string): Promise<string | null> {
+  async function startTimer(
+    taskId: string,
+    draft?: StartDraft,
+  ): Promise<string | null> {
     const anyRunning = timeEntries.some((entry) => entry.endedAt === null)
     // Resposta instantânea; quem garante de verdade é o índice do banco (409)
     if (anyRunning) return null // só um cronômetro por vez
@@ -204,13 +208,17 @@ function App() {
 
     let execution: SavedExecution
     try {
-      execution = await executionsApi.startExecution(taskId)
+      execution = await executionsApi.startExecution(taskId, draft)
     } catch (error) {
       console.error(error)
+      // 400: o servidor recusou o caminho do rascunho com motivo (ex.: tag
+      // arquivada em outra aba)
       setSaveError(
         isConflict(error)
           ? 'Essa tarefa já está em andamento em outro lugar. Recarregue a página.'
-          : 'Não foi possível iniciar o cronômetro. Tente de novo.',
+          : error instanceof ApiError && error.status === 400
+            ? error.message
+            : 'Não foi possível iniciar o cronômetro. Tente de novo.',
       )
       return null
     }

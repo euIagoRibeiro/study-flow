@@ -145,6 +145,11 @@ export type TagChoice = {
   phase: Phase | null
 }
 
+// O que o "Iniciar cronômetro" leva do formulário de baixo, se ele foi
+// mexido: caminho (com fase) e descrição. "Quando", estimativa e medida
+// ficam: são do registro manual
+export type StartDraft = { description: string; tags: TagChoice }
+
 // Editar um registro: tags ausentes = o servidor não mexe nelas (registro
 // antigo com mais de uma folha, salvo sem tocar nas tags)
 export type ExecutionChanges = {

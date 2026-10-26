@@ -4,7 +4,14 @@ import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice } from '../tags'
-import type { Measure, MeasureValue, Phase, Tag, TagChoice } from '../types'
+import type {
+  Measure,
+  MeasureValue,
+  Phase,
+  StartDraft,
+  Tag,
+  TagChoice,
+} from '../types'
 import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import { useMeasure } from '../useMeasure'
 import EstimateField from './EstimateField'
@@ -27,6 +34,9 @@ function ExecutionForm(props: {
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
   ) => Promise<unknown>
+  // A cada mudança no caminho, na fase ou na descrição: o "Iniciar
+  // cronômetro" (fora do formulário) leva o que estiver aqui
+  onDraftChange?: (draft: StartDraft) => void
 }) {
   const [description, setDescription] = useState('')
   // "Quando" começa na hora em que o formulário abriu; sem mexer, grava a
@@ -44,11 +54,34 @@ function ExecutionForm(props: {
   const [submitting, setSubmitting] = useState(false)
   const showPhase = phaseApplies(path, indexTags(props.tags))
 
+  // Avisa com os valores NOVOS (o estado só muda na próxima renderização);
+  // pelos eventos dos campos, sem useEffect. Sem mexer, nada é avisado: o
+  // Iniciar continua como antes
+  function report(nextPath: string[], nextPhase: Phase | null, text: string) {
+    const applies = phaseApplies(nextPath, indexTags(props.tags))
+    props.onDraftChange?.({
+      description: text,
+      tags: pathToChoice(nextPath, applies ? nextPhase : null),
+    })
+  }
+
   // Caminho novo, pré-seleção nova (e os campos da medida do caminho)
   function changePath(next: string[]) {
+    const nextPhase = props.suggestPhase(next)
     setPath(next)
-    setPhase(props.suggestPhase(next))
+    setPhase(nextPhase)
     measure.changePath(next)
+    report(next, nextPhase, description)
+  }
+
+  function changePhase(next: Phase | null) {
+    setPhase(next)
+    report(path, next, description)
+  }
+
+  function changeDescription(text: string) {
+    setDescription(text)
+    report(path, phase, text)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -97,7 +130,7 @@ function ExecutionForm(props: {
         <input
           type="text"
           value={description}
-          onChange={(event) => setDescription(event.target.value)}
+          onChange={(event) => changeDescription(event.target.value)}
           className={fieldClass}
         />
       </label>
@@ -113,7 +146,7 @@ function ExecutionForm(props: {
       </label>
       <EstimateField value={minutes} onChange={setMinutes} />
       <TagFields tags={props.tags} value={path} onChange={changePath} />
-      {showPhase && <PhaseField value={phase} onChange={setPhase} />}
+      {showPhase && <PhaseField value={phase} onChange={changePhase} />}
       <MeasureFields
         measure={measure.measure}
         texts={measure.texts}

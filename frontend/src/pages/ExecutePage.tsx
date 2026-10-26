@@ -24,6 +24,7 @@ import type {
   NewTask,
   Measure,
   MeasureValue,
+  StartDraft,
   Tag,
   TagChoice,
   Task,
@@ -60,7 +61,7 @@ function ExecutePage(props: {
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
   ) => Promise<void>
-  onStartTimer: (taskId: string) => Promise<string | null>
+  onStartTimer: (taskId: string, draft?: StartDraft) => Promise<string | null>
   onStopTimer: (timeEntryId: string) => Promise<void>
   onResumeTimer: (executionId: string) => Promise<string | null>
   onFinishExecution: (
@@ -94,6 +95,13 @@ function ExecutePage(props: {
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
+  // O formulário de baixo, se foi mexido: o "Iniciar cronômetro" leva o
+  // caminho e a descrição dele (antes, descartava tudo em silêncio). Marcado
+  // com a tarefa: o de outra tarefa nunca vai junto
+  const [draft, setDraft] = useState<{
+    taskId: string
+    value: StartDraft
+  } | null>(null)
   // Enquanto o servidor confirma o desfazer: tira a contagem da tela (senão
   // ela poderia expirar e navegar no meio da requisição)
   const [undoing, setUndoing] = useState(false)
@@ -110,6 +118,7 @@ function ExecutePage(props: {
   function selectTask(taskId: string | null) {
     setSelectedTaskId(taskId)
     setPendingUndo(null)
+    setDraft(null)
   }
 
   async function handleCreate(newTask: NewTask) {
@@ -140,8 +149,14 @@ function ExecutePage(props: {
   async function handleStart() {
     if (selectedTask === undefined) return
     setStarting(true)
-    await props.onStartTimer(selectedTask.id)
+    const started = await props.onStartTimer(
+      selectedTask.id,
+      draft?.taskId === selectedTask.id ? draft.value : undefined,
+    )
     setStarting(false)
+    // Foi pro registro: o formulário de baixo volta limpo depois de
+    // finalizar, então o rascunho não pode ir de novo no próximo Iniciar
+    if (started) setDraft(null)
   }
 
   // Capturado antes do await: depois dele, a execução já está finalizada
@@ -438,6 +453,9 @@ function ExecutePage(props: {
             suggestPhase={suggestPhase}
             measures={props.measures}
             onSubmit={handleExecute}
+            onDraftChange={(value) =>
+              setDraft({ taskId: selectedTask.id, value })
+            }
           />
         </>
       )}

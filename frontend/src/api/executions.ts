@@ -2,6 +2,7 @@ import type {
   ExecutionChanges,
   MeasureValue,
   SavedExecution,
+  StartDraft,
   TagChoice,
   TaskExecution,
   WorkoutExercise,
@@ -66,9 +67,18 @@ export function createExecution(
   })
 }
 
-export function startExecution(taskId: string): Promise<SavedExecution> {
-  // aberta: cronômetro rodando
-  return postExecution({ taskId, description: null, completedAt: null })
+// Aberta: cronômetro rodando. Com rascunho, já nasce com o caminho e a
+// descrição do formulário de baixo (a seção Treino aparece na hora)
+export function startExecution(
+  taskId: string,
+  draft?: StartDraft,
+): Promise<SavedExecution> {
+  return postExecution({
+    taskId,
+    description: draft?.description ? draft.description : null,
+    completedAt: null,
+    ...draft?.tags,
+  })
 }
 
 // measureValues undefined = não mexer na medida (o servidor mantém)
