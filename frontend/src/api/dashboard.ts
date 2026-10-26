@@ -49,12 +49,12 @@ export function getTimeByPhase(
   )
 }
 
-// Faixas de 1 dia (semana) ou 1 semana (mês), no fuso
+// Faixas de 1 dia (semana), 1 semana (mês) ou 1 mês (ano), no fuso
 export function getTimeByPeriod(
   de: Date,
   ate: Date,
   fuso: string,
-  por: 'dia' | 'semana',
+  por: 'dia' | 'semana' | 'mes',
 ): Promise<{ items: { start: string; seconds: number }[] }> {
   return request(
     `/dashboard/tempo-por-periodo?${query(de, ate, fuso, { por })}`,

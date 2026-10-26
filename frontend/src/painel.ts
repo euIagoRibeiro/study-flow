@@ -1,8 +1,10 @@
-// Período do Painel: semana (segunda a domingo) ou mês, no fuso do aparelho.
+// Período do Painel: dia, semana (segunda a domingo), mês ou ano, no fuso do
+// aparelho.
 // A API só recebe instantes (de, ate) + o fuso: quem sabe o que é "semana" é
 // a tela. Datas aqui são sempre Date LOCAIS à meia-noite
 
-export type PeriodKind = 'semana' | 'mes'
+export type PeriodKind = 'dia' | 'semana' | 'mes' | 'ano'
+const KINDS: PeriodKind[] = ['dia', 'semana', 'mes', 'ano']
 export type Period = { kind: PeriodKind; start: Date; end: Date } // [start, end)
 
 // O fuso do aparelho, o mesmo que as datas locais usam
@@ -12,7 +14,9 @@ export function deviceTimeZone(): string {
 
 function startOf(kind: PeriodKind, day: Date): Date {
   const d = new Date(day.getFullYear(), day.getMonth(), day.getDate())
+  if (kind === 'dia') return d
   if (kind === 'mes') return new Date(d.getFullYear(), d.getMonth(), 1)
+  if (kind === 'ano') return new Date(d.getFullYear(), 0, 1)
   // getDay: 0 = domingo; a semana começa na segunda (ISO)
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
   return d
@@ -21,9 +25,16 @@ function startOf(kind: PeriodKind, day: Date): Date {
 // new Date(ano, mês, dia + n) e não + n × 24h: o dia local pode ter 23 ou
 // 25 horas em fuso com horário de verão
 function endOf(kind: PeriodKind, start: Date): Date {
-  return kind === 'mes'
-    ? new Date(start.getFullYear(), start.getMonth() + 1, 1)
-    : new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)
+  return shiftStart(kind, start, 1)
+}
+
+// O começo do período n tipos depois (ou antes, com n negativo)
+function shiftStart(kind: PeriodKind, start: Date, n: number): Date {
+  const [y, m, d] = [start.getFullYear(), start.getMonth(), start.getDate()]
+  if (kind === 'dia') return new Date(y, m, d + n)
+  if (kind === 'semana') return new Date(y, m, d + 7 * n)
+  if (kind === 'mes') return new Date(y, m + n, 1)
+  return new Date(y + n, 0, 1)
 }
 
 export function periodAt(kind: PeriodKind, day: Date): Period {
@@ -31,11 +42,11 @@ export function periodAt(kind: PeriodKind, day: Date): Period {
   return { kind, start, end: endOf(kind, start) }
 }
 
-// Da URL (?periodo=semana|mes&inicio=AAAA-MM-DD). Inválido ou ausente: a
+// Da URL (?periodo=dia|semana|mes|ano&inicio=AAAA-MM-DD). Inválido ou ausente: a
 // semana de hoje. Um início no meio do período cai no começo dele
 export function periodFromParams(params: URLSearchParams, today: Date): Period {
   const raw = params.get('periodo')
-  const kind = raw === 'semana' || raw === 'mes' ? raw : null
+  const kind = KINDS.find((k) => k === raw) ?? null
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(params.get('inicio') ?? '')
   if (!kind || !match) return periodAt('semana', today)
   const month = Number(match[2]) - 1
@@ -51,23 +62,29 @@ export function toParams(period: Period): Record<string, string> {
   return { periodo: period.kind, inicio: ymd }
 }
 
-// Anterior/próximo: −1/+1 semana ou mês
+// Anterior/próximo: −1/+1 dia, semana, mês ou ano
 export function shift(period: Period, direction: 1 | -1): Period {
-  const s = period.start
-  const day =
-    period.kind === 'mes'
-      ? new Date(s.getFullYear(), s.getMonth() + direction, 1)
-      : new Date(s.getFullYear(), s.getMonth(), s.getDate() + 7 * direction)
-  return periodAt(period.kind, day)
+  return periodAt(period.kind, shiftStart(period.kind, period.start, direction))
 }
 
 export function contains(period: Period, moment: Date): boolean {
   return moment >= period.start && moment < period.end
 }
 
-// "19 – 25 de out.", "29 de set. – 5 de out.", "outubro de 2026"; o ano só
-// aparece na semana quando não é o de hoje
+// "seg., 26 de out.", "19 – 25 de out.", "29 de set. – 5 de out.", "outubro
+// de 2026", "2026"; o ano só aparece no dia e na semana quando não é o de hoje
 export function periodLabel(period: Period, today: Date): string {
+  if (period.kind === 'ano') return String(period.start.getFullYear())
+  if (period.kind === 'dia') {
+    return period.start.toLocaleDateString('pt-BR', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      ...(period.start.getFullYear() === today.getFullYear()
+        ? {}
+        : { year: 'numeric' as const }),
+    })
+  }
   if (period.kind === 'mes') {
     return period.start.toLocaleDateString('pt-BR', {
       month: 'long',
@@ -133,11 +150,51 @@ export function toSlices(items: { seconds: number }[]) {
 }
 
 const WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
+const MONTHS = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+]
 
-// Rótulo de cada barra: o dia da semana (na semana) ou "dd/mm" do início da
-// semana (no mês). start = 'AAAA-MM-DD' da API
+// Rótulo de cada barra: o dia da semana (na semana), "dd/mm" do início da
+// semana (no mês) ou o mês (no ano). start = 'AAAA-MM-DD' da API
 export function barLabel(kind: PeriodKind, start: string, index: number) {
-  return kind === 'semana'
-    ? WEEKDAYS[index]
-    : `${start.slice(8)}/${start.slice(5, 7)}`
+  if (kind === 'semana') return WEEKDAYS[index]
+  if (kind === 'ano') return MONTHS[Number(start.slice(5, 7)) - 1]
+  return `${start.slice(8)}/${start.slice(5, 7)}`
 }
+
+// Nome do mês por extenso (tabela do ano), da faixa 'AAAA-MM-DD' da API
+export function monthName(start: string): string {
+  return new Date(
+    Number(start.slice(0, 4)),
+    Number(start.slice(5, 7)) - 1,
+    1,
+  ).toLocaleDateString('pt-BR', { month: 'long' })
+}
+
+// As faixas das barras: dia na semana, semana no mês, mês no ano; o dia não
+// tem barras
+export const barsBy = {
+  dia: null,
+  semana: 'dia',
+  mes: 'semana',
+  ano: 'mes',
+} as const
+
+// "neste dia", "nesta semana"…: o fim das frases de período vazio
+export const periodNoun = {
+  dia: 'neste dia',
+  semana: 'nesta semana',
+  mes: 'neste mês',
+  ano: 'neste ano',
+} as const

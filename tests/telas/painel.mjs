@@ -100,6 +100,13 @@ try {
   const mon = mondayOf(todayYmd)
   const sun = addDays(mon, 6)
   const sem = await apiFor(mon, addDays(mon, 7))
+  // A semana atual tem a sessão rodando do seed: o total cresce enquanto a
+  // bateria roda. Comparar com a API de AGORA (a tela buscou um instante antes:
+  // aceita também o minuto anterior), não com a de lá do começo
+  const currentWeek = async () => {
+    const t = (await apiFor(mon, addDays(mon, 7))).totalSeconds
+    return [duration(t), duration(t - 60)]
+  }
   check('padrão: semana atual, de segunda a domingo', s.period?.includes(String(Number(mon.slice(8)))) && s.period?.includes(String(Number(sun.slice(8)))), `${s.period} (${mon}..${sun})`)
   matches('semana atual', s, sem)
   const req = requests.at(-1)
@@ -125,7 +132,7 @@ try {
   check('semana anterior: sem aviso de rodando', !s.text.includes('rodando'))
   await page.goBack({ waitUntil: 'networkidle0' })
   s = await settle()
-  check('voltar do navegador volta pra semana atual', s.url === '/painel' && s.total === duration(sem.totalSeconds), `${s.url} ${s.total}`)
+  check('voltar do navegador volta pra semana atual', s.url === '/painel' && (await currentWeek()).includes(s.total), `${s.url} ${s.total}`)
 
   // ---- mês
   await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Mês').click())
@@ -150,7 +157,7 @@ try {
   check('período sem tempo: "Nenhum tempo dedicado nesta semana."', s.text.includes('Nenhum tempo dedicado nesta semana.') && s.rows.length === 0, s.text.slice(0, 120))
   await page.goto(`${APP}/painel?periodo=quinzena&inicio=ontem`, { waitUntil: 'networkidle0' })
   s = await settle()
-  check('URL inválida: cai na semana atual', s.total === duration(sem.totalSeconds), `${s.url} ${s.total}`)
+  check('URL inválida: cai na semana atual', (await currentWeek()).includes(s.total), `${s.url} ${s.total}`)
   await page.goto(`${APP}/painel?periodo=semana&inicio=2025-03-26`, { waitUntil: 'networkidle0' })
   s = await settle()
   const r2 = requests.at(-1)
@@ -176,7 +183,7 @@ try {
   failing = false
   await page.evaluate(() => [...document.querySelector('section[aria-label="Tempo"]').querySelectorAll('button')].find((b) => b.textContent.trim() === 'Tentar de novo').click())
   s = await settle()
-  check('Tentar de novo carrega', s.total === duration(sem.totalSeconds), `${s.total}`)
+  check('Tentar de novo carrega', (await currentWeek()).includes(s.total), `${s.total}`)
 } catch (err) {
   check('rodou sem erro', false, err.message)
 } finally {

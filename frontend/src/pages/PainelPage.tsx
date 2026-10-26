@@ -13,13 +13,16 @@ import PieChart from '../components/PieChart'
 import { formatDuration } from '../dates'
 import {
   barLabel,
+  barsBy,
   categoryAt,
   contains,
   deviceTimeZone,
+  monthName,
   percent,
   periodAt,
   periodFromParams,
   periodLabel,
+  periodNoun,
   shift,
   toParams,
   toSlices,
@@ -36,13 +39,23 @@ import { indexTags } from '../tags'
 import type { Phase, Tag, TimeByContext } from '../types'
 
 const kindOptions: ChipOption<PeriodKind>[] = [
+  { value: 'dia', label: 'Dia' },
   { value: 'semana', label: 'Semana' },
   { value: 'mes', label: 'Mês' },
+  { value: 'ano', label: 'Ano' },
 ]
+
+// O dia não tem barras (barsBy.dia = null)
+const barsTitle = {
+  dia: '',
+  semana: 'Por dia',
+  mes: 'Por semana',
+  ano: 'Por mês',
+}
 
 type Overview = {
   context: TimeByContext
-  period: { start: string; seconds: number }[]
+  period: { start: string; seconds: number }[] | null // null = dia, sem barras
 }
 type Detail = {
   subtags: { tagId: string | null; seconds: number }[]
@@ -154,16 +167,12 @@ function PainelPage(props: { tags: Tag[] }) {
   const base = `${period.start.toISOString()}|${period.end.toISOString()}|${zone}|${attempt}`
 
   const overview = useFetched<Overview>(base, async () => {
+    const by = barsBy[period.kind]
     const [context, byPeriod] = await Promise.all([
       getTimeByContext(period.start, period.end, zone),
-      getTimeByPeriod(
-        period.start,
-        period.end,
-        zone,
-        period.kind === 'semana' ? 'dia' : 'semana',
-      ),
+      by ? getTimeByPeriod(period.start, period.end, zone, by) : null,
     ])
-    return { context, period: byPeriod.items }
+    return { context, period: byPeriod?.items ?? null }
   })
 
   // Detalhe de um contexto (?contexto=), na mesma página: só raiz que existe
@@ -189,7 +198,7 @@ function PainelPage(props: { tags: Tag[] }) {
   const data = overview?.data
   const nameOf = (tagId: string | null, none: string) =>
     tagId === null ? none : (tagsById.get(tagId)?.name ?? 'Tag removida')
-  const noun = period.kind === 'mes' ? 'neste mês' : 'nesta semana'
+  const noun = periodNoun[period.kind]
 
   // Trocar de período mantém o contexto aberto
   function go(next: Period, contexto = contextTag?.id) {
@@ -203,8 +212,8 @@ function PainelPage(props: { tags: Tag[] }) {
           label="Período"
           options={kindOptions}
           value={period.kind}
-          // Trocar semana ↔ mês: no período de hoje, vai pro de hoje; num
-          // período passado, pro que contém o começo dele
+          // Trocar o tipo: no período de hoje, vai pro de hoje; num período
+          // passado, pro que contém o começo dele
           onChange={(kind) =>
             go(periodAt(kind, isCurrent ? today : period.start))
           }
@@ -371,17 +380,34 @@ function PainelPage(props: { tags: Tag[] }) {
               </section>
             )}
 
-            <h3 className="mt-2 font-titulo text-base font-semibold">
-              {period.kind === 'semana' ? 'Por dia' : 'Por semana'}
-            </h3>
-            <BarChart
-              label={`Barras do tempo ${period.kind === 'semana' ? 'por dia' : 'por semana'} (o valor está escrito em cima de cada barra)`}
-              bars={data.period.map((item, i) => ({
-                value: item.seconds,
-                valueLabel: formatDuration(item.seconds * 1000),
-                label: barLabel(period.kind, item.start, i),
-              }))}
-            />
+            {data.period && (
+              <>
+                <h3 className="mt-2 font-titulo text-base font-semibold">
+                  {barsTitle[period.kind]}
+                </h3>
+                {/* No ano, 12 barras: sem o valor em cima, a tabela dá o número */}
+                <BarChart
+                  label={`Barras do tempo ${barsTitle[period.kind].toLowerCase()} (${period.kind === 'ano' ? 'os números estão na tabela abaixo' : 'o valor está escrito em cima de cada barra'})`}
+                  hideValues={period.kind === 'ano'}
+                  bars={data.period.map((item, i) => ({
+                    value: item.seconds,
+                    valueLabel: formatDuration(item.seconds * 1000),
+                    label: barLabel(period.kind, item.start, i),
+                  }))}
+                />
+                {period.kind === 'ano' && (
+                  <TimeTable
+                    caption="Tempo dedicado por mês"
+                    head="Mês"
+                    rows={data.period.map((item) => ({
+                      key: item.start,
+                      name: monthName(item.start),
+                      seconds: item.seconds,
+                    }))}
+                  />
+                )}
+              </>
+            )}
           </>
         )}
       </section>

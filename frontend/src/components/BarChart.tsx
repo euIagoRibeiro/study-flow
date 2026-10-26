@@ -1,6 +1,7 @@
 // Barras em SVG à mão: tempo de cada faixa do período (dia na semana,
-// semana no mês). Uma cor só, neutra (tinta-suave, ≥ 6:1 com o fundo): a
-// barra diz "quanto", não "o quê". O valor vai escrito em cima de cada barra
+// semana no mês, mês no ano). Uma cor só, neutra (tinta-suave, ≥ 6:1 com o
+// fundo): a barra diz "quanto", não "o quê". O valor vai escrito em cima de
+// cada barra, ou na tabela ao lado (hideValues: 12 barras não cabem o valor)
 export type Bar = { value: number; valueLabel: string; label: string }
 
 const WIDTH = 300
@@ -8,7 +9,7 @@ const HEIGHT = 150
 const TOP = 18 // espaço do valor em cima da barra mais alta
 const BOTTOM = 18 // espaço do rótulo embaixo
 
-function BarChart(props: { bars: Bar[]; label: string }) {
+function BarChart(props: { bars: Bar[]; label: string; hideValues?: boolean }) {
   const max = Math.max(...props.bars.map((b) => b.value), 1)
   const slot = WIDTH / props.bars.length
   const barWidth = Math.min(slot * 0.62, 36)
@@ -46,7 +47,7 @@ function BarChart(props: { bars: Bar[]; label: string }) {
               rx={2}
               className="fill-tinta-suave"
             />
-            {bar.value > 0 && (
+            {bar.value > 0 && !props.hideValues && (
               <text
                 x={center}
                 y={y - 5}

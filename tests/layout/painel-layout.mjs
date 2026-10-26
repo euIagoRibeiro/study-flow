@@ -1,5 +1,6 @@
-// D4: layout do Painel em 4 estados (semana atual, mês, detalhe de Código
-// aberto numa semana passada, período vazio) × 8 larguras, janela real.
+// D4: layout do Painel em 6 estados (semana atual, mês, detalhe de Código
+// aberto numa semana passada, período vazio; D5b: dia de hoje, ano atual com
+// 12 barras e a tabela mês a mês) × 8 larguras, janela real.
 // Confere: sem rolagem lateral, nada fora da coluna, rótulos dos gráficos
 // dentro do desenho (texto fora do viewBox some cortado), tabela sem
 // estourar, fonte dos gráficos ≥ 9px e folga do anel de foco.
@@ -18,6 +19,8 @@ const states = {
   mes: '/painel?periodo=mes&inicio=' + ymd(new Date()).slice(0, 8) + '01',
   detalhe: `/painel?periodo=semana&inicio=${ymd(monday)}&contexto=${codigo}`,
   vazio: '/painel?periodo=semana&inicio=2025-01-06',
+  dia: '/painel?periodo=dia&inicio=' + ymd(new Date()),
+  ano: `/painel?periodo=ano&inicio=${new Date().getFullYear()}-01-01`,
 }
 const widths = [320, 360, 375, 414, 640, 768, 1024, 1280]
 
@@ -79,9 +82,10 @@ try {
       const tight = m.gaps.filter((g) => g.min < 4)
       check(tight.length === 0, `${tag}: foco com folga < 4px ${JSON.stringify(tight.slice(0, 3))}`)
       // O estado esperado montou (bateria que não mede nada tem que falhar)
-      const expected = { semana: 2, mes: 2, detalhe: 3, vazio: 0 }[name]
+      const expected = { semana: 2, mes: 2, detalhe: 3, vazio: 0, dia: 1, ano: 2 }[name]
       check(m.svgs.length === expected, `${tag}: ${m.svgs.length} gráficos (esperado ${expected})`)
       if (name === 'vazio') check(m.text.includes('Nenhum tempo dedicado'), `${tag}: estado vazio não montou`)
+      if (name === 'ano') check(m.tables.length === 2, `${tag}: ${m.tables.length} tabelas (esperado: contexto + meses)`)
       if (width === 320 || (width === 1280 && name === 'detalhe')) {
         await page.screenshot({ path: out(`painel-${name}-${width}.png`), fullPage: true })
       }
