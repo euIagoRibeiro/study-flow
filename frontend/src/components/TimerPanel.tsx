@@ -25,6 +25,12 @@ import type {
   TimeEntry,
   WorkoutExercise,
 } from '../types'
+import {
+  clearTimerMemory,
+  isChoosablePath,
+  readTimerMemory,
+  writeTimerMemory,
+} from '../timerMemory'
 import { useMeasure } from '../useMeasure'
 import { useWorkoutSync, type WorkoutTarget } from '../useWorkoutSync'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
@@ -67,22 +73,59 @@ function TimerPanel(props: {
   // Desestruturado: runningEntry como const local permite o TypeScript
   // estreitar o tipo dentro dos closures dos botões, sem precisar de "!"
   const { execution, entries, runningEntry, onStop, onResume, onFinish } = props
-  const [description, setDescription] = useState(execution.description ?? '')
-  const [selection, setSelection] = useState(props.initial)
-  // Voltou pelo Desfazer: começa na fase que tinha
-  const [phase, setPhase] = useState(
-    () => execution.phase ?? props.suggestPhase(props.initial.path),
-  )
   const tagsById = indexTags(props.tags)
+  // Treino ao vivo: o caminho GRAVADO (o servidor) pode ficar diferente do
+  // da tela até o 1º exercício
+  const serverPathKey = executionSelection(execution, tagsById).path.join('/')
+  // A escolha feita no painel antes de sair (ou recarregar), se ainda vale:
+  // o caminho só se o servidor não mudou desde então (o 1º exercício grava
+  // o dele) e as tags existem ativas; a descrição, se a do servidor é a mesma
+  const [remembered] = useState(() => {
+    const memory = readTimerMemory(execution.id)
+    if (!memory) return null
+    return {
+      path:
+        memory.base === serverPathKey && isChoosablePath(memory.path, tagsById)
+          ? memory
+          : null,
+      description:
+        memory.descriptionBase === (execution.description ?? null)
+          ? memory.description
+          : null,
+    }
+  })
+  const [description, setDescription] = useState(
+    remembered?.description ?? execution.description ?? '',
+  )
+  const [selection, setSelection] = useState<TagSelection>(
+    remembered?.path
+      ? { path: remembered.path.path, legacyCount: 0 }
+      : props.initial,
+  )
+  // Voltou pelo Desfazer: começa na fase que tinha
+  const [phase, setPhase] = useState(() =>
+    remembered?.path
+      ? remembered.path.phase
+      : (execution.phase ?? props.suggestPhase(props.initial.path)),
+  )
   const showPhase = phaseApplies(selection.path, tagsById)
+
+  // Guarda o que está na tela agora (com o que o servidor tinha), a cada
+  // mudança feita aqui: sair e voltar não perde a escolha
+  function remember(path: string[], phaseValue: Phase | null, text: string) {
+    writeTimerMemory(execution.id, {
+      base: serverPathKey,
+      path,
+      phase: phaseValue,
+      descriptionBase: execution.description ?? null,
+      description: text,
+    })
+  }
   // Voltou pelo Desfazer com medida: os campos começam nos valores dela
   // A medida do registro como estava ao abrir: a gravação do caminho (treino
   // ao vivo) pode tirá-la do servidor, e voltar o caminho tem que trazê-la
   const [openedMeasure] = useState(execution.measure)
   const measure = useMeasure(selection.path, props.measures, openedMeasure)
-  // Treino ao vivo: o caminho GRAVADO (o servidor) pode ficar diferente do
-  // da tela até o 1º exercício
-  const serverPathKey = executionSelection(execution, tagsById).path.join('/')
   const [mountedPathKey] = useState(serverPathKey)
   const targetFor = (path: string[], phaseValue: Phase | null) =>
     ({
@@ -162,6 +205,8 @@ function TimerPanel(props: {
           : pathToChoice(selection.path, showPhase ? phase : null),
         sent.values,
       )
+      // Gravado: a escolha da tela não tem mais o que guardar
+      clearTimerMemory(execution.id)
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 400
@@ -234,7 +279,10 @@ function TimerPanel(props: {
             <input
               type="text"
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(event) => {
+                setDescription(event.target.value)
+                remember(selection.path, phase, event.target.value)
+              }}
               className={fieldClass}
             />
           </label>
@@ -247,6 +295,7 @@ function TimerPanel(props: {
               setPhase(nextPhase)
               measure.changePath(path)
               workout.retarget(targetFor(path, nextPhase))
+              remember(path, nextPhase, description)
             }}
             keep={[
               ...(execution.rootTagId ? [execution.rootTagId] : []),
@@ -254,7 +303,15 @@ function TimerPanel(props: {
             ]}
             legacyCount={selection.legacyCount}
           />
-          {showPhase && <PhaseField value={phase} onChange={setPhase} />}
+          {showPhase && (
+            <PhaseField
+              value={phase}
+              onChange={(next) => {
+                setPhase(next)
+                remember(selection.path, next, description)
+              }}
+            />
+          )}
           <MeasureFields
             measure={measure.measure}
             texts={measure.texts}
