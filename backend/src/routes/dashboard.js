@@ -37,6 +37,25 @@ const contextSchema = z.object({
     .refine(isUuid, 'contexto precisa ser um uuid'),
 })
 
+// Tags escolhidas livremente (Painel v2): de 1 a 5, de qualquer nível,
+// separadas por vírgula, sem repetir
+const MAX_TAGS = 5
+const tagsSchema = z.object({
+  tags: z
+    .string('tags é obrigatório (ids separados por vírgula)')
+    .transform((raw) => (raw === '' ? [] : raw.split(',')))
+    .refine(
+      (ids) => ids.length > 0,
+      'tags é obrigatório (ids separados por vírgula)',
+    )
+    .refine((ids) => ids.every(isUuid), 'tags precisa ser uma lista de uuids')
+    .refine((ids) => ids.length <= MAX_TAGS, `No máximo ${MAX_TAGS} tags`)
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      'tags tem uma tag repetida',
+    ),
+})
+
 const periodBySchema = z.object({
   por: z.enum(['dia', 'semana', 'mes'], 'por precisa ser dia, semana ou mes'),
 })
@@ -235,4 +254,53 @@ dashboardRouter.get('/tempo-por-periodo', async (req, res) => {
     [period.de, period.ate, period.fuso, unitOf[data.por]],
   )
   res.json({ items: items.rows })
+})
+
+// Por tags escolhidas (qualquer nível; arquivada também: é histórico). Tempo
+// sob cada uma: nível 1 pela raiz do registro (exato, como por contexto);
+// nível 2/3 pela subárvore (t.id = X OR t.parent_id = X OR p.parent_id = X),
+// NÃO só pelo fechamento gravado (quem grava o pai é a API, o banco não
+// garante). DISTINCT por (tag, sessão): o mesmo registro chega por duas
+// ligações. A união conta cada sessão UMA vez: tags aninhadas (Vestibular e
+// Vestibular › Matemática) não somam. Itens na ordem pedida, com 0 se a tag
+// não tem tempo. Prototipada no D7-0 (tests/banco/tags-cases.sql)
+dashboardRouter.get('/tempo-por-tags', async (req, res) => {
+  const period = await readPeriod(req, res)
+  if (!period) return
+  const { error, data } = validate(tagsSchema, req.query)
+  if (error) return res.status(400).json({ error })
+  const found = await pool.query(
+    'SELECT id FROM tags WHERE id = ANY ($1::uuid[])',
+    [data.tags],
+  )
+  if (found.rowCount !== data.tags.length) {
+    return res.status(404).json({ error: 'Tag não encontrada' })
+  }
+  const result = await pool.query(
+    `WITH ${RECORTE},
+     escolhidas AS (SELECT id, level FROM tags WHERE id = ANY ($3::uuid[])),
+     sob AS (
+       SELECT n.id AS tag, r.sessao, r.ini, r.fim
+       FROM recorte r
+       JOIN task_executions e ON e.id = r.execucao
+       JOIN escolhidas n ON n.level = 1 AND e.root_tag_id = n.id
+       UNION
+       SELECT DISTINCT n.id, r.sessao, r.ini, r.fim
+       FROM recorte r
+       JOIN task_execution_tags et ON et.task_execution_id = r.execucao
+       JOIN tags t ON t.id = et.tag_id
+       LEFT JOIN tags p ON p.id = t.parent_id
+       JOIN escolhidas n ON n.level > 1
+         AND (t.id = n.id OR t.parent_id = n.id OR p.parent_id = n.id)
+     )
+     SELECT
+       (SELECT json_agg(json_build_object('tagId', n.id, 'seconds', ${seconds(
+         "COALESCE((SELECT sum(s.fim - s.ini) FROM sob s WHERE s.tag = n.id), interval '0')",
+       )}) ORDER BY array_position($3::uuid[], n.id))
+        FROM escolhidas n) AS items,
+       (SELECT ${seconds("COALESCE(sum(u.fim - u.ini), interval '0')")}
+        FROM (SELECT DISTINCT sessao, ini, fim FROM sob) u) AS "unionSeconds"`,
+    [period.de, period.ate, data.tags],
+  )
+  res.json(result.rows[0])
 })

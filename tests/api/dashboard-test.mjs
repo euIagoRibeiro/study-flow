@@ -1,4 +1,4 @@
-// D2: as 4 rotas de tempo do Dashboard. Dados próprios em março de 2025 (os
+// D2: as 4 rotas de tempo do Dashboard (D5a: por=mes; D7a: tempo-por-tags). Dados próprios em março de 2025 (os
 // do D-0, sem a sessão rodando: o índice "uma rodando no app" não deixa
 // outra com a do seed aberta), inseridos no banco e apagados no finally.
 // A rodando é testada com a do seed; e uma janela do seed (semanas 7–12,
@@ -13,9 +13,11 @@ const FUSO = 'America/Sao_Paulo'
 const A = '00000000-0000-4000-a0d0-00000000000a', B = '00000000-0000-4000-a0d0-00000000000b'
 const A1 = '00000000-0000-4000-a0d0-0000000000a1', A2 = '00000000-0000-4000-a0d0-0000000000a2'
 const B1 = '00000000-0000-4000-a0d0-0000000000b1', A11 = '00000000-0000-4000-a0d0-000000000a11'
+const B2 = '00000000-0000-4000-a0d0-0000000000b2' // arquivada (D7a)
 const TASK = '00000000-0000-4000-a0d0-000000000001'
 const VESTIBULAR = '5eed0000-0000-4000-9000-000000000100'
 const MATEMATICA = '5eed0000-0000-4000-9000-000000000110', FISICA = '5eed0000-0000-4000-9000-000000000120'
+const MATEMATICA_RAIZ = '5eed0000-0000-4000-9000-000000000200'
 const id = (n) => `00000000-0000-4000-a0d1-${String(n).padStart(12, '0')}`
 // Hora local de Brasília (-03, sem horário de verão desde 2019) → instante
 const local = (t) => new Date(`${t.replace(' ', 'T')}:00-03:00`).toISOString()
@@ -72,6 +74,12 @@ try {
   await reg(8, B, null); await sess(8, '2025-03-31 23:00', '2025-04-01 01:00')
   await reg(10, B, null); await sess(10, '2025-03-03 19:00', '2025-03-03 20:00')
   await reg(11, B, null); await sess(11, '2025-02-28 23:00', '2025-03-01 01:00')
+  // D7a, numa semana de 2023 que nada mais confere: registro SÓ com a ligação
+  // de nível 3, sem o pai (o banco aceita; a rota não pode depender do
+  // fechamento), e uma tag arquivada usada
+  await pool.query(`INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES ($1, 'B2 arquivada', 2, $2, $2, false)`, [B2, B])
+  await reg(12, A, null, [[A11, A1]]); await sess(12, '2023-06-12 10:00', '2023-06-12 10:10')
+  await reg(13, B, null, [[B2, B]]); await sess(13, '2023-06-13 10:00', '2023-06-13 10:20')
 
   const semana = { de: local('2025-03-24 00:00'), ate: local('2025-03-31 00:00'), fuso: FUSO }
   const marco = { de: local('2025-03-01 00:00'), ate: local('2025-04-01 00:00'), fuso: FUSO }
@@ -91,6 +99,13 @@ try {
   await bad('fase em contexto sem fases: 400', 'tempo-por-fase', { ...semana, contexto: B }, 'fases')
   await bad('período sem "por": 400', 'tempo-por-periodo', semana, 'por')
   await bad('período com "por=ano": 400 (dia, semana ou mês)', 'tempo-por-periodo', { ...semana, por: 'ano' }, 'por')
+  await bad('tags ausente: 400', 'tempo-por-tags', semana, 'tags')
+  await bad('tags vazio: 400', 'tempo-por-tags', { ...semana, tags: '' }, 'tags')
+  await bad('tags com algo que não é uuid: 400', 'tempo-por-tags', { ...semana, tags: `${A},xyz` }, 'tags')
+  await bad('tags repetida: 400', 'tempo-por-tags', { ...semana, tags: `${A},${A1},${A}` }, 'repet')
+  await bad('6 tags: 400 (no máximo 5)', 'tempo-por-tags', { ...semana, tags: [A, B, A1, A2, B1, A11].join(',') }, '5')
+  const nt = await get('tempo-por-tags', { ...semana, tags: `${A},00000000-0000-4000-a0d0-0000000000ff` })
+  check('tags com uma que não existe: 404', nt.status === 404, `${nt.status} ${JSON.stringify(nt.body)}`)
   const nf = await get('tempo-por-subtag', { ...semana, contexto: '00000000-0000-4000-a0d0-0000000000ff' })
   check('contexto que não existe: 404', nf.status === 404, `${nf.status}`)
 
@@ -118,6 +133,31 @@ try {
   check('março por semana (segunda): 24/02=60 03/03=60 10/03=0 17/03=60 24/03=465 31/03=90', weeks === '24/02=60 03/03=60 10/03=0 17/03=60 24/03=465 31/03=90', weeks)
   r = await get('tempo-por-contexto', marco)
   check('março: total 735 (bordas do mês recortadas)', min(r.body.totalSeconds ?? -1) === 735, JSON.stringify(r.body.totalSeconds))
+
+  // ---- tempo por tags (D7a): a conta da semana (sem a rodando)
+  // A: 1 (A1+A11) 90, 2 (A1) 120, 3 60, 6 (A2) 60 dentro = 330; A1 = 210;
+  // A11 = 90; A2 = 60; B = 90 (4 B1 60 + 7 30 dentro); B1 = 60
+  const tagsOf = (body) => (body?.items ?? []).map((x) => `${short(x.tagId)}=${min(x.seconds)}`).join(' ')
+  r = await get('tempo-por-tags', { ...semana, tags: `${A11},${B1}` })
+  check('tags de raízes diferentes (as "duas Álgebras"): A11 90, B1 60, na ordem pedida', r.status === 200 && tagsOf(r.body) === '11=90 b1=60', `${r.status} ${JSON.stringify(r.body)}`)
+  check('tags de raízes diferentes: união 150 = soma', min(r.body?.unionSeconds ?? -1) === 150, JSON.stringify(r.body?.unionSeconds))
+  r = await get('tempo-por-tags', { ...semana, tags: `${B1},${A}` })
+  check('ordem dos itens = ordem pedida (B1 antes de A)', tagsOf(r.body) === 'b1=60 0a=330', tagsOf(r.body))
+  r = await get('tempo-por-tags', { ...semana, tags: `${A},${A1}` })
+  check('aninhadas (A e A1): cada uma certa, A 330 e A1 210 (o registro com A1 e A11 conta UMA vez)', tagsOf(r.body) === '0a=330 a1=210', tagsOf(r.body))
+  check('aninhadas: união 330, não 540', min(r.body?.unionSeconds ?? -1) === 330, JSON.stringify(r.body?.unionSeconds))
+  r = await get('tempo-por-tags', { ...semana, tags: `${A},${B}` })
+  const ctx = await get('tempo-por-contexto', semana)
+  check('contexto escolhido = a regra exata por contexto (A 330, B 90)', tagsOf(r.body) === '0a=330 0b=90' &&
+    ctx.body.items.find((x) => x.tagId === A)?.seconds === r.body.items[0].seconds, tagsOf(r.body))
+  r = await get('tempo-por-tags', { ...semana, ate: local('2025-03-25 12:00'), tags: `${A},${A1}` })
+  check('"até" ter 12:00: A 150 (1 e o pedaço da 6), A1 90', tagsOf(r.body) === '0a=150 a1=90', tagsOf(r.body))
+  const junho23 = { de: local('2023-06-12 00:00'), ate: local('2023-06-19 00:00'), fuso: FUSO }
+  r = await get('tempo-por-tags', { ...junho23, tags: `${A1},${A11}` })
+  check('registro SÓ com o nível 3 (sem o pai gravado): conta no pai, A1 10 e A11 10', tagsOf(r.body) === 'a1=10 11=10', tagsOf(r.body))
+  r = await get('tempo-por-tags', { ...junho23, tags: `${B2},${A2}` })
+  check('tag arquivada aceita (B2 20); escolhida sem tempo aparece com 0 (A2)', r.status === 200 && tagsOf(r.body) === 'b2=20 a2=0', `${r.status} ${tagsOf(r.body)}`)
+  check('união de B2 e A2 = 20', min(r.body?.unionSeconds ?? -1) === 20, JSON.stringify(r.body?.unionSeconds))
 
   // ---- ano por mês (D5a): faixas de 1 mês no fuso. A 11 (28/02 23:00 → 01/03
   // 01:00) divide entre fevereiro e março; a 8 (31/03 23:00 → 01/04 01:00),
@@ -159,6 +199,15 @@ try {
   r = await get('tempo-por-subtag', { de: minus(12), ate: minus(6), fuso: FUSO, contexto: VESTIBULAR })
   const vest = list(r.body.items ?? [], 'tagId', (t) => (t === MATEMATICA ? 'Matemática' : t === FISICA ? 'Física' : t))
   check('seed, semanas 7–12: Vestibular por subtag = Física 300, Matemática 540 (conta do D1)', vest === 'Física=300 Matemática=540', vest)
+  // D7a contra as rotas que já existem, na mesma janela do seed
+  const janela = { de: minus(12), ate: minus(6), fuso: FUSO }
+  const porTags = await get('tempo-por-tags', { ...janela, tags: `${MATEMATICA},${MATEMATICA_RAIZ},${VESTIBULAR}` })
+  const porSubtag = r.body.items.find((x) => x.tagId === MATEMATICA)?.seconds
+  const porContexto = (await get('tempo-por-contexto', janela)).body.items
+  const ctxOf = (id) => porContexto.find((x) => x.tagId === id)?.seconds ?? 0
+  check('seed: Vestibular › Matemática por tags = por subtag (540 min)', porTags.body?.items?.[0]?.seconds === porSubtag && min(porSubtag) === 540, JSON.stringify(porTags.body))
+  check('seed: Matemática (raiz) e Vestibular por tags = por contexto', porTags.body?.items?.[1]?.seconds === ctxOf(MATEMATICA_RAIZ) && porTags.body?.items?.[2]?.seconds === ctxOf(VESTIBULAR), JSON.stringify(porTags.body?.items))
+  check('seed: união (Vestibular contém Vestibular › Matemática) = Vestibular + Matemática raiz', porTags.body?.unionSeconds === ctxOf(VESTIBULAR) + ctxOf(MATEMATICA_RAIZ), `${porTags.body?.unionSeconds}`)
 } catch (err) {
   check('rodou sem erro', false, err.message)
 } finally {
