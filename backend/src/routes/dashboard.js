@@ -38,9 +38,9 @@ const contextSchema = z.object({
 })
 
 const periodBySchema = z.object({
-  por: z.enum(['dia', 'semana'], 'por precisa ser dia ou semana'),
+  por: z.enum(['dia', 'semana', 'mes'], 'por precisa ser dia, semana ou mes'),
 })
-const unitOf = { dia: 'day', semana: 'week' }
+const unitOf = { dia: 'day', semana: 'week', mes: 'month' }
 
 // Os nomes que o Postgres conhece: validar contra eles, não só pelo formato
 let zones = null
@@ -205,7 +205,7 @@ dashboardRouter.get('/tempo-por-fase', async (req, res) => {
   res.json({ items: items.rows })
 })
 
-// Por período: faixas de 1 dia ou 1 semana (segunda) NO FUSO pedido, cada
+// Por período: faixas de 1 dia, 1 semana (segunda) ou 1 mês NO FUSO pedido, cada
 // sessão dividida entre as faixas que cruza. Faixa sem sessão vem do LEFT
 // JOIN com r.* nulo, e LEAST/GREATEST IGNORAM NULL (LEAST(NULL, f.fim) =
 // f.fim): sem o FILTER, dia vazio daria o dia inteiro (achado no D-0)

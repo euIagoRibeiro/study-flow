@@ -90,7 +90,7 @@ try {
   await bad('subtag com contexto que é subtag (nível 2): 400', 'tempo-por-subtag', { ...semana, contexto: A1 }, 'contexto')
   await bad('fase em contexto sem fases: 400', 'tempo-por-fase', { ...semana, contexto: B }, 'fases')
   await bad('período sem "por": 400', 'tempo-por-periodo', semana, 'por')
-  await bad('período com "por=mes": 400 (dia ou semana)', 'tempo-por-periodo', { ...semana, por: 'mes' }, 'por')
+  await bad('período com "por=ano": 400 (dia, semana ou mês)', 'tempo-por-periodo', { ...semana, por: 'ano' }, 'por')
   const nf = await get('tempo-por-subtag', { ...semana, contexto: '00000000-0000-4000-a0d0-0000000000ff' })
   check('contexto que não existe: 404', nf.status === 404, `${nf.status}`)
 
@@ -118,6 +118,24 @@ try {
   check('março por semana (segunda): 24/02=60 03/03=60 10/03=0 17/03=60 24/03=465 31/03=90', weeks === '24/02=60 03/03=60 10/03=0 17/03=60 24/03=465 31/03=90', weeks)
   r = await get('tempo-por-contexto', marco)
   check('março: total 735 (bordas do mês recortadas)', min(r.body.totalSeconds ?? -1) === 735, JSON.stringify(r.body.totalSeconds))
+
+  // ---- ano por mês (D5a): faixas de 1 mês no fuso. A 11 (28/02 23:00 → 01/03
+  // 01:00) divide entre fevereiro e março; a 8 (31/03 23:00 → 01/04 01:00),
+  // entre março e abril. Março = 735 (a conta do mês acima)
+  const ano = { de: local('2025-01-01 00:00'), ate: local('2026-01-01 00:00'), fuso: FUSO, por: 'mes' }
+  r = await get('tempo-por-periodo', ano)
+  const months = (r.body?.items ?? []).map((x) => `${x.start.slice(5, 7)}=${min(x.seconds)}`).join(' ')
+  check('ano por mês: 12 faixas, 01=0 02=60 03=735 04=60, o resto 0', r.status === 200 &&
+    months === '01=0 02=60 03=735 04=60 05=0 06=0 07=0 08=0 09=0 10=0 11=0 12=0', `${r.status} ${months} ${JSON.stringify(r.body)}`)
+  check('ano por mês: cada faixa começa no dia 1', (r.body?.items ?? []).length === 12 && r.body.items.every((x) => x.start.endsWith('-01')), JSON.stringify(r.body?.items?.map((x) => x.start)))
+  const yearTotal = await get('tempo-por-contexto', ano)
+  check('ano: soma das faixas = total do contexto (855)', min(yearTotal.body?.totalSeconds ?? -1) === 855 &&
+    (r.body?.items ?? []).reduce((s, x) => s + x.seconds, 0) === yearTotal.body.totalSeconds, `${yearTotal.body?.totalSeconds}`)
+  r = await get('tempo-por-periodo', { ...ano, fuso: 'UTC' })
+  const utcMonths = Object.fromEntries((r.body?.items ?? []).map((x) => [x.start.slice(5, 7), min(x.seconds)]))
+  check('ano por mês em UTC: a 11 cai toda em março (02=0) e a 8 toda em abril (04=120)', r.status === 200 && utcMonths['02'] === 0 && utcMonths['04'] === 120, JSON.stringify(utcMonths))
+  r = await get('tempo-por-periodo', { de: local('2024-01-01 00:00'), ate: local('2025-01-01 00:00'), fuso: FUSO, por: 'mes' })
+  check('ano bissexto (366 dias) aceito: 12 faixas vazias, 0', r.status === 200 && r.body.items.length === 12 && r.body.items.every((x) => x.seconds === 0), `${r.status} ${JSON.stringify(r.body)}`)
 
   // ---- a rodando do seed: "até" depois dela conta até agora; antes, até o "até"
   const running = (await (await fetch(`${API}/time-entries`)).json()).find((e) => e.endedAt === null)
