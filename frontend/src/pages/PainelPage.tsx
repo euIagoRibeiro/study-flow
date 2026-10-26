@@ -15,8 +15,12 @@ import {
   barLabel,
   barsBy,
   categoryAt,
+  comparisonFor,
+  comparisonLabel,
   contains,
+  daysCounted,
   deviceTimeZone,
+  formatDiff,
   monthName,
   percent,
   periodAt,
@@ -26,6 +30,8 @@ import {
   shift,
   toParams,
   toSlices,
+  withPrevious,
+  type Comparison,
   type Period,
   type PeriodKind,
 } from '../painel'
@@ -53,24 +59,60 @@ const barsTitle = {
   ano: 'Por mês',
 }
 
+type TagTime = { tagId: string | null; seconds: number }
+type PhaseTime = { phase: Phase | null; seconds: number }
 type Overview = {
   context: TimeByContext
   period: { start: string; seconds: number }[] | null // null = dia, sem barras
+  comparison: Comparison
+  previous: { totalSeconds: number; items: TagTime[] }
 }
 type Detail = {
-  subtags: { tagId: string | null; seconds: number }[]
-  phases: { phase: Phase | null; seconds: number }[] | null // null = contexto sem fases
+  subtags: TagTime[]
+  phases: PhaseTime[] | null // null = contexto sem fases
+  previous: { subtags: TagTime[]; phases: PhaseTime[] }
 }
 type Row = {
   key: string
   name: string
   seconds: number
+  previous?: number // com comparação: o tempo no período anterior
   dot?: string // classe da cor (legenda); sem ela, linha sem bolinha
   onOpen?: () => void // contexto: abre o detalhe
 }
 
-// Tabela = os números exatos e a legenda dos gráficos (bolinha da cor)
-function TimeTable(props: { caption: string; head: string; rows: Row[] }) {
+// O anterior sem pedido: "até" no começo dele (agora = meia-noite exata)
+const NOTHING = { totalSeconds: 0, items: [] }
+
+// Diferença com o anterior: o sinal e a palavra, o % embaixo
+function Diff(props: { current: number; previous: number }) {
+  const diff = formatDiff(props.current, props.previous)
+  return (
+    <>
+      <span className="block">{diff.text}</span>
+      {diff.percent && (
+        <span className="block text-meta text-tinta-suave">{diff.percent}</span>
+      )}
+    </>
+  )
+}
+
+// Tabela = os números exatos e a legenda dos gráficos (bolinha da cor). Um
+// formato só, em qualquer largura: o % do total embaixo do tempo (com a 4ª
+// coluna, "%" espremia e encostava no tempo em 320px). Com `compare`, a
+// coluna "vs. anterior". Nome quebra dentro da palavra só como último
+// recurso: até 10 caracteres não quebra (sem o mínimo, a tabela encolhia o
+// nome primeiro e partia "Vestibul/ar" em 320px); maior que isso, quebra em
+// vez de empurrar a tabela pra fora da tela. 10 = o que cabe no cartão do
+// detalhe em 320 (com a barra de rolagem clássica), com a bolinha, o tempo e
+// a diferença, e os vãos de 6px (com 8px, faltava 1,4px). O mínimo vai no
+// texto, não na caixa com a bolinha
+function TimeTable(props: {
+  caption: string
+  head: string
+  rows: Row[]
+  compare?: boolean
+}) {
   const total = props.rows.reduce((sum, row) => sum + row.seconds, 0)
   return (
     <table className="w-full text-left">
@@ -83,16 +125,18 @@ function TimeTable(props: { caption: string; head: string; rows: Row[] }) {
           <th scope="col" className="pb-1 text-right font-normal">
             Tempo
           </th>
-          <th scope="col" className="w-14 pb-1 text-right font-normal">
-            %
-          </th>
+          {props.compare && (
+            <th scope="col" className="pb-1 pl-1.5 text-right font-normal">
+              vs. anterior
+            </th>
+          )}
         </tr>
       </thead>
       <tbody className="font-dados tabular-nums">
         {props.rows.map((row) => (
           <tr key={row.key} className="border-t border-linha">
-            <td className="py-1 pr-2 break-words">
-              <span className="flex min-h-9 items-center gap-2">
+            <td className="py-1 pr-1.5 wrap-anywhere">
+              <span className="flex min-h-9 items-center gap-1.5">
                 {row.dot && (
                   <span
                     aria-hidden="true"
@@ -103,21 +147,28 @@ function TimeTable(props: { caption: string; head: string; rows: Row[] }) {
                   <button
                     type="button"
                     onClick={row.onOpen}
-                    className={`text-left underline decoration-dotted underline-offset-2 ${textButtonClass}`}
+                    className={`min-w-[10ch] text-left underline decoration-dotted underline-offset-2 ${textButtonClass}`}
                   >
                     {row.name}
                   </button>
                 ) : (
-                  row.name
+                  <span className="min-w-[10ch]">{row.name}</span>
                 )}
               </span>
             </td>
             <td className="py-1 text-right whitespace-nowrap">
-              {formatDuration(row.seconds * 1000)}
+              <span className="block">
+                {formatDuration(row.seconds * 1000)}
+              </span>
+              <span className="block text-meta text-tinta-suave">
+                {percent(row.seconds, total)}
+              </span>
             </td>
-            <td className="py-1 text-right text-tinta-suave">
-              {percent(row.seconds, total)}
-            </td>
+            {props.compare && (
+              <td className="py-1 pl-1.5 text-right">
+                <Diff current={row.seconds} previous={row.previous ?? 0} />
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
@@ -166,13 +217,24 @@ function PainelPage(props: { tags: Tag[] }) {
   const [attempt, setAttempt] = useState(0)
   const base = `${period.start.toISOString()}|${period.end.toISOString()}|${zone}|${attempt}`
 
+  // O anterior vem na mesma busca: período e comparação chegam juntos
   const overview = useFetched<Overview>(base, async () => {
     const by = barsBy[period.kind]
-    const [context, byPeriod] = await Promise.all([
+    const comparison = comparisonFor(period, new Date())
+    const prev = comparison.previous
+    const [context, byPeriod, previous] = await Promise.all([
       getTimeByContext(period.start, period.end, zone),
       by ? getTimeByPeriod(period.start, period.end, zone, by) : null,
+      comparison.until > prev.start
+        ? getTimeByContext(prev.start, comparison.until, zone)
+        : NOTHING,
     ])
-    return { context, period: byPeriod?.items ?? null }
+    return {
+      context,
+      period: byPeriod?.items ?? null,
+      comparison,
+      previous,
+    }
   })
 
   // Detalhe de um contexto (?contexto=), na mesma página: só raiz que existe
@@ -185,13 +247,25 @@ function PainelPage(props: { tags: Tag[] }) {
     contextTag ? `${base}|${contextTag.id}` : null,
     async () => {
       if (!contextTag) throw new Error('sem contexto')
-      const [subtags, phases] = await Promise.all([
+      const { previous: prev, until } = comparisonFor(period, new Date())
+      const asked = until > prev.start
+      const [subtags, phases, prevSubtags, prevPhases] = await Promise.all([
         getTimeBySubtag(period.start, period.end, zone, contextTag.id),
         contextTag.tracksPhase
           ? getTimeByPhase(period.start, period.end, zone, contextTag.id)
-          : Promise.resolve(null),
+          : null,
+        asked
+          ? getTimeBySubtag(prev.start, until, zone, contextTag.id)
+          : NOTHING,
+        contextTag.tracksPhase && asked
+          ? getTimeByPhase(prev.start, until, zone, contextTag.id)
+          : NOTHING,
       ])
-      return { subtags: subtags.items, phases: phases?.items ?? null }
+      return {
+        subtags: subtags.items,
+        phases: phases?.items ?? null,
+        previous: { subtags: prevSubtags.items, phases: prevPhases.items },
+      }
     },
   )
 
@@ -199,6 +273,23 @@ function PainelPage(props: { tags: Tag[] }) {
   const nameOf = (tagId: string | null, none: string) =>
     tagId === null ? none : (tagsById.get(tagId)?.name ?? 'Tag removida')
   const noun = periodNoun[period.kind]
+  const days = daysCounted(period, today)
+  const totalDiff = data
+    ? formatDiff(data.context.totalSeconds, data.previous.totalSeconds)
+    : null
+  // "vs. semana passada, até seg., 15h32: +3h00 (+8%)"
+  const comparisonLine = data && totalDiff && (
+    <p className="text-sm">
+      <span className="text-tinta-suave">
+        {comparisonLabel(period.kind, data.comparison)}:
+      </span>{' '}
+      <span className="font-dados tabular-nums">
+        {totalDiff.percent
+          ? `${totalDiff.text} ${totalDiff.percent}`
+          : totalDiff.text}
+      </span>
+    </p>
+  )
 
   // Trocar de período mantém o contexto aberto
   function go(next: Period, contexto = contextTag?.id) {
@@ -273,9 +364,12 @@ function PainelPage(props: { tags: Tag[] }) {
             </button>
           </div>
         ) : data.context.totalSeconds === 0 ? (
-          <p className="py-6 text-center text-sm text-tinta-suave">
-            Nenhum tempo dedicado {noun}.
-          </p>
+          <>
+            <p className="py-6 text-center text-sm text-tinta-suave">
+              Nenhum tempo dedicado {noun}.
+            </p>
+            {data.previous.totalSeconds > 0 && comparisonLine}
+          </>
         ) : (
           <>
             <dl>
@@ -284,6 +378,14 @@ function PainelPage(props: { tags: Tag[] }) {
                 {formatDuration(data.context.totalSeconds * 1000)}
               </dd>
             </dl>
+            {/* No dia, a média seria o próprio total */}
+            {period.kind !== 'dia' && (
+              <p className="-mt-2 font-dados text-sm text-tinta-suave tabular-nums">
+                {formatDuration((data.context.totalSeconds / days) * 1000)}/dia
+                · {days} {days === 1 ? 'dia' : 'dias'}
+              </p>
+            )}
+            {comparisonLine}
             {data.context.running.length > 0 && (
               <p className="inline-flex items-start gap-2 rounded-xl bg-andamento/[0.13] px-4 py-3 text-sm">
                 <span className="mt-1.5 h-2 w-2 shrink-0 animate-pulsa rounded-full bg-andamento" />
@@ -307,13 +409,20 @@ function PainelPage(props: { tags: Tag[] }) {
             <TimeTable
               caption="Tempo dedicado por contexto"
               head="Contexto"
-              rows={data.context.items.map((item, i) => ({
-                key: item.tagId ?? 'sem',
-                name: nameOf(item.tagId, '(sem tag)'),
-                seconds: item.seconds,
-                dot: categoryAt(i).dot,
-                onOpen: item.tagId
-                  ? () => go(period, item.tagId ?? undefined)
+              compare
+              // Só no anterior: no fim, sem bolinha (não tem fatia)
+              rows={withPrevious(
+                data.context.items,
+                data.previous.items,
+                (item) => item.tagId ?? 'sem',
+              ).map((row, i) => ({
+                key: row.item.tagId ?? 'sem',
+                name: nameOf(row.item.tagId, '(sem tag)'),
+                seconds: row.seconds,
+                previous: row.previous,
+                dot: row.seconds > 0 ? categoryAt(i).dot : undefined,
+                onOpen: row.item.tagId
+                  ? () => go(period, row.item.tagId ?? undefined)
                   : undefined,
               }))}
             />
@@ -354,24 +463,36 @@ function PainelPage(props: { tags: Tag[] }) {
                     <TimeTable
                       caption={`Tempo dedicado por subtag em ${contextTag.name}`}
                       head="Subtag"
-                      rows={detail.data.subtags.map((item, i) => ({
-                        key: item.tagId ?? 'sem',
-                        name: nameOf(item.tagId, '(sem subtag)'),
-                        seconds: item.seconds,
-                        dot: categoryAt(i).dot,
+                      compare
+                      rows={withPrevious(
+                        detail.data.subtags,
+                        detail.data.previous.subtags,
+                        (item) => item.tagId ?? 'sem',
+                      ).map((row, i) => ({
+                        key: row.item.tagId ?? 'sem',
+                        name: nameOf(row.item.tagId, '(sem subtag)'),
+                        seconds: row.seconds,
+                        previous: row.previous,
+                        dot: row.seconds > 0 ? categoryAt(i).dot : undefined,
                       }))}
                     />
                     {detail.data.phases && detail.data.phases.length > 0 && (
                       <TimeTable
                         caption={`Tempo dedicado por fase em ${contextTag.name}`}
                         head="Fase"
-                        rows={detail.data.phases.map((item) => ({
-                          key: item.phase ?? 'sem',
+                        compare
+                        rows={withPrevious(
+                          detail.data.phases,
+                          detail.data.previous.phases,
+                          (item) => item.phase ?? 'sem',
+                        ).map((row) => ({
+                          key: row.item.phase ?? 'sem',
                           name:
-                            item.phase === null
+                            row.item.phase === null
                               ? '(sem fase)'
-                              : phaseLabels[item.phase],
-                          seconds: item.seconds,
+                              : phaseLabels[row.item.phase],
+                          seconds: row.seconds,
+                          previous: row.previous,
                         }))}
                       />
                     )}

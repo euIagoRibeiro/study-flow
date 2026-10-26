@@ -63,7 +63,7 @@ try {
   })
   const screen = () => page.evaluate(() => {
     const s = document.querySelector('section[aria-label="Tempo"]')
-    const rows = [...(s?.querySelectorAll('table tbody tr') ?? [])].map((tr) => [...tr.children].map((td) => td.textContent.trim()))
+    const rows = [...(s?.querySelectorAll('table tbody tr') ?? [])].map((tr) => ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children]))
     return {
       period: document.querySelector('[role="group"][aria-label="Navegar no período"] p')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
       total: [...(s?.querySelectorAll('dt') ?? [])].find((dt) => dt.textContent.trim() === 'Tempo dedicado')?.nextElementSibling?.textContent.trim() ?? null,
@@ -83,9 +83,11 @@ try {
   }
   const matches = (label, s, api) => {
     const expected = api.items.map((x) => [nameOf(x.tagId), duration(x.seconds)])
-    const got = s.rows.map((r) => [r[0], r[1]])
+    // as linhas do período primeiro; depois as só do anterior (D6), com 0min
+    const got = s.rows.slice(0, api.items.length).map((r) => [r[0], r[1]])
+    const extra = s.rows.slice(api.items.length)
     check(`${label}: total = API (${duration(api.totalSeconds)})`, s.total === duration(api.totalSeconds), `${s.total}`)
-    check(`${label}: tabela = itens da API, na ordem`, JSON.stringify(got) === JSON.stringify(expected), `${JSON.stringify(got)} x ${JSON.stringify(expected)}`)
+    check(`${label}: tabela = itens da API, na ordem`, JSON.stringify(got) === JSON.stringify(expected) && extra.every((r) => r[1] === '0min'), `${JSON.stringify(s.rows)} x ${JSON.stringify(expected)}`)
   }
 
   // ---- aba na navegação
@@ -109,7 +111,7 @@ try {
   }
   check('padrão: semana atual, de segunda a domingo', s.period?.includes(String(Number(mon.slice(8)))) && s.period?.includes(String(Number(sun.slice(8)))), `${s.period} (${mon}..${sun})`)
   matches('semana atual', s, sem)
-  const req = requests.at(-1)
+  const req = requests.filter((u) => u.pathname.endsWith('tempo-por-contexto')).slice(-2)[0]
   check('pedido: fuso do aparelho e bordas na meia-noite local (segunda → segunda)',
     req?.searchParams.get('fuso') === FUSO && req.searchParams.get('de') === local(mon).toISOString() && req.searchParams.get('ate') === local(addDays(mon, 7)).toISOString(),
     req?.search)
@@ -160,7 +162,7 @@ try {
   check('URL inválida: cai na semana atual', (await currentWeek()).includes(s.total), `${s.url} ${s.total}`)
   await page.goto(`${APP}/painel?periodo=semana&inicio=2025-03-26`, { waitUntil: 'networkidle0' })
   s = await settle()
-  const r2 = requests.at(-1)
+  const r2 = requests.filter((u) => u.pathname.endsWith('tempo-por-contexto')).slice(-2)[0]
   check('início no meio da semana: ajusta pra segunda (24/03)', r2?.searchParams.get('de') === local('2025-03-24').toISOString(), r2?.search)
 
   // ---- corrida: a resposta da semana anterior chega DEPOIS da atual

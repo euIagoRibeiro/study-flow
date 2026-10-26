@@ -60,13 +60,13 @@ try {
       slices: [...(pie?.querySelectorAll('path') ?? [])].map((p) => getComputedStyle(p).fill),
       pieTexts: [...(pie?.querySelectorAll('text') ?? [])].map((t) => t.textContent.trim()),
       rows: [...(table?.querySelectorAll('tbody tr') ?? [])].map((tr) => ({
-        cells: [...tr.children].map((td) => td.textContent.trim()),
+        cells: ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children]),
         dot: (() => { const d = tr.querySelector('td span[aria-hidden="true"]'); return d ? getComputedStyle(d).backgroundColor : null })(),
         button: !!tr.querySelector('button'),
       })),
       bars: [...(bars?.querySelectorAll('rect') ?? [])].length,
       barTexts: [...(bars?.querySelectorAll('text') ?? [])].map((t) => t.textContent.trim()),
-      phaseRows: [...(s.querySelectorAll('table') ?? [])].slice(1).flatMap((t) => [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim()))),
+      phaseRows: [...(s.querySelectorAll('table') ?? [])].slice(1).flatMap((t) => [...t.querySelectorAll('tbody tr')].map((tr) => ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children]))),
       text: s.textContent.replace(/\s+/g, ' '),
     }
   }, sectionLabel)
@@ -99,8 +99,8 @@ try {
   check('pizza com nome acessível', /^Pizza do tempo por contexto/.test(r.pieLabel ?? ''), r.pieLabel)
   check('uma fatia por item (até 6)', r.slices.length === Math.min(ctx.items.length, 6), `${r.slices.length} x ${ctx.items.length}`)
   check('fatias nas cores da ordem: 1ª = --categoria-1, 2ª = --categoria-2…', JSON.stringify(r.slices) === JSON.stringify(colors.slice(0, r.slices.length)), JSON.stringify(r.slices))
-  check('legenda: a bolinha de cada linha tem a cor da fatia dela', r.rows.every((row, i) => row.dot === (i < 5 ? colors[i] : colors[5])), JSON.stringify(r.rows.map((x) => x.dot)))
-  check('tabela = itens da API, na ordem', JSON.stringify(r.rows.map((x) => [x.cells[0], x.cells[1]])) === JSON.stringify(ctx.items.map((x) => [nameOf(x.tagId), duration(x.seconds)])), JSON.stringify(r.rows.map((x) => x.cells)))
+  check('legenda: a bolinha de cada linha tem a cor da fatia dela', r.rows.every((row, i) => row.dot === (i >= ctx.items.length ? null : i < 5 ? colors[i] : colors[5])), JSON.stringify(r.rows.map((x) => x.dot)))
+  check('tabela = itens da API, na ordem', JSON.stringify(r.rows.slice(0, ctx.items.length).map((x) => [x.cells[0], x.cells[1]])) === JSON.stringify(ctx.items.map((x) => [nameOf(x.tagId), duration(x.seconds)])), JSON.stringify(r.rows.map((x) => x.cells)))
   const big = ctx.items.filter((x) => x.seconds / ctx.totalSeconds >= 0.1).map((x) => `${Math.round((x.seconds / ctx.totalSeconds) * 100)}%`)
   check('% ao lado das fatias grandes (≥ 10%), igual ao da tabela', JSON.stringify(r.pieTexts) === JSON.stringify(big), `${JSON.stringify(r.pieTexts)} x ${JSON.stringify(big)}`)
   const days = await api('tempo-por-periodo', { ...period, por: 'dia' })
@@ -129,7 +129,7 @@ try {
   check('tocar em Código: ?contexto= na URL, seção "Em Código" na mesma página', url === `?periodo=semana&inicio=${prev}&contexto=${codigo.id}` && d !== null, `${url}`)
   const sub = await api('tempo-por-subtag', { ...period, contexto: codigo.id })
   check('Em Código: subtags = API (nome e tempo, na ordem; null = "(sem subtag)")',
-    JSON.stringify(d.rows.map((x) => [x.cells[0], x.cells[1]])) === JSON.stringify(sub.items.map((x) => [x.tagId === null ? '(sem subtag)' : tags.find((t) => t.id === x.tagId)?.name, duration(x.seconds)])),
+    JSON.stringify(d.rows.slice(0, sub.items.length).map((x) => [x.cells[0], x.cells[1]])) === JSON.stringify(sub.items.map((x) => [x.tagId === null ? '(sem subtag)' : tags.find((t) => t.id === x.tagId)?.name, duration(x.seconds)])),
     `${JSON.stringify(d.rows.map((x) => x.cells))} x ${JSON.stringify(sub.items)}`)
   check('Em Código: pizza das subtags', /^Pizza do tempo por subtag/.test(d.pieLabel ?? '') && d.slices.length === Math.min(sub.items.length, 6), `${d.pieLabel} ${d.slices.length}`)
   const ph = await api('tempo-por-fase', { ...period, contexto: codigo.id })

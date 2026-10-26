@@ -43,7 +43,7 @@ try {
     const tables = [...(s?.querySelectorAll('table') ?? [])].map((t) => ({
       caption: t.querySelector('caption')?.textContent.trim(),
       head: [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim()),
-      rows: [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim())),
+      rows: [...t.querySelectorAll('tbody tr')].map((tr) => ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children])),
     }))
     const bars = s?.querySelector('svg[role="img"][aria-label^="Barras"]')
     return {
@@ -71,9 +71,12 @@ try {
   const contextTable = (s) => s.tables.find((t) => t.head[0] === 'Contexto')
   const matches = (label, s, apiBody) => {
     check(`${label}: total = API (${duration(apiBody.totalSeconds)})`, s.total === duration(apiBody.totalSeconds), `${s.total}`)
-    const got = (contextTable(s)?.rows ?? []).map((r) => [r[0], r[1]])
+    // as linhas do período primeiro; depois as só do anterior (D6), com 0min
+    const rows = contextTable(s)?.rows ?? []
+    const got = rows.slice(0, apiBody.items.length).map((r) => [r[0], r[1]])
+    const extra = rows.slice(apiBody.items.length)
     const expected = apiBody.items.map((x) => [nameOf(x.tagId), duration(x.seconds)])
-    check(`${label}: tabela por contexto = API`, JSON.stringify(got) === JSON.stringify(expected), `${JSON.stringify(got)} x ${JSON.stringify(expected)}`)
+    check(`${label}: tabela por contexto = API`, JSON.stringify(got) === JSON.stringify(expected) && extra.every((r) => r[1] === '0min'), `${JSON.stringify(rows)} x ${JSON.stringify(expected)}`)
   }
 
   // ---- seletor com os 4 tipos
@@ -91,7 +94,7 @@ try {
   matches('Dia (hoje)', s, hoje)
   check('Dia: hoje tem tempo no seed (o caso não é vazio)', hoje.totalSeconds > 0, `${hoje.totalSeconds}`)
   check('Dia: pizza, e nenhuma barra nem título "Por …"', s.pie && s.bars === null && !s.headings.some((h) => h.startsWith('Por ')), JSON.stringify(s.headings))
-  const dayReq = requests.filter((r) => r.pathname.endsWith('tempo-por-contexto')).at(-1)
+  const dayReq = requests.filter((r) => r.pathname.endsWith('tempo-por-contexto')).slice(-2)[0]
   check('Dia: pedido da meia-noite de hoje à de amanhã', dayReq?.searchParams.get('de') === local(todayYmd).toISOString() && dayReq.searchParams.get('ate') === local(addDays(todayYmd, 1)).toISOString(), dayReq?.search)
   check('Dia: não pede o tempo por período', !requests.some((r) => r.pathname.endsWith('tempo-por-periodo')), requests.map((r) => r.pathname).join(' '))
   check('Dia: próximo desabilitado hoje', s.nextDisabled === true)

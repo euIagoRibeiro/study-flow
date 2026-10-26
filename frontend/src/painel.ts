@@ -3,6 +3,8 @@
 // A API só recebe instantes (de, ate) + o fuso: quem sabe o que é "semana" é
 // a tela. Datas aqui são sempre Date LOCAIS à meia-noite
 
+import { formatDuration } from './dates'
+
 export type PeriodKind = 'dia' | 'semana' | 'mes' | 'ano'
 const KINDS: PeriodKind[] = ['dia', 'semana', 'mes', 'ano']
 export type Period = { kind: PeriodKind; start: Date; end: Date } // [start, end)
@@ -105,6 +107,160 @@ export function periodLabel(period: Period, today: Date): string {
         month: 'short',
       })
   return `${first} – ${last.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', ...year })}`
+}
+
+// ---- Comparação com o período anterior
+
+export type Comparison = {
+  previous: Period
+  until: Date // o "até" do pedido do anterior
+  partial: boolean // período em andamento: o anterior até o mesmo ponto
+}
+
+// Dias locais entre duas meias-noites (arredonda: o dia pode ter 23 ou 25 h)
+function daysBetween(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / 86400000)
+}
+
+function midnightOf(moment: Date): Date {
+  return new Date(moment.getFullYear(), moment.getMonth(), moment.getDate())
+}
+
+// Período passado: o anterior inteiro. Em andamento: o anterior até o MESMO
+// PONTO pelo relógio local (mesmo dia da semana/do mês/do ano, mesma hora),
+// não "agora − 7 × 24 h" (horário de verão). Dia que não existe no anterior
+// (31 contra fevereiro; 29/02 contra um ano sem ele): o ponto cai no fim do
+// mês que não tem o dia
+export function comparisonFor(period: Period, now: Date): Comparison {
+  const previous = shift(period, -1)
+  if (!contains(period, now)) {
+    return { previous, until: previous.end, partial: false }
+  }
+  const ps = previous.start
+  const clock = [
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds(),
+  ] as const
+  let until: Date
+  if (period.kind === 'dia' || period.kind === 'semana') {
+    const offset = daysBetween(period.start, midnightOf(now))
+    until = new Date(
+      ps.getFullYear(),
+      ps.getMonth(),
+      ps.getDate() + offset,
+      ...clock,
+    )
+  } else {
+    const month = period.kind === 'mes' ? ps.getMonth() : now.getMonth()
+    until = new Date(ps.getFullYear(), month, now.getDate(), ...clock)
+    // 31 em fevereiro viraria 3 de março: o fim de fevereiro
+    if (until.getMonth() !== month)
+      until = new Date(ps.getFullYear(), month + 1, 1)
+  }
+  return {
+    previous,
+    until: until < previous.end ? until : previous.end,
+    partial: true,
+  }
+}
+
+const LAST = {
+  dia: 'ontem',
+  semana: 'semana passada',
+  mes: 'mês passado',
+  ano: 'ano passado',
+}
+const WHOLE = {
+  dia: 'ontem inteiro',
+  semana: 'semana passada inteira',
+  mes: 'mês passado inteiro',
+  ano: 'ano passado inteiro',
+}
+const BEFORE = {
+  dia: 'dia anterior',
+  semana: 'semana anterior',
+  mes: 'mês anterior',
+  ano: 'ano anterior',
+}
+
+// "vs. semana anterior" (passado); "vs. semana passada, até seg., 15h32";
+// "vs. mês passado inteiro"; "vs. ano passado, até o fim de 28 de fev."
+export function comparisonLabel(kind: PeriodKind, c: Comparison): string {
+  if (!c.partial) return `vs. ${BEFORE[kind]}`
+  if (c.until.getTime() === c.previous.end.getTime())
+    return `vs. ${WHOLE[kind]}`
+  // Agora = meia-noite exata do começo do período: nada do anterior ainda
+  if (c.until <= c.previous.start) return `vs. ${LAST[kind]}, até 0h00`
+  const u = c.until
+  const midnight = u.getTime() === midnightOf(u).getTime()
+  // À meia-noite, o ponto é o fim do dia de antes
+  const ref = midnight
+    ? new Date(u.getFullYear(), u.getMonth(), u.getDate() - 1)
+    : u
+  const day =
+    kind === 'dia'
+      ? 'do dia'
+      : kind === 'semana'
+        ? ref.toLocaleDateString('pt-BR', { weekday: 'short' })
+        : kind === 'mes'
+          ? `dia ${ref.getDate()}`
+          : ref.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })
+  if (midnight)
+    return `vs. ${LAST[kind]}, até o fim ${kind === 'dia' ? day : `de ${day}`}`
+  const clock = `${u.getHours()}h${String(u.getMinutes()).padStart(2, '0')}`
+  return kind === 'dia'
+    ? `vs. ${LAST[kind]}, até ${clock}`
+    : `vs. ${LAST[kind]}, até ${day}, ${clock}`
+}
+
+// A diferença como se lê: pelos MINUTOS arredondados, a mesma conta que o
+// leitor faria com os dois tempos da tela; o % pelos segundos. Sem cor: o
+// sinal e a palavra dizem tudo (verde/vermelho são reservados)
+export function formatDiff(
+  current: number,
+  previous: number,
+): { text: string; percent?: string } {
+  if (previous === 0) return { text: current === 0 ? 'igual' : 'novo' }
+  if (current === 0) return { text: 'sem tempo agora' }
+  const minutes = Math.round(current / 60) - Math.round(previous / 60)
+  if (minutes === 0) return { text: 'igual' }
+  const pct = Math.round(((current - previous) / previous) * 100)
+  return {
+    text: `${minutes > 0 ? '+' : '−'}${formatDuration(Math.abs(minutes) * 60000)}`,
+    percent:
+      pct === 0 ? undefined : `(${pct > 0 ? '+' : '−'}${Math.abs(pct)}%)`,
+  }
+}
+
+// Linhas das tabelas com comparação: as do período, depois as que só
+// existiam no anterior (com 0 agora), cada uma com o tempo de antes
+export function withPrevious<T extends { seconds: number }>(
+  current: T[],
+  previous: T[],
+  keyOf: (item: T) => string,
+) {
+  const before = new Map(previous.map((item) => [keyOf(item), item.seconds]))
+  const present = new Set(current.map(keyOf))
+  return [
+    ...current.map((item) => ({
+      item,
+      seconds: item.seconds,
+      previous: before.get(keyOf(item)) ?? 0,
+    })),
+    ...previous
+      .filter((item) => !present.has(keyOf(item)))
+      .map((item) => ({ item, seconds: 0, previous: item.seconds })),
+  ]
+}
+
+// Dias pra média: no período em andamento, os decorridos contando hoje
+// inteiro (a mesma contagem do "até o mesmo ponto"); no passado, todos
+export function daysCounted(period: Period, now: Date): number {
+  return contains(period, now)
+    ? daysBetween(period.start, midnightOf(now)) + 1
+    : daysBetween(period.start, period.end)
 }
 
 // ---- Gráficos
