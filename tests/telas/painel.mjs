@@ -81,6 +81,15 @@ try {
     }
     return screen()
   }
+  // Clica e espera o RÓTULO do período mudar antes de ler (o total do
+  // período anterior já estava na tela, e a URL muda antes do React desenhar:
+  // com o computador carregado, a semana anterior era lida ainda como a atual)
+  const periodText = () => page.evaluate(() => document.querySelector('[role="group"][aria-label="Navegar no período"] p')?.textContent.replace(/\s+/g, ' ').trim() ?? null)
+  const act = async (fn) => {
+    const before = await periodText()
+    await page.evaluate(fn)
+    for (let i = 0; i < 40 && (await periodText()) === before; i++) await pause(50)
+  }
   const matches = (label, s, api) => {
     const expected = api.items.map((x) => [nameOf(x.tagId), duration(x.seconds)])
     // as linhas do período primeiro; depois as só do anterior (D6), com 0min
@@ -125,7 +134,7 @@ try {
   check('coluna %: um valor por linha, terminando em %', pct.length > 0 && pct.every((p) => /^(<1|\d+)%$/.test(p)), JSON.stringify(pct))
 
   // ---- semana anterior: URL, totais, voltar do navegador
-  await page.evaluate(() => document.querySelector('button[aria-label="Período anterior"]').click())
+  await act(() => document.querySelector('button[aria-label="Período anterior"]').click())
   s = await settle()
   const prev = addDays(mon, -7)
   check('anterior: URL ?periodo=semana&inicio=<segunda anterior>', s.url === `/painel?periodo=semana&inicio=${prev}`, s.url)
@@ -137,14 +146,14 @@ try {
   check('voltar do navegador volta pra semana atual', s.url === '/painel' && (await currentWeek()).includes(s.total), `${s.url} ${s.total}`)
 
   // ---- mês
-  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Mês').click())
+  await act(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Mês').click())
   s = await settle()
   const m1 = firstOfMonth(todayYmd)
   check('Mês: URL ?periodo=mes&inicio=<dia 1>', s.url === `/painel?periodo=mes&inicio=${m1}`, s.url)
   matches('mês atual', s, await apiFor(m1, nextMonth(m1)))
   const monthName = new Date(`${m1}T12:00:00-03:00`).toLocaleDateString('pt-BR', { month: 'long', timeZone: FUSO })
   check('rótulo do mês por extenso', s.period?.toLowerCase().includes(monthName), `${s.period} (${monthName})`)
-  await page.evaluate(() => document.querySelector('button[aria-label="Período anterior"]').click())
+  await act(() => document.querySelector('button[aria-label="Período anterior"]').click())
   s = await settle()
   const [y, m] = m1.split('-').map(Number)
   const m0 = m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, '0')}-01`

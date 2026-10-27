@@ -67,7 +67,20 @@ try {
     }
     return screen()
   }
-  const click = (text) => page.evaluate((t) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === t).click(), text)
+  // Clica e espera o RÓTULO do período mudar (o que a bateria vai ler). O
+  // settle() sozinho voltava na hora, porque o total do período ANTERIOR já
+  // estava na tela; e esperar a URL também não basta: ela muda no clique,
+  // antes do React desenhar. Corrida que só aparecia com o computador
+  // carregado ("Dia" lido ainda como a semana; "2025" ainda como "2026")
+  const label = () => page.evaluate(() => document.querySelector('[role="group"][aria-label="Navegar no período"] p')?.textContent.replace(/\s+/g, ' ').trim() ?? null)
+  const act = async (fn, ...args) => {
+    const before = await label()
+    await page.evaluate(fn, ...args)
+    for (let i = 0; i < 40 && (await label()) === before; i++) await pause(50)
+  }
+  const click = (text) => act((t) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === t).click(), text)
+  const prevPeriod = () => act(() => document.querySelector('button[aria-label="Período anterior"]').click())
+  const nextPeriod = () => act(() => document.querySelector('button[aria-label="Próximo período"]').click())
   const contextTable = (s) => s.tables.find((t) => t.head[0] === 'Contexto')
   const matches = (label, s, apiBody) => {
     check(`${label}: total = API (${duration(apiBody.totalSeconds)})`, s.total === duration(apiBody.totalSeconds), `${s.total}`)
@@ -98,7 +111,7 @@ try {
   check('Dia: pedido da meia-noite de hoje à de amanhã', dayReq?.searchParams.get('de') === local(todayYmd).toISOString() && dayReq.searchParams.get('ate') === local(addDays(todayYmd, 1)).toISOString(), dayReq?.search)
   check('Dia: não pede o tempo por período', !requests.some((r) => r.pathname.endsWith('tempo-por-periodo')), requests.map((r) => r.pathname).join(' '))
   check('Dia: próximo desabilitado hoje', s.nextDisabled === true)
-  await page.evaluate(() => document.querySelector('button[aria-label="Período anterior"]').click())
+  await prevPeriod()
   s = await settle()
   const ontem = addDays(todayYmd, -1)
   check('Dia anterior: URL com ontem', s.url === `/painel?periodo=dia&inicio=${ontem}`, s.url)
@@ -111,7 +124,7 @@ try {
   // virada do ano no "próximo" e no "anterior"
   await page.goto(`${APP}/painel?periodo=dia&inicio=2025-12-31`, { waitUntil: 'networkidle0' })
   await settle()
-  await page.evaluate(() => document.querySelector('button[aria-label="Próximo período"]').click())
+  await nextPeriod()
   s = await settle()
   check('Dia: próximo de 31/12 é 01/01', s.url === '/painel?periodo=dia&inicio=2026-01-01', s.url)
 
@@ -138,7 +151,7 @@ try {
   check('Ano: tabela de meses soma o total', meses.items.reduce((a, x) => a + x.seconds, 0) === anoApi.totalSeconds)
   check('Ano: tabela de meses depois das barras', s.tables.indexOf(monthTable) === s.tables.length - 1)
   check('Ano: próximo desabilitado no ano atual', s.nextDisabled === true)
-  await page.evaluate(() => document.querySelector('button[aria-label="Período anterior"]').click())
+  await prevPeriod()
   s = await settle()
   check('Ano anterior: URL e rótulo', s.url === `/painel?periodo=ano&inicio=${year - 1}-01-01` && s.period === String(year - 1), `${s.url} ${s.period}`)
   check('Ano sem tempo (o seed não tem ano passado): "Nenhum tempo dedicado neste ano."', s.text.includes('Nenhum tempo dedicado neste ano.'), s.text.slice(0, 120))
