@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import ActionMenu, { type MenuAction } from '../components/ActionMenu'
 import {
   ArchiveIcon,
@@ -80,6 +81,8 @@ function TagsPage(props: {
   onSetWorkout: (id: string, tracksWorkout: boolean) => void
   onDelete: (id: string) => void
 }) {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [showArchived, setShowArchived] = useState(false)
   const [open, setOpen] = useState(() => readOpen(props.tags))
   // Um formulário por vez (criar raiz, criar subtag, renomear ou medida)
@@ -456,7 +459,21 @@ function TagsPage(props: {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="font-titulo text-lg font-bold">Tags</h2>
+      <div className="flex flex-col items-start gap-1.5">
+        {/* Volta pra onde você estava (o ícone do topo e o "gerenciar
+            tags" dos formulários trazem pra cá); aberta direto pela URL, sem
+            histórico no app (key "default"), vai pra Lista */}
+        <button
+          type="button"
+          onClick={() =>
+            location.key === 'default' ? navigate('/') : navigate(-1)
+          }
+          className={`-mt-2 mb-1 inline-flex min-h-11 items-center rounded-md text-sm text-tinta-suave hover:text-tinta ${focusRing}`}
+        >
+          ← Voltar
+        </button>
+        <h2 className="font-titulo text-lg font-bold">Tags</h2>
+      </div>
       {form?.kind === 'root' ? (
         <div className={cardClass}>
           <TagForm

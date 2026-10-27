@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import ExecutionForm from '../components/ExecutionForm'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
 import TaskForm from '../components/TaskForm'
@@ -12,7 +12,7 @@ import {
   cardClass,
   chipAndamentoClass,
   chipClass,
-  inlineButtonClass,
+  focusRing,
   pickerButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
@@ -79,14 +79,16 @@ function ExecutePage(props: {
     resumeEntryId: string | null,
   ) => Promise<void>
 }) {
-  const [searchParams] = useSearchParams()
-  // Lido só na 1ª renderização: "retomar" na Lista chega com ?tarefa=<id>
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() =>
-    searchParams.get('tarefa'),
-  )
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  // A tarefa aberta mora na URL (?tarefa=<id>): o voltar do navegador (e o
+  // do Android) volta da tarefa pra lista de tarefas, sem sair do Executar
+  const selectedTaskId = searchParams.get('tarefa')
   // Janela de desfazer depois de finalizar — só existe enquanto essa
-  // mesma tela continua montada, nunca sobrevive a trocar de tarefa
+  // mesma tela continua montada e só vale pra tarefa dela (a tarefa pode
+  // mudar pelo voltar do navegador, sem passar por selectTask)
   const [pendingUndo, setPendingUndo] = useState<{
+    taskId: string
     executionId: string
     previousDescription: string | null
     previousTags: TagChoice
@@ -112,13 +114,27 @@ function ExecutePage(props: {
 
   const activeTasks = props.tasks.filter((task) => task.active)
   const selectedTask = activeTasks.find((task) => task.id === selectedTaskId)
+  const undo = pendingUndo?.taskId === selectedTaskId ? pendingUndo : null
 
-  // Troca de tarefa sempre limpa uma janela de desfazer pendente — senão,
-  // reabrir a mesma tarefa depois mostraria o aviso de uma finalização antiga
-  function selectTask(taskId: string | null) {
-    setSelectedTaskId(taskId)
+  // Abrir uma tarefa empilha (o voltar volta pra lista), marcado no estado
+  // da navegação: o "← Tarefas" sabe que pode só voltar. Trocar de tarefa
+  // limpa a janela de desfazer e o rascunho (reabrir a mesma tarefa não pode
+  // mostrar o aviso de uma finalização antiga)
+  function selectTask(taskId: string) {
+    setSearchParams({ tarefa: taskId }, { state: { fromPicker: true } })
     setPendingUndo(null)
     setDraft(null)
+  }
+
+  // "← Tarefas": aberta pela lista daqui, é um voltar de verdade (o próximo
+  // voltar sai do Executar, sem pingue-pongue); aberta direto (cartão da
+  // Lista, link), troca pela lista sem empilhar
+  function backToTasks() {
+    setPendingUndo(null)
+    setDraft(null)
+    const state = location.state as { fromPicker?: boolean } | null
+    if (state?.fromPicker) navigate(-1)
+    else setSearchParams({}, { replace: true })
   }
 
   async function handleCreate(newTask: NewTask) {
@@ -173,6 +189,7 @@ function ExecutePage(props: {
     )
     await props.onFinishExecution(executionId, description, tags, measureValues)
     setPendingUndo({
+      taskId: selectedTask?.id ?? '',
       executionId,
       previousDescription: execution?.description ?? null,
       previousTags: {
@@ -189,15 +206,15 @@ function ExecutePage(props: {
   }
 
   async function handleUndo() {
-    if (!pendingUndo) return
+    if (!undo) return
     setUndoing(true)
     await props.onUndoFinishExecution(
-      pendingUndo.executionId,
-      pendingUndo.previousDescription,
-      pendingUndo.previousTags,
-      pendingUndo.previousMeasureValues,
-      pendingUndo.previousWorkout,
-      pendingUndo.resumeEntryId,
+      undo.executionId,
+      undo.previousDescription,
+      undo.previousTags,
+      undo.previousMeasureValues,
+      undo.previousWorkout,
+      undo.resumeEntryId,
     )
     setUndoing(false)
     setPendingUndo(null)
@@ -348,29 +365,30 @@ function ExecutePage(props: {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col items-start gap-1.5">
-          <h2 className="font-titulo text-xl font-bold break-words">
-            {selectedTask.title}
-          </h2>
-          {selectedTask.frequency !== 'none' && (
-            <span className={chipClass}>
-              {frequencyLabels[selectedTask.frequency]}
-            </span>
-          )}
-        </div>
+      <div className="flex flex-col items-start gap-1.5">
+        {/* Voltar à vista, no lugar de sempre (em cima, à esquerda); 44px de
+            altura pra tocar. Substitui o "trocar tarefa", que não parecia
+            um voltar */}
         <button
           type="button"
-          onClick={() => selectTask(null)}
-          className={`mt-1 whitespace-nowrap text-sm text-tinta-suave ${inlineButtonClass}`}
+          onClick={backToTasks}
+          className={`-mt-2 mb-1 inline-flex min-h-11 items-center rounded-md text-sm text-tinta-suave hover:text-tinta ${focusRing}`}
         >
-          trocar tarefa
+          ← Tarefas
         </button>
+        <h2 className="min-w-0 font-titulo text-xl font-bold break-words">
+          {selectedTask.title}
+        </h2>
+        {selectedTask.frequency !== 'none' && (
+          <span className={chipClass}>
+            {frequencyLabels[selectedTask.frequency]}
+          </span>
+        )}
       </div>
 
       {undoing ? (
         <p className="text-sm text-tinta-suave">Desfazendo…</p>
-      ) : pendingUndo ? (
+      ) : undo ? (
         <UndoNotice
           seconds={UNDO_SECONDS}
           onExpire={() => {

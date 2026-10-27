@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet } from 'react-router'
 import ThemeToggle from '../components/ThemeToggle'
 import {
   ChartIcon,
@@ -60,8 +60,11 @@ function Layout(props: {
             embaixo (com 4 abas, numa linha só faltavam 55px na coluna de
             544px, em qualquer largura). Ordem = ordem visual (e do Tab) */}
         <header className="mx-auto flex max-w-xl items-center gap-4 px-4 pt-6 pb-3 sm:flex-wrap sm:gap-y-1 sm:pt-2.5 sm:pb-2">
+          {/* O nome leva ao início (a Lista), como em quase todo app */}
           <h1 className="mr-auto font-titulo text-xl font-bold tracking-tight">
-            StudyFlow
+            <Link to="/" className={`rounded-md ${focusRing}`}>
+              StudyFlow
+            </Link>
           </h1>
           {/* Configuração, não uso diário: fica no topo, fora da barra de baixo */}
           <NavLink
