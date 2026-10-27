@@ -134,7 +134,10 @@ try {
   check('Em Código: pizza das subtags', /^Pizza do tempo por subtag/.test(d.pieLabel ?? '') && d.slices.length === Math.min(sub.items.length, 6), `${d.pieLabel} ${d.slices.length}`)
   const ph = await api('tempo-por-fase', { ...period, contexto: codigo.id })
   check('Em Código: tabela de fases = API (rótulos da tela; null = "(sem fase)")',
-    JSON.stringify(d.phaseRows.map((x) => [x[0], x[1]])) === JSON.stringify(ph.items.map((x) => [x.phase === null ? '(sem fase)' : phaseLabels[x.phase], duration(x.seconds)])),
+    // as linhas do período primeiro; depois as só do anterior (D6), com 0min
+    // (a fase que só existe na semana anterior: depende do dia em que roda)
+    JSON.stringify(d.phaseRows.slice(0, ph.items.length).map((x) => [x[0], x[1]])) === JSON.stringify(ph.items.map((x) => [x.phase === null ? '(sem fase)' : phaseLabels[x.phase], duration(x.seconds)])) &&
+      d.phaseRows.slice(ph.items.length).every((x) => x[1] === '0min'),
     `${JSON.stringify(d.phaseRows)} x ${JSON.stringify(ph.items)}`)
   await page.goBack({ waitUntil: 'networkidle0' })
   await pause(300)

@@ -61,6 +61,16 @@ const browser = await puppeteer.launch({
 let bad = 0
 try {
   const page = await browser.newPage()
+  // Cada caso começa sem rascunho (N3): os rascunhos dos formulários ficam na
+  // sessão do navegador, e esta bateria recarrega a página esperando o
+  // formulário intocado (quem testa a memória é a telas/rascunhos)
+  await page.evaluateOnNewDocument(() => {
+    try {
+      sessionStorage.clear()
+    } catch {
+      // sem a sessão do navegador: nada a limpar
+    }
+  })
   page.setDefaultTimeout(10000)
   const scenarios = {
     async registrar() {

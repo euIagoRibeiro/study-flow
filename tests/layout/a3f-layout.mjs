@@ -12,6 +12,16 @@ const minField = {}
 const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
+  // Cada caso começa sem rascunho (N3): os rascunhos dos formulários ficam na
+  // sessão do navegador, e esta bateria recarrega a página esperando o
+  // formulário intocado (quem testa a memória é a telas/rascunhos)
+  await page.evaluateOnNewDocument(() => {
+    try {
+      sessionStorage.clear()
+    } catch {
+      // sem a sessão do navegador: nada a limpar
+    }
+  })
   page.setDefaultTimeout(10000)
   // O cartão do 1401: o artigo mais interno com a descrição (o 1º, mais recente)
   const markCard = () => page.evaluate(() => {

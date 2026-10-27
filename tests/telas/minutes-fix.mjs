@@ -31,6 +31,16 @@ try {
       args: [`--lang=${lang}`],
     })
     const page = await browser.newPage()
+    // Cada caso começa sem rascunho (N3): os rascunhos dos formulários ficam na
+    // sessão do navegador, e esta bateria recarrega a página esperando o
+    // formulário intocado (quem testa a memória é a telas/rascunhos)
+    await page.evaluateOnNewDocument(() => {
+      try {
+        sessionStorage.clear()
+      } catch {
+        // sem a sessão do navegador: nada a limpar
+      }
+    })
     await page.setViewport({ width: 375, height: 900 })
     for (const [typed, expected] of [['4,5', 'erro'], ['4.5', 'erro'], ['0', 'erro'], ['1441', 'erro'], ['abc', 'erro'], ['45', 45]]) {
       await waitForApi()
