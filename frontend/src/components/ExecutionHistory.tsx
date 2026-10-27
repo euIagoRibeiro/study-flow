@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   formatDayLabel,
   formatDuration,
@@ -53,6 +53,16 @@ function ExecutionHistory(props: {
   // sessão de tempo está em edição, são coisas independentes
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
+  // Os lápis, pra o Cancelar devolver o foco a quem abriu a edição (focar
+  // também rola a tela até ele: num formulário longo, o lápis fica lá em cima)
+  const pencils = useRef(new Map<string, HTMLButtonElement>())
+  const pencilRef = (key: string) => (el: HTMLButtonElement | null) => {
+    if (!el) return
+    pencils.current.set(key, el)
+    return () => {
+      pencils.current.delete(key)
+    }
+  }
   // Sessões começam recolhidas: guarda só as execuções abertas
   const [openSessions, setOpenSessions] = useState<Set<string>>(() => new Set())
   // Treino também começa recolhido ("3 exercícios ⌄"), independente das sessões
@@ -218,6 +228,7 @@ function ExecutionHistory(props: {
             )}
           </div>
           <CompactIconButton
+            buttonRef={pencilRef(`registro:${execution.id}`)}
             onClick={() => setEditingId(editing ? null : execution.id)}
             expanded={editing}
             label={`${editing ? 'Cancelar edição do' : 'Editar'} registro de ${dateLabel}`}
@@ -241,6 +252,10 @@ function ExecutionHistory(props: {
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)
               setEditingId(null)
+            }}
+            onCancel={() => {
+              setEditingId(null)
+              pencils.current.get(`registro:${execution.id}`)?.focus()
             }}
           />
         )}
@@ -280,6 +295,7 @@ function ExecutionHistory(props: {
                     {/* Estimada: sem lápis, ajusta-se pelo registro (a âncora) */}
                     {!entry.estimated && (
                       <CompactIconButton
+                        buttonRef={pencilRef(`sessao:${entry.id}`)}
                         onClick={() =>
                           setEditingEntryId(editingEntry ? null : entry.id)
                         }
@@ -300,6 +316,10 @@ function ExecutionHistory(props: {
                       onSubmit={async (changes) => {
                         await props.onEditTimeEntry(entry.id, changes)
                         setEditingEntryId(null)
+                      }}
+                      onCancel={() => {
+                        setEditingEntryId(null)
+                        pencils.current.get(`sessao:${entry.id}`)?.focus()
                       }}
                     />
                   )}

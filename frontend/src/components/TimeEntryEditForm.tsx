@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
-import { fieldClass, primaryButtonClass } from '../styles'
+import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import type { TimeEntry } from '../types'
 import FormError from './FormError'
 
@@ -10,6 +10,7 @@ function TimeEntryEditForm(props: {
     startedAt: string
     endedAt: string
   }) => Promise<unknown>
+  onCancel: () => void // fecha sem gravar
 }) {
   const [startedAt, setStartedAt] = useState(
     toDatetimeLocalValue(props.entry.startedAt),
@@ -68,13 +69,22 @@ function TimeEntryEditForm(props: {
             className={fieldClass}
           />
         </label>
-        <button
-          type="submit"
-          disabled={submitting}
-          className={`w-full ${primaryButtonClass}`}
-        >
-          Salvar
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={props.onCancel}
+            className={`flex-1 ${secondaryButtonClass}`}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className={`flex-1 ${primaryButtonClass}`}
+          >
+            Salvar
+          </button>
+        </div>
       </div>
       {error && <FormError>{error}</FormError>}
     </form>

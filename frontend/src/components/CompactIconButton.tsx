@@ -1,19 +1,25 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 
 // Área de toque de 44px (acessibilidade), mas o que se VÊ — fundo no hover,
 // estado ativo e anel de foco — é um círculo de 32px dentro dela. Pra
 // botão de ícone numa linha mais baixa que 44px: o destaque não invade as
 // linhas vizinhas
-function CompactIconButton(props: {
+function CompactIconButton({
+  buttonRef,
+  ...props
+}: {
   label: string
   title: string
   expanded?: boolean
   onClick: () => void
   className?: string
   children: ReactNode
+  // Pra devolver o foco a ele (ex.: o Cancelar do formulário que ele abriu)
+  buttonRef?: Ref<HTMLButtonElement>
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={props.onClick}
       aria-expanded={props.expanded}

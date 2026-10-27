@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Link } from 'react-router'
 import { formatDayLabel, isSameLocalDay } from '../dates'
 import { frequencyLabels } from '../frequency'
@@ -73,6 +74,19 @@ function Task(props: {
 }) {
   const { id, title, frequency, active } = props.task
   const { openForm, onToggle } = props
+  const cardRef = useRef<HTMLElement>(null)
+
+  // Fechar o histórico pelo fim dele: o foco volta pro ⋯ do cartão (quem
+  // abriu), e focar rola a tela até ele (senão, fechando um histórico longo,
+  // a tela ficaria parada lá embaixo)
+  function closeHistory() {
+    onToggle('history')
+    cardRef.current
+      ?.querySelector<HTMLButtonElement>(
+        `button[aria-label="Mais ações de ${CSS.escape(title)}"]`,
+      )
+      ?.focus()
+  }
 
   // Tudo abaixo é derivado de executions: nada disso é guardado em estado
   const completed = props.executions.filter(isCompleted)
@@ -136,7 +150,7 @@ function Task(props: {
     <li>
       {/* Arquivada: tinta-suave + chip, sem opacity no cartão (apagar duas
           vezes derrubava o contraste). Uma cor por estado: o grifo ganha */}
-      <article className={`${cardClass} flex flex-col gap-2`}>
+      <article ref={cardRef} className={`${cardClass} flex flex-col gap-2`}>
         <div className="flex items-start gap-2">
           <h3 className="min-w-0 flex-1 pt-1.5 font-titulo text-base font-semibold break-words">
             <span
@@ -229,6 +243,14 @@ function Task(props: {
               onEdit={props.onEditExecution}
               onEditTimeEntry={props.onEditTimeEntry}
             />
+            {/* Fecha no fim também: num histórico longo, o ⋯ fica lá em cima */}
+            <button
+              type="button"
+              onClick={closeHistory}
+              className={`mt-3 w-full ${secondaryButtonClass}`}
+            >
+              Fechar histórico
+            </button>
           </div>
         )}
       </article>

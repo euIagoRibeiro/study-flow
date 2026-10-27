@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
-import { fieldClass, primaryButtonClass } from '../styles'
+import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
 import type {
@@ -29,6 +29,9 @@ function ExecutionEditForm(props: {
   estimateMinutes: number | null // a estimativa que o registro já tem
   workoutCatalog: WorkoutCatalog
   onSubmit: (changes: ExecutionChanges) => Promise<unknown>
+  // Fecha sem gravar (o formulário com treino é longo: o lápis que abriu
+  // fica lá em cima)
+  onCancel: () => void
 }) {
   const { execution } = props
   const [description, setDescription] = useState(execution.description ?? '')
@@ -190,14 +193,24 @@ function ExecutionEditForm(props: {
             onCreateExercise={props.workoutCatalog.create}
           />
         )}
-        <button
-          type="submit"
-          form={`editar-${execution.id}`}
-          disabled={submitting}
-          className={`w-full ${primaryButtonClass}`}
-        >
-          Salvar
-        </button>
+        {/* Cancelar + Salvar lado a lado, como no formulário de tarefa */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={props.onCancel}
+            className={`flex-1 ${secondaryButtonClass}`}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form={`editar-${execution.id}`}
+            disabled={submitting}
+            className={`flex-1 ${primaryButtonClass}`}
+          >
+            Salvar
+          </button>
+        </div>
       </div>
       {error && <FormError>{error}</FormError>}
     </div>
