@@ -1,6 +1,8 @@
 // M5: formulários ABERTOS com os campos de medida, de 320 a 1280: Registrar
 // (Linguagens, 4 tipos), Finalizar (Linguagens), editar no Histórico e no
 // cartão da Lista (1106 trocado pra Linguagens: tipos + aviso). Não salva nada.
+// Item 3 (2026-10-27): tipos UM EMBAIXO DO OUTRO no celular (< 640px), grade
+// 2×2 no computador, nos 4 lugares.
 import puppeteer from 'puppeteer-core'
 import { APP, CHROME, out } from '../config.mjs'
 
@@ -33,7 +35,9 @@ function measure(page) {
     const outOfForm = els.filter((el) => el.getBoundingClientRect().right > fr.right + 0.5).length
     const hasWarning = !!form.querySelector('p[role="status"]')
     const kinds = form.querySelectorAll('fieldset input').length
-    return { page: doc.scrollWidth - doc.clientWidth, past, bars, ring: Math.round(ring * 10) / 10, outOfForm, hasWarning, kinds }
+    // colunas da grade = quantos "lefts" diferentes os campos dos tipos têm
+    const columns = new Set([...form.querySelectorAll('fieldset label')].map((l) => Math.round(l.getBoundingClientRect().left))).size
+    return { page: doc.scrollWidth - doc.clientWidth, past, bars, ring: Math.round(ring * 10) / 10, outOfForm, hasWarning, kinds, columns }
   })
 }
 async function markForm(page) {
@@ -100,7 +104,7 @@ try {
       await markForm(page)
     },
   }
-  for (const width of [320, 375, 414, 768, 1024, 1280]) {
+  for (const width of [320, 360, 375, 414, 640, 768, 1024, 1280]) {
     await page.setViewport({ width, height: 900 })
     for (const [name, open] of Object.entries(scenarios)) {
       await open()
@@ -108,10 +112,11 @@ try {
       await new Promise((r) => setTimeout(r, 150))
       const m = await measure(page)
       const needsWarning = name === 'historico' || name === 'lista'
-      const fail = m.page > 0 || m.past > 0 || m.bars > 0 || m.outOfForm > 0 || m.ring < 4 || m.kinds !== 4 || m.hasWarning !== needsWarning
+      const columns = width < 640 ? 1 : 2
+      const fail = m.page > 0 || m.past > 0 || m.bars > 0 || m.outOfForm > 0 || m.ring < 4 || m.kinds !== 4 || m.hasWarning !== needsWarning || m.columns !== columns
       if (fail) bad++
       console.log(`${fail ? 'FALHOU' : 'OK    '} ${name} ${width}px: página +${m.page}px, passa da borda ${m.past}, barras ${m.bars}, ` +
-        `fora do formulário ${m.outOfForm}, folga do foco ${m.ring}px, tipos ${m.kinds}, aviso ${m.hasWarning}`)
+        `fora do formulário ${m.outOfForm}, folga do foco ${m.ring}px, tipos ${m.kinds}, aviso ${m.hasWarning}, colunas ${m.columns} (esperado ${columns})`)
       if (width === 320) {
         await page.evaluate(() => document.querySelector('[data-form="f"] fieldset').scrollIntoView({ block: 'center' }))
         await page.screenshot({ path: out(`m5-form-${name}-320.png`) })

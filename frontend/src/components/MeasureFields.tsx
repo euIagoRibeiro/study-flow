@@ -39,7 +39,11 @@ function MeasureFields(props: {
             <legend className="mb-1.5 text-sm text-tinta-suave">
               {title} (opcional)
             </legend>
-            <div className="grid grid-cols-2 gap-3">
+            {/* Um embaixo do outro no celular (pedido do uso real: a grade
+                2×2 quebrava os rótulos); no computador, a 2×2 de sempre. Pela
+                janela, de propósito: no computador, até o cartão mais estreito
+                (lápis no cartão da Lista) cabe a 2×2 (medido de 640 a 1280) */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {kinds.map((kind) => (
                 <label key={kind.id} className="flex min-w-0 flex-col gap-1.5">
                   <span className="text-sm break-words text-tinta-suave">
