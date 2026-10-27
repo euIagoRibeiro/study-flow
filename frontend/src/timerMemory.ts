@@ -1,3 +1,4 @@
+import type { MeasureTexts } from './measures'
 import type { TagIndex } from './tags'
 import type { Phase } from './types'
 
@@ -14,6 +15,7 @@ export type TimerMemory = {
   phase: Phase | null
   descriptionBase: string | null
   description: string
+  measureTexts?: MeasureTexts // N3; conferido por quem lê (isTexts)
 }
 
 const key = (executionId: string) => `studyflow:cronometro:${executionId}`
@@ -44,13 +46,18 @@ export function readTimerMemory(executionId: string): TimerMemory | null {
 
 // Caminho guardado que ainda dá pra escolher: começa num contexto, cada tag
 // é filha da anterior, e todas existem ativas (escolha nova não aceita
-// arquivada, como nos campos)
-export function isChoosablePath(path: string[], byId: TagIndex): boolean {
+// arquivada, como nos campos); `keep`: as que o registro já tem valem mesmo
+// arquivadas (editar registro antigo, como nos campos)
+export function isChoosablePath(
+  path: string[],
+  byId: TagIndex,
+  keep: string[] = [],
+): boolean {
   return path.every((id, i) => {
     const tag = byId.get(id)
     return (
       tag !== undefined &&
-      tag.active &&
+      (tag.active || keep.includes(id)) &&
       (i === 0 ? tag.parentId === null : tag.parentId === path[i - 1])
     )
   })

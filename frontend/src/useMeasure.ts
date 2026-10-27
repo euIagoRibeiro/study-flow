@@ -15,16 +15,21 @@ export function useMeasure(
   path: string[],
   measures: Measure[],
   recorded: ExecutionMeasure | null, // o que o registro já tem
+  // Rascunho recuperado (N3): os campos começam no que estava digitado, e
+  // contam como mexidos
+  restoredTexts?: MeasureTexts,
 ) {
   const [originalPath] = useState(path)
   const measureFor = (p: string[]) =>
     applicableMeasure(p, measures, recorded?.measureId)
   const restores = (p: string[]) =>
     recorded !== null && measureFor(p)?.id === recorded.measureId
-  const [texts, setTexts] = useState<MeasureTexts>(() =>
-    recorded && restores(path) ? valuesToTexts(recorded.values) : {},
+  const [texts, setTexts] = useState<MeasureTexts>(
+    () =>
+      restoredTexts ??
+      (recorded && restores(path) ? valuesToTexts(recorded.values) : {}),
   )
-  const [touched, setTouched] = useState(false)
+  const [touched, setTouched] = useState(restoredTexts !== undefined)
 
   const measure = measureFor(path)
   const pathChanged = path.join('/') !== originalPath.join('/')

@@ -17,6 +17,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../styles'
+import { clearDraft, draftKeys } from '../formDrafts'
 import { executionSelection, indexTags, lastRootPath } from '../tags'
 import type {
   Exercise,
@@ -171,8 +172,12 @@ function ExecutePage(props: {
     )
     setStarting(false)
     // Foi pro registro: o formulário de baixo volta limpo depois de
-    // finalizar, então o rascunho não pode ir de novo no próximo Iniciar
-    if (started) setDraft(null)
+    // finalizar, então o rascunho não pode ir de novo no próximo Iniciar, nem
+    // reaparecer como "Rascunho recuperado" (o conteúdo já foi usado)
+    if (started) {
+      setDraft(null)
+      clearDraft(draftKeys.registrar(selectedTask.id))
+    }
   }
 
   // Capturado antes do await: depois dele, a execução já está finalizada
@@ -471,8 +476,9 @@ function ExecutePage(props: {
             suggestPhase={suggestPhase}
             measures={props.measures}
             onSubmit={handleExecute}
+            draftKey={draftKeys.registrar(selectedTask.id)}
             onDraftChange={(value) =>
-              setDraft({ taskId: selectedTask.id, value })
+              setDraft(value ? { taskId: selectedTask.id, value } : null)
             }
           />
         </>

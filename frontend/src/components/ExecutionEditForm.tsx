@@ -1,13 +1,30 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
+import {
+  clearDraft,
+  draftKeys,
+  isPhase,
+  isText,
+  isTexts,
+  isWorkout,
+  readDraft,
+  useDraftSync,
+} from '../formDrafts'
+import {
+  applicableMeasure,
+  valuesToTexts,
+  type MeasureTexts,
+} from '../measures'
 import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
+import { isChoosablePath } from '../timerMemory'
 import type {
   CompletedExecution,
   ExecutionChanges,
   Measure,
+  Phase,
   Tag,
   WorkoutCatalog,
   WorkoutExercise,
@@ -15,6 +32,7 @@ import type {
 import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import { useMeasure } from '../useMeasure'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
+import DraftNotice from './DraftNotice'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
@@ -22,7 +40,7 @@ import PhaseField from './PhaseField'
 import TagFields from './TagFields'
 import WorkoutSection from './WorkoutSection'
 
-function ExecutionEditForm(props: {
+type EditProps = {
   execution: CompletedExecution
   tags: Tag[]
   measures: Measure[]
@@ -32,24 +50,142 @@ function ExecutionEditForm(props: {
   // Fecha sem gravar (o formulário com treino é longo: o lápis que abriu
   // fica lá em cima)
   onCancel: () => void
-}) {
+}
+
+// O que fica guardado do lápis (N3): tudo o que se mexe aqui, inclusive o
+// treino ainda não salvo. path null = registro antigo com mais de uma folha,
+// tags intocadas
+type EditDraft = {
+  description: string
+  completedAt: string
+  minutes: string
+  path: string[] | null
+  phase: Phase | null
+  measureTexts: MeasureTexts
+  workout: WorkoutExercise[]
+}
+
+const filledTexts = (texts: MeasureTexts) =>
+  Object.fromEntries(
+    Object.entries(texts).filter(([, text]) => text.trim() !== ''),
+  )
+
+// O "descartar" do rascunho remonta a edição intocada; o Cancelar (descartar
+// a edição) também apaga o rascunho
+function ExecutionEditForm(props: EditProps) {
+  const [generation, setGeneration] = useState(0)
+  const key = draftKeys.editar(props.execution.id)
+  return (
+    <EditForm
+      key={generation}
+      {...props}
+      onCancel={() => {
+        clearDraft(key)
+        props.onCancel()
+      }}
+      onDiscard={() => {
+        clearDraft(key)
+        setGeneration((n) => n + 1)
+      }}
+    />
+  )
+}
+
+function EditForm(props: EditProps & { onDiscard: () => void }) {
   const { execution } = props
-  const [description, setDescription] = useState(execution.description ?? '')
-  const [completedAt, setCompletedAt] = useState(
-    toDatetimeLocalValue(execution.completedAt),
-  )
-  const initialMinutes = props.estimateMinutes?.toString() ?? ''
-  const [minutes, setMinutes] = useState(initialMinutes)
   const byId = indexTags(props.tags)
-  const [selection, setSelection] = useState(() =>
-    executionSelection(execution, byId),
+  const draftKey = draftKeys.editar(execution.id)
+  // Tudo que o registro já tem continua escolhível, mesmo arquivado
+  const keep = [
+    ...(execution.rootTagId ? [execution.rootTagId] : []),
+    ...execution.tagIds,
+  ]
+  const initialMinutes = props.estimateMinutes?.toString() ?? ''
+  // Como o formulário abre sem rascunho (o registro como está gravado)
+  const [pristine] = useState<EditDraft>(() => {
+    const selected = executionSelection(execution, byId)
+    const recorded = execution.measure
+    return {
+      description: execution.description ?? '',
+      completedAt: toDatetimeLocalValue(execution.completedAt),
+      minutes: initialMinutes,
+      path: selected.legacyCount > 0 ? null : selected.path,
+      phase: execution.phase,
+      measureTexts:
+        recorded &&
+        applicableMeasure(selected.path, props.measures, recorded.measureId)
+          ?.id === recorded.measureId
+          ? filledTexts(valuesToTexts(recorded.values))
+          : {},
+      workout: execution.workout ?? [],
+    }
+  })
+  // O que ficou digitado antes (ir às tags e voltar, por exemplo); cada parte
+  // conferida: com lixo, o rascunho inteiro é ignorado
+  const [restored] = useState<EditDraft | null>(() => {
+    const d = readDraft(draftKey)
+    if (
+      !d ||
+      !isText(d.description) ||
+      !isText(d.completedAt) ||
+      !isText(d.minutes) ||
+      !(
+        d.path === null ||
+        (Array.isArray(d.path) &&
+          d.path.every(isText) &&
+          isChoosablePath(d.path, byId, keep))
+      ) ||
+      !isPhase(d.phase) ||
+      !isTexts(d.measureTexts) ||
+      !isWorkout(d.workout) ||
+      !d.workout.every((item) =>
+        props.workoutCatalog.exercises.some((x) => x.id === item.exerciseId),
+      )
+    ) {
+      return null
+    }
+    return d as EditDraft
+  })
+  const [description, setDescription] = useState(
+    restored?.description ?? pristine.description,
   )
-  const [phase, setPhase] = useState(execution.phase)
+  const [completedAt, setCompletedAt] = useState(
+    restored?.completedAt ?? pristine.completedAt,
+  )
+  const [minutes, setMinutes] = useState(restored?.minutes ?? initialMinutes)
+  const [selection, setSelection] = useState(() =>
+    restored?.path
+      ? { path: restored.path, legacyCount: 0 }
+      : executionSelection(execution, byId),
+  )
+  const [phase, setPhase] = useState(
+    restored ? restored.phase : execution.phase,
+  )
   const showPhase = phaseApplies(selection.path, byId)
-  // Começa nos valores do próprio registro (não é sugestão)
-  const measure = useMeasure(selection.path, props.measures, execution.measure)
+  // Começa nos valores do próprio registro (não é sugestão), ou no rascunho
+  const measure = useMeasure(
+    selection.path,
+    props.measures,
+    execution.measure,
+    restored?.measureTexts,
+  )
   // Treino: rascunho na tela, vai só no Salvar
-  const [draft, setDraft] = useState<WorkoutExercise[]>(execution.workout ?? [])
+  const [draft, setDraft] = useState<WorkoutExercise[]>(
+    restored?.workout ?? execution.workout ?? [],
+  )
+  useDraftSync(
+    draftKey,
+    {
+      description,
+      completedAt,
+      minutes,
+      path: selection.legacyCount > 0 ? null : selection.path,
+      phase,
+      measureTexts: filledTexts(measure.texts),
+      workout: draft,
+    } satisfies EditDraft,
+    pristine,
+  )
   const [originalPathKey] = useState(() =>
     executionSelection(execution, byId).path.join('/'),
   )
@@ -113,6 +249,7 @@ function ExecutionEditForm(props: {
         ...(sent.values ? { measureValues: sent.values } : {}),
         ...(sendWorkout ? { workout: draft } : {}),
       })
+      clearDraft(draftKey)
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 400
@@ -128,6 +265,7 @@ function ExecutionEditForm(props: {
 
   return (
     <div className="mt-3 flex flex-col gap-2">
+      {restored && <DraftNotice onDiscard={props.onDiscard} />}
       {/* Sempre empilhado: o form vive dentro de um cartão, e na linha única
           (antes, a partir de sm) os campos de data não encolhiam e empurravam
           o Salvar pra fora do cartão. O Salvar fica fora do <form>, ligado
@@ -166,10 +304,7 @@ function ExecutionEditForm(props: {
             value={selection.path}
             onChange={changePath}
             // Tudo que o registro já tem continua escolhível, mesmo arquivado
-            keep={[
-              ...(execution.rootTagId ? [execution.rootTagId] : []),
-              ...execution.tagIds,
-            ]}
+            keep={keep}
             legacyCount={selection.legacyCount}
           />
           {showPhase && <PhaseField value={phase} onChange={setPhase} />}

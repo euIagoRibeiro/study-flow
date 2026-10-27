@@ -31,6 +31,8 @@ import {
   readTimerMemory,
   writeTimerMemory,
 } from '../timerMemory'
+import { isTexts } from '../formDrafts'
+import type { MeasureTexts } from '../measures'
 import { useMeasure } from '../useMeasure'
 import { useWorkoutSync, type WorkoutTarget } from '../useWorkoutSync'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
@@ -92,6 +94,9 @@ function TimerPanel(props: {
         memory.descriptionBase === (execution.description ?? null)
           ? memory.description
           : null,
+      // Valores da medida (N3): de qual caminho eram, pra só valerem nele
+      measureTexts: isTexts(memory.measureTexts) ? memory.measureTexts : null,
+      measurePath: memory.path.join('/'),
     }
   })
   const [description, setDescription] = useState(
@@ -112,20 +117,40 @@ function TimerPanel(props: {
 
   // Guarda o que está na tela agora (com o que o servidor tinha), a cada
   // mudança feita aqui: sair e voltar não perde a escolha
-  function remember(path: string[], phaseValue: Phase | null, text: string) {
+  function remember(
+    path: string[],
+    phaseValue: Phase | null,
+    text: string,
+    texts: MeasureTexts,
+  ) {
     writeTimerMemory(execution.id, {
       base: serverPathKey,
       path,
       phase: phaseValue,
       descriptionBase: execution.description ?? null,
       description: text,
+      measureTexts: texts,
     })
   }
   // Voltou pelo Desfazer com medida: os campos começam nos valores dela
   // A medida do registro como estava ao abrir: a gravação do caminho (treino
   // ao vivo) pode tirá-la do servidor, e voltar o caminho tem que trazê-la
   const [openedMeasure] = useState(execution.measure)
-  const measure = useMeasure(selection.path, props.measures, openedMeasure)
+  // Valores da medida digitados antes de sair: só se o painel abriu no
+  // mesmo caminho em que foram digitados (são da medida dele)
+  const [restoredTexts] = useState(() =>
+    remembered?.measureTexts &&
+    Object.keys(remembered.measureTexts).length > 0 &&
+    remembered.measurePath === selection.path.join('/')
+      ? remembered.measureTexts
+      : undefined,
+  )
+  const measure = useMeasure(
+    selection.path,
+    props.measures,
+    openedMeasure,
+    restoredTexts,
+  )
   const [mountedPathKey] = useState(serverPathKey)
   const targetFor = (path: string[], phaseValue: Phase | null) =>
     ({
@@ -281,7 +306,12 @@ function TimerPanel(props: {
               value={description}
               onChange={(event) => {
                 setDescription(event.target.value)
-                remember(selection.path, phase, event.target.value)
+                remember(
+                  selection.path,
+                  phase,
+                  event.target.value,
+                  measure.texts,
+                )
               }}
               className={fieldClass}
             />
@@ -295,7 +325,8 @@ function TimerPanel(props: {
               setPhase(nextPhase)
               measure.changePath(path)
               workout.retarget(targetFor(path, nextPhase))
-              remember(path, nextPhase, description)
+              // caminho novo, campos da medida nova (vazios)
+              remember(path, nextPhase, description, {})
             }}
             keep={[
               ...(execution.rootTagId ? [execution.rootTagId] : []),
@@ -308,14 +339,20 @@ function TimerPanel(props: {
               value={phase}
               onChange={(next) => {
                 setPhase(next)
-                remember(selection.path, next, description)
+                remember(selection.path, next, description, measure.texts)
               }}
             />
           )}
           <MeasureFields
             measure={measure.measure}
             texts={measure.texts}
-            onChange={measure.change}
+            onChange={(key, text) => {
+              measure.change(key, text)
+              remember(selection.path, phase, description, {
+                ...measure.texts,
+                [key]: text,
+              })
+            }}
             keptKindIds={measure.keptKindIds}
             oldValues={measure.oldValues}
           />
