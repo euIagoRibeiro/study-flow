@@ -38,7 +38,20 @@ const SELECT_EXECUTION = `SELECT e.id,
                               ORDER BY s.position)
               FROM exercise_sets s WHERE s.execution_exercise_id = x.id))
      ORDER BY x.position)
-   FROM execution_exercises x WHERE x.task_execution_id = e.id) AS workout
+   FROM execution_exercises x WHERE x.task_execution_id = e.id) AS workout,
+  -- Escolhas agrupadas por seleção, opções na ordem de cadastro
+  COALESCE(
+    (SELECT json_agg(json_build_object('selectionId', g.selection_id,
+                                       'optionIds', g.option_ids)
+                     ORDER BY lower(g.name), g.selection_id)
+     FROM (SELECT es.selection_id, s.name,
+                  array_agg(es.option_id ORDER BY o.position) AS option_ids
+           FROM execution_selections es
+           JOIN selections s ON s.id = es.selection_id
+           JOIN selection_options o ON o.id = es.option_id
+           WHERE es.task_execution_id = e.id
+           GROUP BY es.selection_id, s.name) g),
+    '[]') AS selections
 FROM task_executions e
 LEFT JOIN task_execution_tags et ON et.task_execution_id = e.id`
 
@@ -109,6 +122,20 @@ const measureValues = z
   .max(20, 'No máximo 20 valores por registro')
   .optional()
 
+// Seleções: as opções escolhidas, numa lista plana (o servidor descobre a
+// seleção de cada uma). No PUT, ausente mantém, [] limpa, lista substitui
+const selectionOptionIds = z
+  .array(
+    z.uuid('selectionOptionIds precisa ser uma lista de uuids'),
+    'selectionOptionIds precisa ser uma lista de uuids',
+  )
+  .max(50, 'No máximo 50 opções por registro')
+  .refine(
+    (ids) => new Set(ids).size === ids.length,
+    'Opção repetida em selectionOptionIds',
+  )
+  .optional()
+
 // Treino (A3): a lista inteira, em ordem. Ausente mantém, [] remove, lista
 // substitui tudo. Os tetos são de garantia, não regra de tela. O banco
 // arredondaria a 3ª casa do peso em silêncio: recusar antes
@@ -173,6 +200,7 @@ const newExecutionSchema = withTagRule(
     phase,
     estimatedMinutes,
     measureValues,
+    selectionOptionIds,
     ...tagFields,
   }),
 )
@@ -185,6 +213,7 @@ const executionChangesSchema = withTagRule(
     estimatedMinutes,
     measureValues,
     workout: workout.optional(),
+    selectionOptionIds,
     ...tagFields,
   }),
 )
@@ -444,6 +473,119 @@ function measureConstraintError(err) {
   )
 }
 
+class SelectionError extends Error {}
+const SELECTION_MISMATCH = 'Seleção não confere com o caminho'
+
+async function choicesOf(client, executionId) {
+  const result = await client.query(
+    'SELECT option_id AS "optionId" FROM execution_selections WHERE task_execution_id = $1',
+    [executionId],
+  )
+  return result.rows.map((row) => row.optionId)
+}
+
+// Grava as escolhas (já dentro de uma transação, com o caminho gravado).
+// [] limpa. Vale a seleção global ou a declarada em qualquer tag do caminho
+// (somam). Seleção ou opção arquivada: só se já estava no registro
+async function setSelections(client, executionId, optionIds, previous) {
+  const options = optionIds.length
+    ? (
+        await client.query(
+          `SELECT o.id, o.active, o.selection_id AS "selectionId",
+                  s.name AS "selectionName", s.tag_id AS "tagId", s.multiple,
+                  s.is_global AS "isGlobal", s.active AS "selectionActive"
+           FROM selection_options o JOIN selections s ON s.id = o.selection_id
+           WHERE o.id = ANY($1)`,
+          [optionIds],
+        )
+      ).rows
+    : []
+  if (options.length !== optionIds.length) {
+    throw new SelectionError('Uma das opções não existe')
+  }
+  const path = await client.query(
+    `SELECT root_tag_id AS id FROM task_executions WHERE id = $1
+     UNION SELECT tag_id FROM task_execution_tags WHERE task_execution_id = $1`,
+    [executionId],
+  )
+  const onPath = new Set(path.rows.map((row) => row.id))
+  const kept = new Set(previous)
+  const chosen = new Map()
+  for (const option of options) {
+    const name = option.selectionName
+    if (!option.isGlobal && !onPath.has(option.tagId)) {
+      throw new SelectionError(
+        `A seleção "${name}" não vale para o caminho deste registro`,
+      )
+    }
+    if (!kept.has(option.id) && !option.selectionActive) {
+      throw new SelectionError(`A seleção "${name}" está arquivada`)
+    }
+    if (!kept.has(option.id) && !option.active) {
+      throw new SelectionError(
+        `Opção arquivada em "${name}" não pode ser escolhida`,
+      )
+    }
+    const count = (chosen.get(option.selectionId) ?? 0) + 1
+    chosen.set(option.selectionId, count)
+    if (!option.multiple && count > 1) {
+      throw new SelectionError(`"${name}" é de escolha única`)
+    }
+  }
+  await client.query(
+    'DELETE FROM execution_selections WHERE task_execution_id = $1',
+    [executionId],
+  )
+  if (options.length > 0) {
+    // As cópias saem da própria seleção; a raiz, do registro (NULL na global)
+    await client.query(
+      `INSERT INTO execution_selections
+         (task_execution_id, selection_id, option_id, selection_multiple,
+          selection_global, tag_id, root_tag_id)
+       SELECT e.id, s.id, o.id, s.multiple, s.is_global, s.tag_id,
+              CASE WHEN s.is_global THEN NULL ELSE e.root_tag_id END
+       FROM selection_options o
+       JOIN selections s ON s.id = o.selection_id
+       CROSS JOIN task_executions e
+       WHERE o.id = ANY($2) AND e.id = $1`,
+      [executionId, optionIds],
+    )
+  }
+}
+
+// Raiz nova: saem as escolhas presas à raiz antiga ANTES do applyTags (a FK
+// da raiz não é adiável). A global não depende da raiz e fica
+async function dropRootSelections(client, executionId) {
+  await client.query(
+    `DELETE FROM execution_selections
+     WHERE task_execution_id = $1 AND NOT selection_global`,
+    [executionId],
+  )
+}
+
+// Caminho trocado sem mandar as escolhas: saem, uma a uma, as que a
+// declarante deixou o caminho (depois do applyTags e antes do COMMIT: a FK
+// do caminho é adiável). As da raiz e a global ficam
+async function dropSelectionsOffPath(client, executionId) {
+  await client.query(
+    `DELETE FROM execution_selections es
+     WHERE es.task_execution_id = $1
+       AND es.tag_id <> es.root_tag_id
+       AND NOT EXISTS (SELECT 1 FROM task_execution_tags et
+                       WHERE et.task_execution_id = es.task_execution_id
+                         AND et.tag_id = es.tag_id)`,
+    [executionId],
+  )
+}
+
+// Rede de segurança: recusas do banco (migration 0013), pelo nome
+function selectionConstraintError(err) {
+  return (
+    ['23503', '23505', '23514'].includes(err.code) &&
+    err.constraint?.startsWith('execution_selections_')
+  )
+}
+
 // A estimativa é uma sessão marcada: termina no "Quando" do registro e
 // começa X minutos antes. Trocar = apagar e criar (nunca duas ao mesmo tempo)
 async function setEstimate(client, executionId, minutes) {
@@ -647,17 +789,27 @@ executionsRouter.post('/', async (req, res) => {
     if (execution.measureValues?.length) {
       await setMeasure(client, id, execution.measureValues)
     }
+    if (execution.selectionOptionIds?.length) {
+      await setSelections(client, id, execution.selectionOptionIds, [])
+    }
     const created = await findExecution(client, id)
     const timeEntries = await entriesOf(client, id)
     await client.query('COMMIT')
     res.status(201).json({ ...created, timeEntries })
   } catch (err) {
     await client.query('ROLLBACK')
-    if (err instanceof TagError || err instanceof MeasureError) {
+    if (
+      err instanceof TagError ||
+      err instanceof MeasureError ||
+      err instanceof SelectionError
+    ) {
       return res.status(400).json({ error: err.message })
     }
     if (measureConstraintError(err)) {
       return res.status(400).json({ error: 'Medida não confere com o caminho' })
+    }
+    if (selectionConstraintError(err)) {
+      return res.status(400).json({ error: SELECTION_MISMATCH })
     }
     if (phaseError(err)) return res.status(400).json({ error: phaseError(err) })
     if (isOpenExecutionConflict(err)) {
@@ -715,6 +867,8 @@ executionsRouter.put('/:id', async (req, res) => {
       )
     }
     const current = result.rows[0]
+    // Antes de qualquer troca: as arquivadas que podem continuar
+    const previousChoices = await choicesOf(client, req.params.id)
     if (hasTags(changes)) {
       const previousTags = await client.query(
         'SELECT tag_id FROM task_execution_tags WHERE task_execution_id = $1',
@@ -733,6 +887,7 @@ executionsRouter.put('/:id', async (req, res) => {
       if (rootTagId !== current.rootTagId) {
         await dropMeasure(client, req.params.id)
         await dropWorkout(client, req.params.id)
+        await dropRootSelections(client, req.params.id)
       }
       await applyTags(
         client,
@@ -753,6 +908,9 @@ executionsRouter.put('/:id', async (req, res) => {
       if (changes.workout === undefined) {
         await dropWorkoutIfOffPath(client, req.params.id)
       }
+      if (changes.selectionOptionIds === undefined) {
+        await dropSelectionsOffPath(client, req.params.id)
+      }
     } else if (changes.phase !== undefined) {
       await setPhase(client, req.params.id, changes.phase)
     }
@@ -767,6 +925,14 @@ executionsRouter.put('/:id', async (req, res) => {
     if (changes.workout !== undefined) {
       await setWorkout(client, req.params.id, changes.workout)
     }
+    if (changes.selectionOptionIds !== undefined) {
+      await setSelections(
+        client,
+        req.params.id,
+        changes.selectionOptionIds,
+        previousChoices,
+      )
+    }
     const updated = {
       ...(await findExecution(client, req.params.id)),
       timeEntries: await entriesOf(client, req.params.id),
@@ -778,13 +944,17 @@ executionsRouter.put('/:id', async (req, res) => {
     if (
       err instanceof TagError ||
       err instanceof MeasureError ||
-      err instanceof WorkoutError
+      err instanceof WorkoutError ||
+      err instanceof SelectionError
     ) {
       return res.status(400).json({ error: err.message })
     }
     // Inclui as FKs adiáveis do caminho, que só são conferidas no COMMIT
     if (measureConstraintError(err)) {
       return res.status(400).json({ error: 'Medida não confere com o caminho' })
+    }
+    if (selectionConstraintError(err)) {
+      return res.status(400).json({ error: SELECTION_MISMATCH })
     }
     if (workoutConstraintError(err)) {
       return res.status(400).json({ error: 'Treino não confere com o caminho' })
