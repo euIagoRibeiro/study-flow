@@ -4,6 +4,10 @@ import { dashboardRouter } from './routes/dashboard.js'
 import { executionsRouter } from './routes/executions.js'
 import { exercisesRouter } from './routes/exercises.js'
 import { measureKindsRouter, measuresRouter } from './routes/measures.js'
+import {
+  selectionOptionsRouter,
+  selectionsRouter,
+} from './routes/selections.js'
 import { tagsRouter } from './routes/tags.js'
 import { tasksRouter } from './routes/tasks.js'
 import { timeEntriesRouter } from './routes/timeEntries.js'
@@ -24,6 +28,8 @@ app.use('/tags', tagsRouter)
 app.use('/measures', measuresRouter)
 app.use('/measure-kinds', measureKindsRouter)
 app.use('/exercises', exercisesRouter)
+app.use('/selections', selectionsRouter)
+app.use('/selection-options', selectionOptionsRouter)
 app.use('/dashboard', dashboardRouter)
 
 // Os 4 parâmetros são obrigatórios: é pela contagem que o Express
