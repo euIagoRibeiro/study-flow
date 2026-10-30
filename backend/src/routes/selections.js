@@ -57,6 +57,17 @@ const optionChangesSchema = z
     'Nenhum campo pra atualizar (name, active)',
   )
 
+// Sem rootTagId: registro sem caminho, sem sugestão (decidido no plano do S2)
+const suggestionSchema = z
+  .object({
+    rootTagId: z.uuid('rootTagId precisa ser um id válido').optional(),
+    tagId: z.uuid('tagId precisa ser um id válido').optional(),
+  })
+  .refine(
+    (query) => !(query.tagId && !query.rootTagId),
+    'tagId precisa de rootTagId',
+  )
+
 const SELECT_SELECTION = `SELECT s.id, s.tag_id AS "tagId", s.name, s.multiple, s.active,
   COALESCE(
     (SELECT json_agg(json_build_object('id', o.id, 'name', o.name,
@@ -118,6 +129,91 @@ selectionsRouter.get('/', async (req, res) => {
     `${SELECT_SELECTION} ORDER BY lower(s.name), s.id`,
   )
   res.json(result.rows)
+})
+
+// Sugestão: pra cada seleção ativa que vale no caminho, as opções ATIVAS do
+// último registro concluído com a MESMA folha que a escolheu; sem nenhum,
+// o último da mesma raiz. "Mesma folha": nível 3, o registro tem a tag;
+// nível 2, tem a tag e nenhuma filha dela; a raiz, nenhuma subtag
+const SUGGESTION = `WITH path AS (
+    SELECT $1::uuid AS id
+    UNION SELECT $2::uuid
+    UNION SELECT parent_id FROM tags WHERE id = $2::uuid),
+  choices AS (
+    SELECT es.selection_id, es.task_execution_id, e.completed_at, e.created_at,
+      CASE $3::int
+        WHEN 1 THEN NOT EXISTS (
+          SELECT 1 FROM task_execution_tags et WHERE et.task_execution_id = e.id)
+        WHEN 2 THEN EXISTS (
+            SELECT 1 FROM task_execution_tags et
+            WHERE et.task_execution_id = e.id AND et.tag_id = $2::uuid)
+          AND NOT EXISTS (
+            SELECT 1 FROM task_execution_tags et JOIN tags x ON x.id = et.tag_id
+            WHERE et.task_execution_id = e.id AND x.parent_id = $2::uuid)
+        ELSE EXISTS (
+          SELECT 1 FROM task_execution_tags et
+          WHERE et.task_execution_id = e.id AND et.tag_id = $2::uuid)
+      END AS same_leaf
+    FROM execution_selections es
+    JOIN selections s ON s.id = es.selection_id AND s.active
+    JOIN selection_options o ON o.id = es.option_id AND o.active
+    JOIN task_executions e ON e.id = es.task_execution_id
+    WHERE e.completed_at IS NOT NULL AND e.root_tag_id = $1::uuid
+      AND (s.tag_id IS NULL OR s.tag_id IN (SELECT id FROM path))),
+  picked AS (
+    SELECT DISTINCT ON (selection_id) selection_id, task_execution_id, same_leaf
+    FROM choices
+    ORDER BY selection_id, same_leaf DESC, completed_at DESC, created_at DESC,
+             task_execution_id DESC)
+  SELECT p.selection_id AS "selectionId",
+         array_agg(es.option_id ORDER BY o.position) AS "optionIds",
+         CASE WHEN p.same_leaf THEN 'path' ELSE 'root' END AS "from"
+  FROM picked p
+  JOIN execution_selections es
+    ON es.task_execution_id = p.task_execution_id AND es.selection_id = p.selection_id
+  JOIN selection_options o ON o.id = es.option_id AND o.active
+  JOIN selections s ON s.id = p.selection_id
+  GROUP BY p.selection_id, p.same_leaf, s.name
+  ORDER BY lower(s.name), p.selection_id`
+
+selectionsRouter.get('/sugestao', async (req, res) => {
+  const { error, data: query } = validate(suggestionSchema, req.query)
+  if (error) return res.status(400).json({ error })
+  if (!query.rootTagId) return res.json({ items: [] })
+
+  const root = await pool.query('SELECT level FROM tags WHERE id = $1', [
+    query.rootTagId,
+  ])
+  if (root.rowCount === 0) {
+    return res.status(404).json({ error: 'Tag não encontrada' })
+  }
+  if (root.rows[0].level !== 1) {
+    return res
+      .status(400)
+      .json({ error: 'rootTagId precisa ser um contexto (nível 1)' })
+  }
+  let leafLevel = 1
+  if (query.tagId) {
+    const leaf = await pool.query(
+      'SELECT level, effective_root AS "rootId" FROM tags WHERE id = $1',
+      [query.tagId],
+    )
+    if (leaf.rowCount === 0) {
+      return res.status(404).json({ error: 'Tag não encontrada' })
+    }
+    if (leaf.rows[0].level === 1 || leaf.rows[0].rootId !== query.rootTagId) {
+      return res
+        .status(400)
+        .json({ error: 'tagId não é uma subtag desse contexto' })
+    }
+    leafLevel = leaf.rows[0].level
+  }
+  const result = await pool.query(SUGGESTION, [
+    query.rootTagId,
+    query.tagId ?? query.rootTagId,
+    leafLevel,
+  ])
+  res.json({ items: result.rows })
 })
 
 // Seleção e opções juntas, ou nada; posições na ordem da lista
