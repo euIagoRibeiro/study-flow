@@ -98,6 +98,8 @@ async function expandAll(page) {
 }
 
 const realTags = await (await fetch(`${API}/tags`)).json()
+const activeCount = (tags) => tags.filter((t) => t.active).length
+const expectedRows = { seed: activeCount(realTags), 'nomes longos': activeCount([...realTags, ...LONG]) }
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
@@ -125,7 +127,7 @@ try {
       await expandAll(page)
       const m = await inspect(page)
       check(`${scenario} ${width}px: ${m.rows} linhas, ${m.wrapped} chip(s) na linha de baixo${m.longBreaks.length ? '; palavra longa quebrada (aceito): ' + m.longBreaks.map((x) => x.split('"')[1]).join(', ') : ''}`,
-        m.rows === (scenario === 'seed' ? 21 : 25) && m.problems.length === 0 && m.pageScroll === 0, [...m.problems, m.pageScroll ? `página +${m.pageScroll}px` : ''].filter(Boolean).join('; '))
+        m.rows > 0 && m.rows === expectedRows[scenario] && m.problems.length === 0 && m.pageScroll === 0, [...m.problems, m.pageScroll ? `página +${m.pageScroll}px` : ''].filter(Boolean).join('; '))
       if (width === 320) await page.screenshot({ path: `${OUT}/chip-tags-${scenario === 'seed' ? 'seed' : 'longos'}-320.png`, fullPage: true })
     }
   }

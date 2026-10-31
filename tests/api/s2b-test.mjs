@@ -213,7 +213,7 @@ try {
   const left = await pool.query(
     `SELECT (SELECT count(*) FROM tags WHERE name LIKE '${P}%')::int + (SELECT count(*) FROM tasks WHERE title LIKE '${P}%')::int +
             (SELECT count(*) FROM selections WHERE id::text NOT LIKE '5eed%')::int +
-            (SELECT count(*) FROM execution_selections)::int AS n`)
+            (SELECT count(*) FROM execution_selections WHERE task_execution_id::text NOT LIKE '5eed%')::int AS n`)
   check('dados de teste apagados (nenhuma seleção nem escolha fora do seed)', left.rows[0].n === 0, `${left.rows[0].n} sobrando`)
   await pool.end()
   const ok = results.filter(Boolean).length

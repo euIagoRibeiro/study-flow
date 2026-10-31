@@ -487,4 +487,128 @@ JOIN tags t ON t.id = leaf.id OR (leaf.level = 3 AND t.id = leaf.parent_id);
 INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated)
 SELECT id, ini AT TIME ZONE 'America/Sao_Paulo', (ini + dur) AT TIME ZONE 'America/Sao_Paulo', estimada FROM d1;
 
+-- Seleções (S3a): só acrescenta. Sessões das anotações de 27 e 28/10, com as
+-- durações delas (cronômetro com os segundos), ontem e anteontem em hora LOCAL
+-- fixa; nada hoje e nada nas semanas 7–12 (janela fixa da dashboard-test).
+-- Raízes novas Desenho, Tecnologia, Música; Vestibular › Redação com medida
+-- própria "exercícios" (substitui a "questões" herdada). Tarefas novas avulsas.
+--   Natureza (global): estudo, pesquisa, prática, criação, lazer
+--   Meio (Desenho): digital, tradicional · Abordagem (Tecnologia): vibecode,
+--   tradicional · Instrumento (Música): guitarra, violão (opção ARQUIVADA
+--   depois de usada no 2208)
+-- 2201/2202 Inktober (digital, criação) · 2203 Perspectiva há 9 dias
+-- (tradicional, estudo) · 2204 IA sem Abordagem (pesquisa) · 2205 IA
+-- (vibecode, criação) · 2206 guitarra prática · 2207 guitarra SEM Natureza
+-- (a sugestão de Natureza da Música vem do 2206) · 2208 violão há 30 dias ·
+-- 2209 Redação (pesquisa) · 2210 Redação (prática, 1 exercício) · 501 já
+-- existia, sem tag (estudo). Totais: 10 registros, 159:05 de sessões; 17
+-- escolhas. Ids: tags 6xx/7xx/8xx/140, tarefas 13/14, registros 22xx, medida
+-- a000…07, seleções c000, opções c100
+INSERT INTO tasks (id, title, frequency, active, created_at) VALUES
+  ('5eed0000-0000-4000-8000-000000000013', 'Desenhar',          'none', true, now() - interval '40 days'),
+  ('5eed0000-0000-4000-8000-000000000014', 'Praticar guitarra', 'none', true, now() - interval '39 days');
+
+INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
+  ('5eed0000-0000-4000-9000-000000000600', 'Desenho',    1, NULL, NULL),
+  ('5eed0000-0000-4000-9000-000000000700', 'Tecnologia', 1, NULL, NULL),
+  ('5eed0000-0000-4000-9000-000000000800', 'Música',     1, NULL, NULL);
+INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
+  ('5eed0000-0000-4000-9000-000000000140', 'Redação',     2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
+  ('5eed0000-0000-4000-9000-000000000610', 'Inktober',    2, '5eed0000-0000-4000-9000-000000000600', '5eed0000-0000-4000-9000-000000000600'),
+  ('5eed0000-0000-4000-9000-000000000620', 'Fundamentos', 2, '5eed0000-0000-4000-9000-000000000600', '5eed0000-0000-4000-9000-000000000600'),
+  ('5eed0000-0000-4000-9000-000000000710', 'IA',          2, '5eed0000-0000-4000-9000-000000000700', '5eed0000-0000-4000-9000-000000000700');
+INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
+  ('5eed0000-0000-4000-9000-000000000621', 'Luz e sombra', 3, '5eed0000-0000-4000-9000-000000000620', '5eed0000-0000-4000-9000-000000000600'),
+  ('5eed0000-0000-4000-9000-000000000622', 'Perspectiva',  3, '5eed0000-0000-4000-9000-000000000620', '5eed0000-0000-4000-9000-000000000600');
+
+INSERT INTO measures (id, tag_id, name, singular, allows_decimal) VALUES
+  ('5eed0000-0000-4000-a000-000000000007', '5eed0000-0000-4000-9000-000000000140', 'exercícios', 'exercício', false); -- Vestibular › Redação
+
+CREATE TEMP TABLE s3 ON COMMIT DROP AS
+SELECT v.id::uuid, v.task::uuid, v.titulo, v.descricao, v.raiz::uuid, v.folha::uuid,
+       (SELECT d FROM dia_local) + v.ini AS ini, v.dur
+FROM (VALUES
+  ('5eed0000-0000-4000-8000-000000002201', '5eed0000-0000-4000-8000-000000000013', 'Desenhar',                  'Inktober: retrato alternativo',         '5eed0000-0000-4000-9000-000000000600', '5eed0000-0000-4000-9000-000000000610', interval '-2 days 14 hours',  interval '35 minutes 30 seconds'),
+  ('5eed0000-0000-4000-8000-000000002202', '5eed0000-0000-4000-8000-000000000013', 'Desenhar',                  'Inktober: frasco de perfume',           '5eed0000-0000-4000-9000-000000000600', '5eed0000-0000-4000-9000-000000000610', interval '-1 day 14 hours',   interval '19 minutes'),
+  ('5eed0000-0000-4000-8000-000000002203', '5eed0000-0000-4000-8000-000000000013', 'Desenhar',                  'Perspectiva com dois pontos de fuga',   '5eed0000-0000-4000-9000-000000000600', '5eed0000-0000-4000-9000-000000000622', interval '-9 days 15 hours',  interval '40 minutes'),
+  ('5eed0000-0000-4000-8000-000000002204', '5eed0000-0000-4000-8000-000000000008', 'Ideias de projeto',         'Pesquisa sobre ferramentas de IA',      '5eed0000-0000-4000-9000-000000000700', '5eed0000-0000-4000-9000-000000000710', interval '-2 days 18 hours',  interval '6 minutes 55 seconds'),
+  ('5eed0000-0000-4000-8000-000000002205', '5eed0000-0000-4000-8000-000000000008', 'Ideias de projeto',         'Workflow com IA',                       '5eed0000-0000-4000-9000-000000000700', '5eed0000-0000-4000-9000-000000000710', interval '-1 day 18 hours',   interval '12 minutes 55 seconds'),
+  ('5eed0000-0000-4000-8000-000000002206', '5eed0000-0000-4000-8000-000000000014', 'Praticar guitarra',         'Coordenação motora',                    '5eed0000-0000-4000-9000-000000000800', NULL,                                   interval '-2 days 18 hours 30 minutes', interval '3 minutes 15 seconds'),
+  ('5eed0000-0000-4000-8000-000000002207', '5eed0000-0000-4000-8000-000000000014', 'Praticar guitarra',         'Coordenação motora',                    '5eed0000-0000-4000-9000-000000000800', NULL,                                   interval '-1 day 18 hours 30 minutes',  interval '4 minutes 10 seconds'),
+  ('5eed0000-0000-4000-8000-000000002208', '5eed0000-0000-4000-8000-000000000014', 'Praticar guitarra',         'Primeiras músicas no violão',           '5eed0000-0000-4000-9000-000000000800', NULL,                                   interval '-30 days 15 hours', interval '20 minutes'),
+  ('5eed0000-0000-4000-8000-000000002209', '5eed0000-0000-4000-8000-000000000009', 'Estudar para o vestibular', 'Buscando uma forma de estudar redação', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000140', interval '-2 days 19 hours',  interval '7 minutes 50 seconds'),
+  ('5eed0000-0000-4000-8000-000000002210', '5eed0000-0000-4000-8000-000000000009', 'Estudar para o vestibular', 'Fórmula de teses',                      '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000140', interval '-1 day 19 hours',   interval '9 minutes 30 seconds')
+) AS v (id, task, titulo, descricao, raiz, folha, ini, dur);
+
+-- O registro termina no fim da sessão (como a API grava)
+INSERT INTO task_executions
+  (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id)
+SELECT id, task, descricao, titulo, 'none', (ini + dur) AT TIME ZONE 'America/Sao_Paulo', raiz FROM s3;
+UPDATE task_executions SET task_frequency_at_time = 'daily'
+WHERE id IN ('5eed0000-0000-4000-8000-000000002209', '5eed0000-0000-4000-8000-000000002210');
+
+INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id)
+SELECT s3.id, t.id, t.parent_id, s3.raiz
+FROM s3
+JOIN tags leaf ON leaf.id = s3.folha
+JOIN tags t ON t.id = leaf.id OR (leaf.level = 3 AND t.id = leaf.parent_id);
+
+INSERT INTO time_entries (task_execution_id, started_at, ended_at)
+SELECT id, ini AT TIME ZONE 'America/Sao_Paulo', (ini + dur) AT TIME ZONE 'America/Sao_Paulo' FROM s3;
+
+-- 2210: a medida mais próxima é a da Redação, não a "questões" do Vestibular
+INSERT INTO execution_measures (task_execution_id, measure_id, tag_id, root_tag_id) VALUES
+  ('5eed0000-0000-4000-8000-000000002210', '5eed0000-0000-4000-a000-000000000007', '5eed0000-0000-4000-9000-000000000140', '5eed0000-0000-4000-9000-000000000100');
+INSERT INTO execution_measure_values (task_execution_id, measure_id, kind_id, quantity) VALUES
+  ('5eed0000-0000-4000-8000-000000002210', '5eed0000-0000-4000-a000-000000000007', NULL, 1);
+
+INSERT INTO selections (id, tag_id, name, multiple) VALUES
+  ('5eed0000-0000-4000-c000-000000000001', NULL,                                   'Natureza',    false),
+  ('5eed0000-0000-4000-c000-000000000002', '5eed0000-0000-4000-9000-000000000600', 'Meio',        false),
+  ('5eed0000-0000-4000-c000-000000000003', '5eed0000-0000-4000-9000-000000000700', 'Abordagem',   false),
+  ('5eed0000-0000-4000-c000-000000000004', '5eed0000-0000-4000-9000-000000000800', 'Instrumento', false);
+
+INSERT INTO selection_options (id, selection_id, name, position) VALUES
+  ('5eed0000-0000-4000-c100-000000000011', '5eed0000-0000-4000-c000-000000000001', 'estudo',      1),
+  ('5eed0000-0000-4000-c100-000000000012', '5eed0000-0000-4000-c000-000000000001', 'pesquisa',    2),
+  ('5eed0000-0000-4000-c100-000000000013', '5eed0000-0000-4000-c000-000000000001', 'prática',     3),
+  ('5eed0000-0000-4000-c100-000000000014', '5eed0000-0000-4000-c000-000000000001', 'criação',     4),
+  ('5eed0000-0000-4000-c100-000000000015', '5eed0000-0000-4000-c000-000000000001', 'lazer',       5),
+  ('5eed0000-0000-4000-c100-000000000021', '5eed0000-0000-4000-c000-000000000002', 'digital',     1),
+  ('5eed0000-0000-4000-c100-000000000022', '5eed0000-0000-4000-c000-000000000002', 'tradicional', 2),
+  ('5eed0000-0000-4000-c100-000000000031', '5eed0000-0000-4000-c000-000000000003', 'vibecode',    1),
+  ('5eed0000-0000-4000-c100-000000000032', '5eed0000-0000-4000-c000-000000000003', 'tradicional', 2),
+  ('5eed0000-0000-4000-c100-000000000041', '5eed0000-0000-4000-c000-000000000004', 'guitarra',    1),
+  ('5eed0000-0000-4000-c100-000000000042', '5eed0000-0000-4000-c000-000000000004', 'violão',      2);
+
+-- Como a API grava: cópias da seleção; declarante e raiz NULL só na global
+INSERT INTO execution_selections
+  (task_execution_id, selection_id, option_id, selection_multiple, selection_global, tag_id, root_tag_id)
+SELECT e.id, s.id, o.id, s.multiple, s.is_global, s.tag_id,
+       CASE WHEN s.is_global THEN NULL ELSE e.root_tag_id END
+FROM (VALUES
+  ('5eed0000-0000-4000-8000-000000002201'::uuid, '5eed0000-0000-4000-c100-000000000021'::uuid),
+  ('5eed0000-0000-4000-8000-000000002201', '5eed0000-0000-4000-c100-000000000014'),
+  ('5eed0000-0000-4000-8000-000000002202', '5eed0000-0000-4000-c100-000000000021'),
+  ('5eed0000-0000-4000-8000-000000002202', '5eed0000-0000-4000-c100-000000000014'),
+  ('5eed0000-0000-4000-8000-000000002203', '5eed0000-0000-4000-c100-000000000022'),
+  ('5eed0000-0000-4000-8000-000000002203', '5eed0000-0000-4000-c100-000000000011'),
+  ('5eed0000-0000-4000-8000-000000002204', '5eed0000-0000-4000-c100-000000000012'),
+  ('5eed0000-0000-4000-8000-000000002205', '5eed0000-0000-4000-c100-000000000031'),
+  ('5eed0000-0000-4000-8000-000000002205', '5eed0000-0000-4000-c100-000000000014'),
+  ('5eed0000-0000-4000-8000-000000002206', '5eed0000-0000-4000-c100-000000000041'),
+  ('5eed0000-0000-4000-8000-000000002206', '5eed0000-0000-4000-c100-000000000013'),
+  ('5eed0000-0000-4000-8000-000000002207', '5eed0000-0000-4000-c100-000000000041'),
+  ('5eed0000-0000-4000-8000-000000002208', '5eed0000-0000-4000-c100-000000000042'),
+  ('5eed0000-0000-4000-8000-000000002208', '5eed0000-0000-4000-c100-000000000013'),
+  ('5eed0000-0000-4000-8000-000000002209', '5eed0000-0000-4000-c100-000000000012'),
+  ('5eed0000-0000-4000-8000-000000002210', '5eed0000-0000-4000-c100-000000000013'),
+  ('5eed0000-0000-4000-8000-000000000501', '5eed0000-0000-4000-c100-000000000011')
+) AS c (execution_id, option_id)
+JOIN task_executions e ON e.id = c.execution_id
+JOIN selection_options o ON o.id = c.option_id
+JOIN selections s ON s.id = o.selection_id;
+
+UPDATE selection_options SET active = false WHERE id = '5eed0000-0000-4000-c100-000000000042';
+
 COMMIT;

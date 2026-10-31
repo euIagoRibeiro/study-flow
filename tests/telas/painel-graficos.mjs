@@ -101,8 +101,15 @@ try {
   check('fatias nas cores da ordem: 1ª = --categoria-1, 2ª = --categoria-2…', JSON.stringify(r.slices) === JSON.stringify(colors.slice(0, r.slices.length)), JSON.stringify(r.slices))
   check('legenda: a bolinha de cada linha tem a cor da fatia dela', r.rows.every((row, i) => row.dot === (i >= ctx.items.length ? null : i < 5 ? colors[i] : colors[5])), JSON.stringify(r.rows.map((x) => x.dot)))
   check('tabela = itens da API, na ordem', JSON.stringify(r.rows.slice(0, ctx.items.length).map((x) => [x.cells[0], x.cells[1]])) === JSON.stringify(ctx.items.map((x) => [nameOf(x.tagId), duration(x.seconds)])), JSON.stringify(r.rows.map((x) => x.cells)))
-  const big = ctx.items.filter((x) => x.seconds / ctx.totalSeconds >= 0.1).map((x) => `${Math.round((x.seconds / ctx.totalSeconds) * 100)}%`)
-  check('% ao lado das fatias grandes (≥ 10%), igual ao da tabela', JSON.stringify(r.pieTexts) === JSON.stringify(big), `${JSON.stringify(r.pieTexts)} x ${JSON.stringify(big)}`)
+  // Pelas FATIAS, como a tela: 5 itens + o resto ("outros" soma itens que
+  // sozinhos podem não chegar a 10%)
+  const bigLabels = (items) => {
+    const total = items.reduce((s, x) => s + x.seconds, 0)
+    const rest = items.slice(5).reduce((s, x) => s + x.seconds, 0)
+    return [...items.slice(0, 5).map((x) => x.seconds), rest].filter((v) => v / total >= 0.1).map((v) => `${Math.round((v / total) * 100)}%`)
+  }
+  const big = bigLabels(ctx.items)
+  check('% ao lado das fatias grandes (≥ 10%), inclusive "outros"', JSON.stringify(r.pieTexts) === JSON.stringify(big), `${JSON.stringify(r.pieTexts)} x ${JSON.stringify(big)}`)
   const days = await api('tempo-por-periodo', { ...period, por: 'dia' })
   check('barras: 7 (de segunda a domingo)', r.bars === 7, String(r.bars))
   const dayLabels = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
@@ -156,6 +163,7 @@ try {
   await page.goto(`${APP}/painel?periodo=semana&inicio=${prev}`, { waitUntil: 'networkidle0' })
   r = await settle('Tempo')
   check('"outros": 8 itens = 6 fatias (5 cores + cinza)', r.slices.length === 6 && JSON.stringify(r.slices) === JSON.stringify(colors), JSON.stringify(r.slices))
+  check('"outros": rótulo da fatia cinza, soma dos itens dela', r.pieTexts.at(-1) === '20%' && JSON.stringify(r.pieTexts) === JSON.stringify(bigLabels(fakeItems)), JSON.stringify(r.pieTexts))
   check('"outros": tabela com as 8 linhas; da 6ª em diante, bolinha cinza', r.rows.length === 8 && r.rows.slice(5).every((x) => x.dot === colors[5]), JSON.stringify(r.rows.map((x) => x.dot)))
   fakeItems = null
 } catch (err) {

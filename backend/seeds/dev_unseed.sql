@@ -2,7 +2,7 @@
 -- nos seus. A ordem importa por causa dos ON DELETE RESTRICT: treinos e
 -- medidas dos registros (e o catálogo de exercícios), sessões e ligações
 -- de tags, depois execuções, depois tarefas;
--- o cadastro de medidas antes das tags; tags dos netos pras raízes.
+-- o cadastro de medidas e de seleções antes das tags; tags dos netos pras raízes.
 --
 -- Se você registrou uma execução de verdade numa tarefa fictícia (ou criou
 -- uma tag sua dentro de uma tag fictícia), o RESTRICT recusa e a transação
@@ -29,6 +29,9 @@ WHERE task_execution_id::text LIKE '5eed%';
 DELETE FROM execution_measures
 WHERE task_execution_id::text LIKE '5eed%';
 
+DELETE FROM execution_selections
+WHERE task_execution_id::text LIKE '5eed%';
+
 DELETE FROM time_entries
 WHERE task_execution_id::text LIKE '5eed%';
 
@@ -39,6 +42,12 @@ DELETE FROM task_executions
 WHERE id::text LIKE '5eed%';
 
 DELETE FROM tasks
+WHERE id::text LIKE '5eed%';
+
+DELETE FROM selection_options
+WHERE id::text LIKE '5eed%';
+
+DELETE FROM selections
 WHERE id::text LIKE '5eed%';
 
 DELETE FROM measure_kinds

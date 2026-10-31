@@ -59,15 +59,15 @@ INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
   (pg_temp.t('r2'), 's0-tecnologia', 1, NULL, NULL),
   (pg_temp.t('r3'), 's0-avulsa', 1, NULL, NULL);
 INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
-  (pg_temp.t('c1'), 'inktober', 2, pg_temp.t('r1'), pg_temp.t('r1')),
-  (pg_temp.t('c2'), 'fundamentos', 2, pg_temp.t('r1'), pg_temp.t('r1'));
+  (pg_temp.t('c1'), 's0-inktober', 2, pg_temp.t('r1'), pg_temp.t('r1')),
+  (pg_temp.t('c2'), 's0-fundamentos', 2, pg_temp.t('r1'), pg_temp.t('r1'));
 INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
-  (pg_temp.t('g1'), 'retrato', 3, pg_temp.t('c1'), pg_temp.t('r1'));
+  (pg_temp.t('g1'), 's0-retrato', 3, pg_temp.t('c1'), pg_temp.t('r1'));
 
 -- Registros: E1 R1›C1›G1, E2 R2, E3 só R1, E4 sem tag, E5 R1›C2, E6 só R1
-INSERT INTO tasks (id, title) VALUES (pg_temp.e(900), 's0 tarefa');
+INSERT INTO tasks (id, title) VALUES (pg_temp.e(900), 's0-tarefa');
 INSERT INTO task_executions (id, task_id, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id)
-SELECT pg_temp.e(n), pg_temp.e(900), 's0 tarefa', 'none', now(), CASE WHEN r IS NULL THEN NULL ELSE pg_temp.t(r) END
+SELECT pg_temp.e(n), pg_temp.e(900), 's0-tarefa', 'none', now(), CASE WHEN r IS NULL THEN NULL ELSE pg_temp.t(r) END
 FROM (VALUES (1, 'r1'), (2, 'r2'), (3, 'r1'), (4, NULL), (5, 'r1'), (6, 'r1')) v(n, r);
 INSERT INTO task_execution_tags VALUES
   (pg_temp.e(1), pg_temp.t('c1'), pg_temp.t('r1'), pg_temp.t('r1')),
@@ -79,21 +79,21 @@ INSERT INTO task_execution_tags VALUES
 -- habilidade (R2, múltipla); jamais (R2, nunca usada)
 \o /dev/null
 SELECT pg_temp.aceita('A1. seleção GLOBAL (sem tag): Natureza',
-  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, NULL, %L)', pg_temp.s('nat'), 'Natureza'));
+  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, NULL, %L)', pg_temp.s('nat'), 's0-natureza'));
 SELECT pg_temp.aceita('A2. seleção na raiz (nível 1): Meio no Desenho',
-  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('meio'), pg_temp.t('r1'), 'Meio'));
+  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('meio'), pg_temp.t('r1'), 's0-meio'));
 SELECT pg_temp.aceita('A3. seleção em subtag (nível 2): Técnica no Inktober',
-  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('tec'), pg_temp.t('c1'), 'Técnica'));
+  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('tec'), pg_temp.t('c1'), 's0-técnica'));
 SELECT pg_temp.aceita('A4. seleção em tema (nível 3): Detalhe no Retrato',
-  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('det'), pg_temp.t('g1'), 'Detalhe'));
+  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('det'), pg_temp.t('g1'), 's0-detalhe'));
 SELECT pg_temp.aceita('A5. seleção múltipla: Ferramentas no Desenho',
-  format('INSERT INTO selections (id, tag_id, name, multiple) VALUES (%L, %L, %L, true)', pg_temp.s('ferr'), pg_temp.t('r1'), 'Ferramentas'));
+  format('INSERT INTO selections (id, tag_id, name, multiple) VALUES (%L, %L, %L, true)', pg_temp.s('ferr'), pg_temp.t('r1'), 's0-ferramentas'));
 SELECT pg_temp.aceita('A6. seleção múltipla em outra raiz: Habilidade na Tecnologia',
-  format('INSERT INTO selections (id, tag_id, name, multiple) VALUES (%L, %L, %L, true)', pg_temp.s('hab'), pg_temp.t('r2'), 'Habilidade'));
+  format('INSERT INTO selections (id, tag_id, name, multiple) VALUES (%L, %L, %L, true)', pg_temp.s('hab'), pg_temp.t('r2'), 's0-habilidade'));
 SELECT pg_temp.aceita('A7. o mesmo nome de seleção em OUTRA tag (Meio na Tecnologia)',
-  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('meio2'), pg_temp.t('r2'), 'Meio'));
+  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('meio2'), pg_temp.t('r2'), 's0-meio'));
 SELECT pg_temp.aceita('A8. seleção que nunca será usada (pra apagar)',
-  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('jamais'), pg_temp.t('r2'), 'Jamais'));
+  format('INSERT INTO selections (id, tag_id, name) VALUES (%L, %L, %L)', pg_temp.s('jamais'), pg_temp.t('r2'), 's0-jamais'));
 INSERT INTO selection_options (id, selection_id, name, position) VALUES
   (pg_temp.o('estudo'), pg_temp.s('nat'), 'estudo', 1), (pg_temp.o('pesquisa'), pg_temp.s('nat'), 'pesquisa', 2),
   (pg_temp.o('pratica'), pg_temp.s('nat'), 'prática', 3),
@@ -156,9 +156,9 @@ SELECT pg_temp.recusa('C11. escolha em tag FORA do caminho (E5 é Desenho › Fu
 
 -- ---- nomes e posições
 SELECT pg_temp.recusa('D1. seleção com nome repetido na mesma tag ("meio", minúscula, no Desenho)',
-  format('INSERT INTO selections (tag_id, name) VALUES (%L, %L)', pg_temp.t('r1'), ' meio '), ARRAY['selections_tag_name_unique']);
+  format('INSERT INTO selections (tag_id, name) VALUES (%L, %L)', pg_temp.t('r1'), ' s0-meio '), ARRAY['selections_tag_name_unique']);
 SELECT pg_temp.recusa('D2. seleção global com nome repetido ("NATUREZA")',
-  format('INSERT INTO selections (tag_id, name) VALUES (NULL, %L)', 'NATUREZA'), ARRAY['selections_global_name_unique']);
+  format('INSERT INTO selections (tag_id, name) VALUES (NULL, %L)', 'S0-NATUREZA'), ARRAY['selections_global_name_unique']);
 SELECT pg_temp.recusa('D3. nome de seleção vazio',
   format('INSERT INTO selections (tag_id, name) VALUES (%L, %L)', pg_temp.t('r1'), '   '), ARRAY['selections_name_valid']);
 SELECT pg_temp.recusa('D4. nome de seleção com 31 caracteres',
