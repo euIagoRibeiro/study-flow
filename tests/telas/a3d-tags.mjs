@@ -6,7 +6,9 @@ import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { createDiagnostico } from '../diagnostico.mjs'
 const { Pool } = pg
+const diag = createDiagnostico()
 // A limpeza usa o banco direto: sem a URL, a bateria sujaria o banco e não limparia
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=backend/.env')
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
@@ -16,6 +18,7 @@ const results = []
 const check = (name, ok, detail = '') => {
   results.push(ok)
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${detail ? ` (${detail})` : ''}`)
+  if (!ok) diag.print(name)
 }
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
@@ -56,6 +59,7 @@ try {
   await api('PUT', `/executions/${reg.id}`, { description: reg.description, completedAt: reg.completedAt, workout: [{ exerciseId: usado.id, sets: [{ reps: 5, weightKg: null }] }] })
 
   const page = await browser.newPage()
+  await diag.watch(page)
   page.setDefaultTimeout(10000)
   page.on('dialog', (d) => d.accept())
   await page.setViewport({ width: 375, height: 900 })

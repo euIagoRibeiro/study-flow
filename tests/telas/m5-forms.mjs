@@ -5,7 +5,9 @@ import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { createDiagnostico } from '../diagnostico.mjs'
 const { Pool } = pg
+const diag = createDiagnostico()
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const id = (n) => `5eed0000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const VESTIBULAR_TASK = id(9)
@@ -23,6 +25,7 @@ const results = []
 const check = (name, ok, detail = '') => {
   results.push(ok)
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${detail ? ` (${detail})` : ''}`)
+  if (!ok) diag.print(name)
 }
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
@@ -163,6 +166,7 @@ try {
       args: [`--lang=${lang}`],
     })
     const page = await browser.newPage()
+    await diag.watch(page)
     page.setDefaultTimeout(10000)
     await page.setViewport({ width: 375, height: 900 })
     const puts = []

@@ -4,6 +4,7 @@
 // (com filtro: npm run telas -- a3e1)
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { freemem } from 'node:os'
 import { join } from 'node:path'
 import pg from 'pg'
 import { API, APP, TESTS } from './config.mjs'
@@ -109,6 +110,7 @@ for (const group of chosen) {
     if (only && !file.includes(only)) continue
     const name = [file, ...args].join(' ')
     const started = Date.now()
+    const freeGb = (freemem() / 1024 ** 3).toFixed(2)
     const r = group === 'banco'
       ? runSql(file)
       : spawnSync(process.execPath, [join(TESTS, group, file), ...args],
@@ -122,6 +124,7 @@ for (const group of chosen) {
     const seconds = ((Date.now() - started) / 1000).toFixed(0)
     console.log(`${passed ? 'OK    ' : 'FALHOU'} ${name.padEnd(26)} ${total || '(sem resumo)'}  ${seconds}s`)
     if (!passed) {
+      console.log(`         memória livre antes da bateria: ${freeGb} GB`)
       console.log(output.split('\n').filter((l) => /FALH|Error|erro/i.test(l)).slice(0, 8).map((l) => `         ${l}`).join('\n'))
     }
     results.push({ name: `${group}/${name}`, passed })
