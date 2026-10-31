@@ -21,7 +21,7 @@ const pathOf = (t) => (t.parentId ? `${pathOf(byId.get(t.parentId))} › ${t.nam
 const idOf = (p) => tags.find((t) => pathOf(t) === p).id
 const ano = `periodo=ano&inicio=${new Date().getFullYear()}-01-01`
 const three = ['Vestibular › Matemática › Álgebra', 'Matemática › Álgebra', 'Vestibular'].map(idOf)
-const five = [codigo, idOf('Código › Empresa › equipamentos-medicos'), ...three.slice(0, 2), idOf('Linguagens')]
+const five = [codigo, idOf('Código › Empresa › equipamentos-medicos'), ...three.slice(0, 2), idOf('Idiomas')]
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const monday = new Date(); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) - 7)
 const states = {
@@ -88,7 +88,7 @@ try {
           const minFont = Math.min(...[...svg.querySelectorAll('text')].map((t) => parseFloat(getComputedStyle(t).fontSize) * scale))
           return { label: svg.getAttribute('aria-label').slice(0, 20), cut, minFont, texts: svg.querySelectorAll('text').length }
         })
-        // Nome comum (sem espaço, até 10 letras: Vestibular, Linguagens) numa
+        // Nome comum (sem espaço, até 10 letras: Vestibular, Idiomas) numa
         // linha só: quebrar dentro da palavra é só pra nome maior que isso
         const broken = all('tbody tr td:first-child').filter((td) => {
           const text = td.textContent.trim()

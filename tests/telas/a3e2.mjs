@@ -30,7 +30,7 @@ let ID = null
 try {
   const tags = (await api('GET', '/tags')).body
   const EXERC = tags.find((t) => t.name === 'Exercícios' && !t.parentId)
-  const ACAD = tags.find((t) => t.name === 'Academia' && t.parentId === EXERC.id)
+  const ACAD = tags.find((t) => t.name === 'Treino' && t.parentId === EXERC.id)
   const ex = (n) => catalogBefore.find((x) => x.name === n)
   const TRI = ex('Puxada alta com triângulo'), AGACH = ex('Agachamento livre'), ROSCA = ex('Rosca direta com barra')
   const open = await api('POST', '/executions', { taskId: TASK, completedAt: null, rootTagId: EXERC.id, tagIds: [ACAD.id] })

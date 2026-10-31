@@ -1,10 +1,12 @@
 // M5: formulários ABERTOS com os campos de medida, de 320 a 1280: Registrar
-// (Linguagens, 4 tipos), Finalizar (Linguagens), editar no Histórico e no
-// cartão da Lista (1106 trocado pra Linguagens: tipos + aviso). Não salva nada.
+// (Idiomas, 4 tipos), Finalizar (Idiomas), editar no Histórico e no cartão da
+// Lista (1106 trocado pra Idiomas: tipos + aviso). Não salva nada. Os 4 tipos
+// são injetados na resposta de /measures (o pior caso de layout; nada no banco:
+// no seed, só Código tem tipos, 3).
 // Item 3 (2026-10-27): tipos UM EMBAIXO DO OUTRO no celular (< 640px), grade
 // 2×2 no computador, nos 4 lugares.
 import puppeteer from 'puppeteer-core'
-import { APP, CHROME, out } from '../config.mjs'
+import { API, APP, CHROME, out } from '../config.mjs'
 
 function measure(page) {
   return page.evaluate(() => {
@@ -58,6 +60,14 @@ async function chooseContext(page, text) {
   await page.select('[data-pick="1"]', v)
 }
 
+const M_IDIOMAS = '5eed0000-0000-4000-a000-000000000002'
+const measures = await (await fetch(`${API}/measures`)).json()
+const model = measures.flatMap((m) => m.kinds)[0]
+if (!model || !measures.some((m) => m.id === M_IDIOMAS)) throw new Error('medida de Idiomas ou tipo modelo não achados')
+const injected = measures.map((m) => (m.id !== M_IDIOMAS ? m : {
+  ...m,
+  kinds: ['escrita', 'escuta', 'fala', 'leitura'].map((name, i) => ({ ...model, id: `aaaaaaaa-0000-4000-8000-00000000000${i}`, name })),
+}))
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
@@ -76,6 +86,12 @@ try {
     }
   })
   page.setDefaultTimeout(10000)
+  await page.setRequestInterception(true)
+  page.on('request', (req) => {
+    if (req.method() === 'GET' && req.url() === `${API}/measures`) {
+      req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(injected) })
+    } else req.continue()
+  })
   const scenarios = {
     async registrar() {
       await page.goto(`${APP}/executar?tarefa=5eed0000-0000-4000-8000-000000000009`, { waitUntil: 'networkidle0' })
@@ -108,7 +124,7 @@ try {
     await page.setViewport({ width, height: 900 })
     for (const [name, open] of Object.entries(scenarios)) {
       await open()
-      await chooseContext(page, 'Linguagens')
+      await chooseContext(page, 'Idiomas')
       await new Promise((r) => setTimeout(r, 150))
       const m = await measure(page)
       const needsWarning = name === 'historico' || name === 'lista'

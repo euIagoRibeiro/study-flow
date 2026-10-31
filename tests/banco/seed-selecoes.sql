@@ -1,4 +1,4 @@
--- Seed das seleções (bloco S3a do dev_seed.sql) contra a conta à mão do comentário dele.
+-- Seed das seleções (blocos S3a e S3b do dev_seed.sql) contra a conta à mão do comentário dele.
 -- Só lê; dias relativos ao dia local de hoje
 CREATE TEMP TABLE r (caso text, ok boolean, detalhe text);
 CREATE TEMP VIEW s3s AS
@@ -36,16 +36,16 @@ SELECT pg_temp.c('7. tarefas novas: Desenhar e Praticar guitarra, avulsas e ativ
   (SELECT string_agg(title || ' ' || frequency || ' ' || active, ', ' ORDER BY title) FROM tasks
    WHERE id IN ('5eed0000-0000-4000-8000-000000000013', '5eed0000-0000-4000-8000-000000000014')),
   'Desenhar none true, Praticar guitarra none true');
-SELECT pg_temp.c('8. seleções: opções em ordem; a Natureza é a única global; nenhuma múltipla',
+SELECT pg_temp.c('8. seleções: opções em ordem; a Natureza é a única global; a Habilidade é a única múltipla',
   (SELECT string_agg(s.name || coalesce('@' || g.name, '@global') || ':' || (SELECT string_agg(o.name, ',' ORDER BY o.position) FROM selection_options o WHERE o.selection_id = s.id), ' ' ORDER BY s.name)
-          || ' ' || bool_or(s.multiple)
+          || ' ' || string_agg(s.name, ',') FILTER (WHERE s.multiple)
    FROM selections s LEFT JOIN tags g ON g.id = s.tag_id WHERE s.id::text LIKE '5eed%'),
-  'Abordagem@Tecnologia:vibecode,tradicional Instrumento@Música:guitarra,violão Meio@Desenho:digital,tradicional Natureza@global:estudo,pesquisa,prática,criação,lazer false');
-SELECT pg_temp.c('9. escolhas por seleção: Natureza 10, Meio 3, Instrumento 3, Abordagem 1 (17)',
+  'Abordagem@Tecnologia:vibecode,tradicional Habilidade@Idiomas:escuta,leitura,escrita,fala,pensamento Instrumento@Música:guitarra,violão Local@Exercícios:academia,casa,rua Meio@Desenho:digital,tradicional Natureza@global:estudo,pesquisa,prática,criação,lazer Tipo de input@Idiomas:raw,comprehensible Habilidade');
+SELECT pg_temp.c('9. escolhas por seleção: Natureza 10, Local 5, Habilidade 4, Meio 3, Instrumento 3, Tipo de input 2, Abordagem 1 (28)',
   (SELECT string_agg(n || '=' || c, ' ' ORDER BY n) FROM (
      SELECT s.name n, count(*) c FROM execution_selections es JOIN selections s ON s.id = es.selection_id
      WHERE es.task_execution_id::text LIKE '5eed%' GROUP BY s.name) x),
-  'Abordagem=1 Instrumento=3 Meio=3 Natureza=10');
+  'Abordagem=1 Habilidade=4 Instrumento=3 Local=5 Meio=3 Natureza=10 Tipo de input=2');
 SELECT pg_temp.c('10. cópias iguais às da seleção; raiz do registro (NULL só na global)',
   (SELECT count(*)::text FROM execution_selections es JOIN selections s ON s.id = es.selection_id
    JOIN task_executions e ON e.id = es.task_execution_id
@@ -57,7 +57,7 @@ SELECT pg_temp.c('11. declarante no caminho gravado (a raiz ou uma ligação); u
   (SELECT count(*) FILTER (WHERE NOT es.selection_global AND es.tag_id <> e.root_tag_id
                              AND NOT EXISTS (SELECT 1 FROM task_execution_tags et
                                              WHERE et.task_execution_id = e.id AND et.tag_id = es.tag_id))
-          || ' ' || (SELECT max(n) FROM (SELECT count(*) n FROM execution_selections WHERE task_execution_id::text LIKE '5eed%'
+          || ' ' || (SELECT max(n) FROM (SELECT count(*) n FROM execution_selections WHERE task_execution_id::text LIKE '5eed%' AND NOT selection_multiple
                                           GROUP BY task_execution_id, selection_id) x)
    FROM execution_selections es JOIN task_executions e ON e.id = es.task_execution_id
    WHERE es.task_execution_id::text LIKE '5eed%'), '0 1');
@@ -80,6 +80,29 @@ SELECT pg_temp.c('14. Redação: medida mais próxima do caminho (a regra da API
                      WHERE em.task_execution_id = '5eed0000-0000-4000-8000-000000002210')
           || ' ' || (SELECT count(*) FROM execution_measures WHERE task_execution_id = '5eed0000-0000-4000-8000-000000002209')),
   'exercícios@Redação exercícios@Redação=1 0');
+SELECT pg_temp.c('15. reestruturação: Casa, Academia e Linguagens fora; Treino a única marcada; 4 grupos embaixo dela; total de tags',
+  (SELECT count(*) FILTER (WHERE name IN ('Casa', 'Academia', 'Linguagens')) || ' '
+          || string_agg(name, ',') FILTER (WHERE tracks_workout) || ' '
+          || (SELECT string_agg(c.name, ',' ORDER BY c.id) FROM tags c WHERE c.parent_id = '5eed0000-0000-4000-9000-000000000310') || ' '
+          || count(*) FROM tags WHERE id::text LIKE '5eed%'),
+  '0 Treino Peito, tríceps e ombro,Costas, trapézio e bíceps,Perna,Abdômen 35');
+SELECT pg_temp.c('16. treinos: caminho gravado (com o fechamento), marcadora = a tag mais funda marcada (regra da API), Local',
+  (SELECT string_agg(substr(w.task_execution_id::text, 33, 4) || ':' || (SELECT string_agg(t.name, '>' ORDER BY t.level) FROM task_execution_tags x JOIN tags t ON t.id = x.tag_id WHERE x.task_execution_id = w.task_execution_id)
+          || '@' || (SELECT t.name FROM tags t WHERE t.id = w.tag_id) || '=' || (SELECT t.name FROM task_execution_tags x JOIN tags t ON t.id = x.tag_id WHERE x.task_execution_id = w.task_execution_id AND t.tracks_workout ORDER BY t.level DESC LIMIT 1)
+          || ':' || (SELECT o.name FROM execution_selections es JOIN selection_options o ON o.id = es.option_id WHERE es.task_execution_id = w.task_execution_id), ' ' ORDER BY w.task_execution_id)
+   FROM execution_workouts w WHERE w.task_execution_id::text LIKE '5eed%'),
+  '0602:Treino@Treino=Treino:academia 1401:Treino>Costas, trapézio e bíceps@Treino=Treino:academia 1402:Treino>Perna@Treino=Treino:casa 1403:Treino>Costas, trapézio e bíceps@Treino=Treino:academia');
+SELECT pg_temp.c('17. Idiomas: medida sem tipos; 1301 e 202 sem tipo, com 1 e 2; total de valores',
+  (SELECT (SELECT count(*) FROM measure_kinds WHERE measure_id = '5eed0000-0000-4000-a000-000000000002') || ' '
+          || (SELECT string_agg(substr(task_execution_id::text, 33, 4) || '=' || quantity::int || coalesce(kind_id::text, ''), ' ' ORDER BY task_execution_id) FROM execution_measure_values WHERE measure_id = '5eed0000-0000-4000-a000-000000000002') || ' '
+          || (SELECT count(*) FROM execution_measure_values WHERE task_execution_id::text LIKE '5eed%')),
+  '0 0202=2 1301=1 9');
+SELECT pg_temp.c('18. Idiomas: 1301 escuta + raw, 202 escuta + comprehensible, 1701 escrita + pensamento (a múltipla com duas)',
+  (SELECT string_agg(r, ' ' ORDER BY r) FROM (
+     SELECT substr(es.task_execution_id::text, 33, 4) || ':' || s.name || '=' || string_agg(o.name, ',' ORDER BY o.position) r
+     FROM execution_selections es JOIN selections s ON s.id = es.selection_id JOIN selection_options o ON o.id = es.option_id
+     WHERE s.name IN ('Habilidade', 'Tipo de input') GROUP BY es.task_execution_id, s.name) x),
+  '0202:Habilidade=escuta 0202:Tipo de input=comprehensible 1301:Habilidade=escuta 1301:Tipo de input=raw 1701:Habilidade=escrita,pensamento');
 \o
 SELECT CASE WHEN ok THEN 'OK     ' ELSE 'FALHOU ' END, caso, detalhe FROM r;
 SELECT count(*) FILTER (WHERE ok) || ' de ' || count(*) FROM r;

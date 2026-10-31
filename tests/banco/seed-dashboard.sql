@@ -15,11 +15,11 @@ CREATE FUNCTION pg_temp.m(i interval) RETURNS text LANGUAGE sql AS $$SELECT roun
 \o /dev/null
 SELECT pg_temp.c('1. registros / sessões do bloco', (SELECT count(DISTINCT task_execution_id) || ' / ' || count(*) FROM d1s), '47 / 47');
 SELECT pg_temp.c('2. total 2840 min', (SELECT pg_temp.m(sum(ended_at - started_at)) FROM d1s), '2840');
-SELECT pg_temp.c('3. por contexto: Vestibular 1700, Linguagens 600, Exercícios 240, Matemática 180, sem tag 120',
+SELECT pg_temp.c('3. por contexto: Vestibular 1700, Idiomas 600, Exercícios 240, Matemática 180, sem tag 120',
   (SELECT string_agg(n || '=' || m, ' ' ORDER BY n) FROM (
      SELECT coalesce(g.name, 'sem tag') n, pg_temp.m(sum(ended_at - started_at)) m
      FROM d1s LEFT JOIN tags g ON g.id = d1s.root_tag_id GROUP BY g.name) x),
-  'Exercícios=240 Linguagens=600 Matemática=180 sem tag=120 Vestibular=1700');
+  'Exercícios=240 Idiomas=600 Matemática=180 sem tag=120 Vestibular=1700');
 SELECT pg_temp.c('4. Vestibular por subtag: Matemática 1080, Física 620',
   (SELECT string_agg(n || '=' || m, ' ' ORDER BY n) FROM (
      SELECT t.name n, pg_temp.m(sum(d.ended_at - d.started_at)) m

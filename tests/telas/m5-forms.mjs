@@ -147,7 +147,7 @@ const measures = await get('/measures')
 kindNames = new Map(measures.flatMap((m) => m.kinds.map((k) => [k.id, k.name])))
 const kindId = (measureId, name) => measures.find((m) => m.id === measureId).kinds.find((k) => k.name === name).id
 const tags = await get('/tags')
-const LINGUAGENS = tags.find((t) => t.name === 'Linguagens' && t.parentId === null).id
+const CODIGO = tags.find((t) => t.name === 'Código' && t.parentId === null).id
 const leafOf = (e) => e.tagIds.filter((t) => !tags.some((x) => x.parentId === t && e.tagIds.includes(x.id)))
 const restore = (e) => send('PUT', `/executions/${e.id}`, {
   description: e.description, completedAt: e.completedAt, rootTagId: e.rootTagId,
@@ -190,7 +190,7 @@ try {
         [['Vestibular', 'Física'], 'Questões (opcional) [] numeric', 'Física herda questões'],
         [['Vestibular'], 'Questões (opcional) [] numeric', 'a própria raiz'],
         [['Exercícios', 'Corrida'], 'Km (opcional) [] decimal', 'Corrida aceita decimal'],
-        [['Linguagens'], 'Exercícios (opcional) [escrita, escuta, fala, leitura] numeric', 'Linguagens, 4 tipos'],
+        [['Idiomas'], 'Exercícios (opcional) [] numeric', 'Idiomas, medida sem tipos'],
         [['Exercícios'], 'nenhum', 'caminho sem medida (Exercícios)'],
         [['Sem tag'], 'nenhum', 'sem tag'],
       ]
@@ -230,13 +230,13 @@ try {
 
       // --- Gravar com tipos, e o singular no Histórico
       await open(VESTIBULAR_TASK)
-      await path(page, 'Linguagens')
+      await path(page, 'Código')
       await type(page, 'O que foi feito (opcional)', 'teste m5 tipos')
-      await type(page, 'escuta', '2')
+      await type(page, 'refatoração', '2')
       await type(page, 'leitura', '1')
       await click(page, 'Registrar')
       await pause(1200)
-      check('Registrar com tipos: escuta 2 e leitura 1, só os preenchidos', vals(await byDesc('teste m5 tipos')) === '2:escuta=2,leitura=1', vals(await byDesc('teste m5 tipos')))
+      check('Registrar com tipos: refatoração 2 e leitura 1, só os preenchidos', vals(await byDesc('teste m5 tipos')) === '1:leitura=1,refatoração=2', vals(await byDesc('teste m5 tipos')))
       await open(VESTIBULAR_TASK)
       await path(page, 'Vestibular', 'Matemática')
       await type(page, 'O que foi feito (opcional)', 'teste m5 singular')
@@ -246,7 +246,7 @@ try {
       check('Registrar em Matemática grava a medida da Matemática', vals(await byDesc('teste m5 singular')) === '4:-=1')
       await page.goto(`${APP}/historico`, { waitUntil: 'networkidle0' })
       check('Histórico: "1 exercício" no singular', (await chips(page, 'teste m5 singular')).includes('1 exercício'), JSON.stringify(await chips(page, 'teste m5 singular')))
-      check('Histórico: tipos em chips separados', JSON.stringify((await chips(page, 'teste m5 tipos')).filter((t) => /^\d/.test(t)).sort()) === '["1 leitura","2 escuta"]')
+      check('Histórico: tipos em chips separados', JSON.stringify((await chips(page, 'teste m5 tipos')).filter((t) => /^\d/.test(t)).sort()) === '["1 leitura","2 refatoração"]')
       await open(VESTIBULAR_TASK)
       await path(page, 'Vestibular', 'Matemática')
       await type(page, 'O que foi feito (opcional)', 'teste m5 inteiro')
@@ -290,7 +290,7 @@ try {
 
       // --- O aviso: aparece na troca, some ao voltar, e salvar remove
       await openEdit(page, 'Novo protótipo')
-      await path(page, 'Linguagens')
+      await path(page, 'Idiomas')
       const w = await warning(page)
       check('trocar o caminho: aviso com os valores que vão sumir',
         w.startsWith('Mudar o caminho vai remover a medida registrada') && w.includes('3 refatoração') && w.includes('2 leitura'), w)
@@ -299,7 +299,7 @@ try {
         (await warning(page)) === '' && (await value(page, 'refatoração')) === '3', await warning(page))
       await path(page, 'Exercícios')
       check('caminho sem medida também avisa', (await warning(page)).startsWith('Mudar o caminho'))
-      await path(page, 'Linguagens')
+      await path(page, 'Idiomas')
       await click(page, 'Salvar')
       await pause(1200)
       check('salvar no caminho novo remove a medida', vals(await exec(E1106)) === 'sem medida', vals(await exec(E1106)))
@@ -334,19 +334,19 @@ try {
       await restore(original[E902])
 
       // --- Finalizar com medida + Desfazer volta a de antes
-      await send('PUT', `/executions/${LIVRO_OPEN}`, { description: null, completedAt: null, rootTagId: LINGUAGENS, tagIds: [], phase: null,
-        measureValues: [{ kindId: kindId(M_LING, 'leitura'), quantity: 4 }] })
+      await send('PUT', `/executions/${LIVRO_OPEN}`, { description: null, completedAt: null, rootTagId: CODIGO, tagIds: [], phase: null,
+        measureValues: [{ kindId: kindId(M_CODIGO, 'leitura'), quantity: 4 }] })
       await open(LIVRO_TASK)
       check('Finalizar: começa no valor que o registro tem (leitura 4)', (await value(page, 'leitura')) === '4')
       await type(page, 'leitura', '7')
       await click(page, 'Finalizar')
       await pause(1500)
       let livro = await exec(LIVRO_OPEN)
-      check('Finalizar grava leitura 7', livro.completedAt !== null && vals(livro) === '2:leitura=7', vals(livro))
+      check('Finalizar grava leitura 7', livro.completedAt !== null && vals(livro) === '1:leitura=7', vals(livro))
       await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('Desfazer')).click())
       await pause(1500)
       livro = await exec(LIVRO_OPEN)
-      check('Desfazer volta a leitura 4', livro.completedAt === null && vals(livro) === '2:leitura=4', vals(livro))
+      check('Desfazer volta a leitura 4', livro.completedAt === null && vals(livro) === '1:leitura=4', vals(livro))
     }
     await browser.close()
   }

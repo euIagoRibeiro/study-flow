@@ -92,7 +92,7 @@ try {
   await pause(400)
   const id = (await saved())[0]?.id
   await choose('Contexto', 'Exercícios')
-  await choose('Em Exercícios', 'Academia')
+  await choose('Em Exercícios', 'Treino')
   await type('O que foi feito (opcional)', 'Peito e tríceps')
   check('escolha no painel: Treino aparece', await treino())
   check('na tela: a escolha guardada na sessão do navegador', JSON.parse((await storage(id)) ?? 'null')?.description === 'Peito e tríceps', String(await storage(id)))
@@ -100,12 +100,12 @@ try {
   check('servidor: nada gravado antes do 1º exercício (sem tag, sem descrição)', db.length === 1 && db[0].raiz === null && db[0].description === null, JSON.stringify(db))
   await leaveAndBack()
   let f = await fields()
-  check('saiu e voltou: Exercícios › Academia e a descrição continuam', f['Contexto'] === 'Exercícios' && f['Em Exercícios'] === 'Academia' && f['O que foi feito (opcional)'] === 'Peito e tríceps', JSON.stringify(f))
+  check('saiu e voltou: Exercícios › Treino e a descrição continuam', f['Contexto'] === 'Exercícios' && f['Em Exercícios'] === 'Treino' && f['O que foi feito (opcional)'] === 'Peito e tríceps', JSON.stringify(f))
   check('saiu e voltou: a seção Treino continua', await treino())
   await page.reload({ waitUntil: 'networkidle0' })
   await pause(200)
   f = await fields()
-  check('recarregou a página: continua', f['Em Exercícios'] === 'Academia' && f['O que foi feito (opcional)'] === 'Peito e tríceps' && (await treino()), JSON.stringify(f))
+  check('recarregou a página: continua', f['Em Exercícios'] === 'Treino' && f['O que foi feito (opcional)'] === 'Peito e tríceps' && (await treino()), JSON.stringify(f))
   db = await saved()
   check('servidor: ainda nada gravado', db[0].raiz === null && db[0].description === null, JSON.stringify(db))
 
@@ -117,10 +117,10 @@ try {
   await clickText('Adicionar série', 'section[aria-label="Treino"]')
   await pause(800)
   db = await saved()
-  check('1º exercício: o caminho grava junto (Exercícios › Academia), a descrição não', db[0].raiz === 'Exercícios' && db[0].subtags === 'Academia' && db[0].exercicios === 1 && db[0].description === null, JSON.stringify(db))
+  check('1º exercício: o caminho grava junto (Exercícios › Treino), a descrição não', db[0].raiz === 'Exercícios' && db[0].subtags === 'Treino' && db[0].exercicios === 1 && db[0].description === null, JSON.stringify(db))
   await leaveAndBack()
   f = await fields()
-  check('depois do 1º exercício, sair e voltar: caminho do servidor, descrição da tela', f['Em Exercícios'] === 'Academia' && f['O que foi feito (opcional)'] === 'Peito e tríceps', JSON.stringify(f))
+  check('depois do 1º exercício, sair e voltar: caminho do servidor, descrição da tela', f['Em Exercícios'] === 'Treino' && f['O que foi feito (opcional)'] === 'Peito e tríceps', JSON.stringify(f))
 
   // ---- 3. Finalizar grava a descrição e apaga a memória
   await clickText('Finalizar')
@@ -136,8 +136,8 @@ try {
   const id2 = (await saved()).find((r) => !r.finalizado)?.id
   f = await fields()
   // (a tarefa agora tem um registro com Exercícios: a pré-seleção de sempre,
-  // T5b, abre no CONTEXTO do último; a Academia e a descrição seriam herança)
-  check('registro novo da mesma tarefa: só a pré-seleção do contexto, sem a Academia nem a descrição', id2 && id2 !== id && f['Contexto'] === 'Exercícios' && f['Em Exercícios'] === 'Nenhuma' && f['O que foi feito (opcional)'] === '', JSON.stringify(f))
+  // T5b, abre no CONTEXTO do último; a Treino e a descrição seriam herança)
+  check('registro novo da mesma tarefa: só a pré-seleção do contexto, sem a Treino nem a descrição', id2 && id2 !== id && f['Contexto'] === 'Exercícios' && f['Em Exercícios'] === 'Nenhuma' && f['O que foi feito (opcional)'] === '', JSON.stringify(f))
 
   // ---- 5. memória inválida é ignorada (tag que não existe; base diferente do servidor)
   await page.evaluate((k) => sessionStorage.setItem(k, JSON.stringify({ base: '', path: ['00000000-0000-4000-a0d0-0000000000ff'], phase: null, descriptionBase: null, description: 'x' })), KEY(id2))

@@ -1,6 +1,7 @@
 // A3d: marcar treino na tela de tags + seção "Exercícios". Cria a própria
-// árvore (teste-a3d › sub › neto) e um exercício pra apagar; usa Academia,
-// Casa e o catálogo do seed só pra ler e pra mudanças que desfaz no finally.
+// árvore (teste-a3d › sub › neto), um exercício pra apagar e uma marcadora
+// com 1 registro (Exercícios › teste-casa); usa Treino e o catálogo do seed só
+// pra ler e pra mudanças que desfaz no finally.
 import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
@@ -10,6 +11,7 @@ const { Pool } = pg
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=backend/.env')
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const REMADA = '5eed0000-0000-4000-b000-000000000007'
+const TASK = '5eed0000-0000-4000-8000-000000000006'
 const results = []
 const check = (name, ok, detail = '') => {
   results.push(ok)
@@ -45,6 +47,13 @@ try {
   ids.sub = (await api('POST', '/tags', { name: 'sub', parentId: ids.root })).id
   ids.neto = (await api('POST', '/tags', { name: 'neto', parentId: ids.sub })).id
   ids.ex = (await api('POST', '/exercises', { name: 'teste-a3d apagar' })).id
+  const exerc = (await api('GET', '/tags')).find((t) => t.name === 'Exercícios')
+  ids.casa = (await api('POST', '/tags', { name: 'teste-casa', parentId: exerc.id })).id
+  await api('PATCH', `/tags/${ids.casa}`, { tracksWorkout: true })
+  const usado = await api('POST', '/exercises', { name: 'teste-a3d usado' })
+  const reg = await api('POST', '/executions', { taskId: TASK, description: 'teste-a3d', completedAt: new Date().toISOString(), rootTagId: exerc.id, tagIds: [ids.casa] })
+  ids.reg = reg.id
+  await api('PUT', `/executions/${reg.id}`, { description: reg.description, completedAt: reg.completedAt, workout: [{ exerciseId: usado.id, sets: [{ reps: 5, weightKg: null }] }] })
 
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
@@ -53,7 +62,7 @@ try {
   const load = async () => {
     await waitForApi()
     await page.goto(`${APP}/tags`, { waitUntil: 'networkidle0' })
-    for (const name of ['teste-a3d', 'sub', 'Exercícios']) {
+    for (const name of ['teste-a3d', 'sub', 'Exercícios', 'Treino']) {
       await page.evaluate((n) => {
         const b = document.querySelector(`button[aria-label="Subtags de ${n}"]`)
         if (b && b.getAttribute('aria-expanded') !== 'true') b.click()
@@ -120,19 +129,21 @@ try {
   it = find(await tagMenu('teste-a3d', ''), 'Usar treino')
   check('raiz acima de subtag marcada continua liberada', it && !it.disabled, JSON.stringify(it))
 
-  // --- Academia e Casa (seed)
-  it = find(await tagMenu('Exercícios › Academia', ''), 'Parar de usar treino')
-  check('Academia: "Parar" travado "Em uso em 3 registros com treino"', it?.disabled && it.text.includes('3 registros com treino'), JSON.stringify(it))
-  it = find(await tagMenu('Exercícios › Casa', ''), 'Parar de usar treino')
-  check('Casa: travado "1 registro com treino"', it?.disabled && it.text.includes('1 registro com treino'), JSON.stringify(it))
-  check('chip "Treino" em Academia e Casa, não em Corrida nem Exercícios',
-    (await chips('Exercícios › Academia'))?.includes('Treino') && (await chips('Exercícios › Casa'))?.includes('Treino') &&
+  // --- Treino (seed) e a marcadora de teste
+  it = find(await tagMenu('Exercícios › Treino', ''), 'Parar de usar treino')
+  check('Treino: "Parar" travado "Em uso em 4 registros com treino"', it?.disabled && it.text.includes('4 registros com treino'), JSON.stringify(it))
+  it = find(await tagMenu('Exercícios › teste-casa', ''), 'Parar de usar treino')
+  check('teste-casa: travado "1 registro com treino"', it?.disabled && it.text.includes('1 registro com treino'), JSON.stringify(it))
+  it = find(await tagMenu('Exercícios › Treino › Perna', ''), 'Usar treino')
+  check('grupo muscular herda: travado "Já usa treino por Treino", sem chip', it?.disabled && it.text.includes('Já usa treino por Treino') && !(await chips('Exercícios › Treino › Perna'))?.includes('Treino'), JSON.stringify(it))
+  check('chip "Treino" em Treino e teste-casa, não em Corrida nem Exercícios',
+    (await chips('Exercícios › Treino'))?.includes('Treino') && (await chips('Exercícios › teste-casa'))?.includes('Treino') &&
     !(await chips('Exercícios › Corrida'))?.includes('Treino') && !(await chips('Exercícios'))?.includes('Treino'))
 
   // --- Seção Exercícios
   let s = await section()
   const expected = ['Agachamento livre 1 registro', 'Puxada alta com barra 3 registros', 'Puxada alta com triângulo 1 registro',
-    'Remada baixa 0 registros', 'Rosca martelo unilateral com halteres 1 registro', 'Supino reto com barra 1 registro', 'teste-a3d apagar 0 registros']
+    'Remada baixa 0 registros', 'Rosca martelo unilateral com halteres 1 registro', 'Supino reto com barra 1 registro', 'teste-a3d apagar 0 registros', 'teste-a3d usado 1 registro']
   check('seção existe, ativos em ordem do português, com contagem', JSON.stringify(s?.rows) === JSON.stringify(expected), JSON.stringify(s?.rows))
   check('arquivados recolhidos: "1 arquivado", fechado', s?.toggle?.text.startsWith('1 arquivado') && s.toggle.open === 'false', JSON.stringify(s?.toggle))
   await page.evaluate(() => document.querySelector('section[aria-label="Exercícios"] button[aria-expanded]:not([aria-haspopup])').click())
@@ -179,15 +190,20 @@ try {
   await browser.close()
   await waitForApi()
   for (const x of catalog) await pool.query('UPDATE exercises SET name = $2, active = $3 WHERE id = $1', [x.id, x.name, x.active])
+  if (ids.reg) {
+    await pool.query('DELETE FROM exercise_sets WHERE execution_exercise_id IN (SELECT id FROM execution_exercises WHERE task_execution_id = $1)', [ids.reg])
+    for (const t of ['execution_exercises', 'execution_workouts', 'task_execution_tags']) await pool.query(`DELETE FROM ${t} WHERE task_execution_id = $1`, [ids.reg])
+    await pool.query('DELETE FROM task_executions WHERE id = $1', [ids.reg])
+  }
   await pool.query("DELETE FROM exercises WHERE name LIKE 'teste-a3d%'")
-  for (const id of [ids.neto, ids.sub, ids.root]) if (id) await pool.query('DELETE FROM tags WHERE id = $1', [id])
-  const left = await pool.query("SELECT (SELECT count(*) FROM tags WHERE name = 'teste-a3d')::int + (SELECT count(*) FROM exercises WHERE name LIKE 'teste-a3d%')::int AS n")
+  for (const id of [ids.casa, ids.neto, ids.sub, ids.root]) if (id) await pool.query('DELETE FROM tags WHERE id = $1', [id])
+  const left = await pool.query("SELECT (SELECT count(*) FROM tags WHERE name IN ('teste-a3d', 'teste-casa'))::int + (SELECT count(*) FROM exercises WHERE name LIKE 'teste-a3d%')::int AS n")
   const remada = await exerciseById(REMADA)
   const now = (await api('GET', '/exercises')).filter((x) => x.id.startsWith('5eed'))
   const same = JSON.stringify(now.map((x) => [x.id, x.name, x.active]).sort()) === JSON.stringify(catalog.map((x) => [x.id, x.name, x.active]).sort())
   const marks = (await api('GET', '/tags')).filter((t) => t.tracksWorkout).map((t) => t.name).sort().join(',')
-  check('limpeza: árvore e exercício de teste apagados, catálogo do seed igual ao do começo, só Academia e Casa marcadas',
-    left.rows[0].n === 0 && same && remada?.name === 'Remada baixa' && marks === 'Academia,Casa', `${left.rows[0].n} ${remada?.name} ${marks}`)
+  check('limpeza: árvore e exercício de teste apagados, catálogo do seed igual ao do começo, só Treino marcada',
+    left.rows[0].n === 0 && same && remada?.name === 'Remada baixa' && marks === 'Treino', `${left.rows[0].n} ${remada?.name} ${marks}`)
   await pool.end()
   const ok = results.filter(Boolean).length
   console.log(`\n${ok} de ${results.length}`)

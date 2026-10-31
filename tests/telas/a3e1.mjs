@@ -38,6 +38,7 @@ const serverExec = async (id) => (await api('GET', '/executions')).body.find((e)
 const sets = (w) => (w ?? []).map((x) => `${x.exerciseId.slice(-2)}:` + x.sets.map((s) => `${s.reps}x${s.weightKg ?? 'c'}`).join(','))
 
 const created = []
+let testTag
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
@@ -51,15 +52,20 @@ try {
   await page.setViewport({ width: 390, height: 900 })
 
   // ---- dados de apoio
+  // Segunda marcadora, só da bateria: a troca entre marcadas precisa de duas
+  // tags diferentes, e o seed só marca Exercícios › Treino
+  const root = (await api('GET', '/tags')).body.find((t) => t.name === 'Exercícios')
+  testTag = (await api('POST', '/tags', { name: 'teste-casa', parentId: root.id })).body.id
+  await api('PATCH', `/tags/${testTag}`, { tracksWorkout: true })
   const tags = (await api('GET', '/tags')).body
   const byName = (n, parent) => tags.find((t) => t.name === n && (parent === undefined || tags.find((p) => p.id === t.parentId)?.name === parent))
-  const EXERC = byName('Exercícios'), ACAD = byName('Academia', 'Exercícios'), CASA = byName('Casa', 'Exercícios'), CORRIDA = byName('Corrida', 'Exercícios')
+  const EXERC = byName('Exercícios'), ACAD = byName('Treino', 'Exercícios'), CASA = tags.find((t) => t.id === testTag), CORRIDA = byName('Corrida', 'Exercícios')
   const exercises = (await api('GET', '/exercises')).body
   const ex = (n) => exercises.find((x) => x.name === n)
   const TRI = ex('Puxada alta com triângulo'), SUPINO = ex('Supino reto com barra')
 
-  // Recentes esperados em Academia: dos registros com treino cuja marcadora é
-  // Academia, do mais recente pro mais antigo, só ativos; depois o resto
+  // Recentes esperados em Treino: dos registros com treino cuja marcadora é
+  // Treino, do mais recente pro mais antigo, só ativos; depois o resto
   const all = (await api('GET', '/executions')).body
   const marker = (e) => [e.rootTagId, ...e.tagIds].map((id) => tags.find((t) => t.id === id)).filter((t) => t?.tracksWorkout).sort((a, b) => b.level - a.level)[0]
   const recentIds = []
@@ -167,16 +173,16 @@ try {
   await load()
   let s = await section()
   check('caminho Exercícios (sem treino): sem seção Treino', s === null, JSON.stringify(s?.status))
-  await choose('Em Exercícios', 'Academia')
+  await choose('Em Exercícios', 'Treino')
   s = await section()
-  check('Academia: seção Treino aparece', s !== null)
-  check('escolher Academia não grava nada (caminho vai com o 1º exercício)', puts.length === 0 && (await serverExec(ID)).rootTagId === null, `${puts.length}`)
+  check('Treino: seção Treino aparece', s !== null)
+  check('escolher Treino não grava nada (caminho vai com o 1º exercício)', puts.length === 0 && (await serverExec(ID)).rootTagId === null, `${puts.length}`)
 
   // Escolha: recentes do contexto, depois o resto; arquivado e os da sessão fora
   await clickIn('section[aria-label="Treino"]', 'Exercício')
   await pause(200)
   const options = await page.evaluate(() => [...document.querySelectorAll('[aria-label="Escolher exercício"] button')].map((b) => b.textContent.replace(/\s+/g, ' ').trim()))
-  check('escolha: recentes em Academia primeiro, depois os outros em ordem alfabética, sem arquivado',
+  check('escolha: recentes em Treino primeiro, depois os outros em ordem alfabética, sem arquivado',
     JSON.stringify(options) === JSON.stringify([...recent, ...rest]), `${JSON.stringify(options)} x ${JSON.stringify([...recent, ...rest])}`)
   await fill('section[aria-label="Treino"]', 'Buscar exercício', 'TRIANGULO')
   await pause(150)
@@ -199,7 +205,7 @@ try {
     puts.length === 1 && !puts[0].url.endsWith('/workout') && puts[0].body.rootTagId === EXERC.id && puts[0].body.tagIds?.[0] === ACAD.id &&
       puts[0].body.completedAt === null && puts[0].body.description === null && Array.isArray(puts[0].body.workout),
     JSON.stringify(puts))
-  check('servidor: caminho Academia + treino 12x25', srv.tagIds.includes(ACAD.id) && sets(srv.workout).join() === `${TRI.id.slice(-2)}:12x25`, JSON.stringify(sets(srv.workout)))
+  check('servidor: caminho Treino + treino 12x25', srv.tagIds.includes(ACAD.id) && sets(srv.workout).join() === `${TRI.id.slice(-2)}:12x25`, JSON.stringify(sets(srv.workout)))
   check('status "Salvo"', s.status === 'Salvo', s.status)
   const empty = await page.evaluate((sel) => [...document.querySelector(sel).querySelectorAll('input')].every((i) => i.value === ''), current)
   check('campos esvaziam depois de adicionar', empty)
@@ -314,27 +320,27 @@ try {
     s && s.items.length === 2 && /7 séries/.test(s.items.find((x) => x.name === TRI.name)?.text ?? '') && s.items.find((x) => x.name === SUPINO.name)?.sets.length === 1,
     JSON.stringify(s?.items.map((x) => x.text.slice(0, 50))))
 
-  // Academia → Casa: grava na hora, mantém o treino com Casa como marcadora
+  // Treino → teste-casa: grava na hora, mantém o treino com teste-casa como marcadora
   puts = []
-  await choose('Em Exercícios', 'Casa')
+  await choose('Em Exercícios', 'teste-casa')
   s = await settle()
   srv = await serverExec(ID)
-  check('Academia → Casa: grava na hora (PUT do registro com o treino) e mantém o treino',
+  check('Treino → teste-casa: grava na hora (PUT do registro com o treino) e mantém o treino',
     puts.length === 1 && !puts[0].url.endsWith('/workout') && srv.tagIds.includes(CASA.id) && srv.workout?.length === 2, `${puts.length} ${srv.tagIds} ${srv.workout?.length}`)
 
-  // Casa → Corrida: aviso, nada gravado, voltar desfaz
+  // teste-casa → Corrida: aviso, nada gravado, voltar desfaz
   puts = []
   await choose('Em Exercícios', 'Corrida')
   s = await section()
   let warn = await page.evaluate(() => document.body.textContent.includes('vai remover o treino'))
   srv = await serverExec(ID)
-  check('Casa → Corrida: seção some, aviso "vai remover o treino", nada gravado',
+  check('teste-casa → Corrida: seção some, aviso "vai remover o treino", nada gravado',
     s === null && warn && puts.length === 0 && srv.tagIds.includes(CASA.id) && srv.workout?.length === 2, `${s === null} ${warn} ${puts.length}`)
   check('aviso diz o tamanho: "2 exercícios, 8 séries"', await page.evaluate(() => document.body.textContent.includes('2 exercícios, 8 séries')))
-  await choose('Em Exercícios', 'Casa')
+  await choose('Em Exercícios', 'teste-casa')
   warn = await page.evaluate(() => document.body.textContent.includes('vai remover o treino'))
   s = await section()
-  check('de volta a Casa: aviso some, seção volta, nada gravado', !warn && s?.items.length === 2 && puts.length === 0, `${warn} ${puts.length}`)
+  check('de volta a teste-casa: aviso some, seção volta, nada gravado', !warn && s?.items.length === 2 && puts.length === 0, `${warn} ${puts.length}`)
 
   // Tirar exercício com séries (confirmação aceita)
   await page.evaluate((n) => document.querySelector(`button[aria-label="Mais ações do exercício ${n}"]`).click(), SUPINO.name)
@@ -356,20 +362,20 @@ try {
   await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.startsWith('Desfazer')).click())
   await pause(1000)
   srv = await serverExec(ID)
-  check('Desfazer: reaberto em Casa, com o treino de antes (7 séries)',
+  check('Desfazer: reaberto em teste-casa, com o treino de antes (7 séries)',
     srv.completedAt === null && srv.tagIds.includes(CASA.id) && srv.workout?.[0]?.sets.length === 7, `${srv.completedAt} ${srv.tagIds} ${JSON.stringify(sets(srv.workout))}`)
   check('Desfazer manda o treino no pedido', puts.some((p) => Array.isArray(p.body.workout)), JSON.stringify(puts.map((p) => Object.keys(p.body))))
   s = await section()
   check('Desfazer: a seção volta com o exercício', s?.items.length === 1, JSON.stringify(s?.items))
 
-  // Finalizar em Casa: mantém o treino
+  // Finalizar em teste-casa: mantém o treino
   await clickIn(null, 'Finalizar')
   await pause(800)
   srv = await serverExec(ID)
-  check('Finalizar em Casa: concluído com o treino', srv.completedAt !== null && srv.workout?.[0]?.sets.length === 7, `${srv.completedAt} ${JSON.stringify(sets(srv.workout))}`)
+  check('Finalizar em teste-casa: concluído com o treino', srv.completedAt !== null && srv.workout?.[0]?.sets.length === 7, `${srv.completedAt} ${JSON.stringify(sets(srv.workout))}`)
 
   // Caso raro: registro aberto COM medida (como depois de um Desfazer),
-  // caminho vai pra Academia (gravado, a medida sai no servidor) e volta pra
+  // caminho vai pra Treino (gravado, a medida sai no servidor) e volta pra
   // Corrida: o Finalizar tem que mandar a medida explícita
   await page.goto(`${APP}/`, { waitUntil: 'networkidle0' })
   const measures = (await api('GET', '/measures')).body
@@ -380,7 +386,7 @@ try {
   const ID2 = open2.body.id
   check('apoio: registro aberto com 5,2 km', open2.body.measure?.measureId === km?.id)
   await load()
-  await choose('Em Exercícios', 'Academia')
+  await choose('Em Exercícios', 'Treino')
   await addExercise('', TRI.name)
   await fill(current, 'Reps', '5')
   await clickIn(current, 'Adicionar série')
@@ -405,13 +411,14 @@ try {
     }
     await pool.query('DELETE FROM task_executions WHERE id = $1', [id])
   }
+  if (testTag) await pool.query('DELETE FROM tags WHERE id = $1', [testTag])
   for (const x of catalogBefore) await pool.query('UPDATE exercises SET name = $2, active = $3 WHERE id = $1', [x.id, x.name, x.active])
   await pool.query('DELETE FROM exercises WHERE NOT (id = ANY($1::uuid[]))', [catalogBefore.map((x) => x.id)])
-  const left = (await pool.query('SELECT count(*)::int AS n FROM task_executions WHERE id = ANY($1::uuid[])', [created])).rows[0].n
+  const left = (await pool.query("SELECT (SELECT count(*) FROM task_executions WHERE id = ANY($1::uuid[]))::int + (SELECT count(*) FROM tags WHERE name = 'teste-casa')::int AS n", [created])).rows[0].n
   const openLeft = (await api('GET', '/executions')).body.filter((e) => e.taskId === TASK && e.completedAt === null).length
   const nowCat = (await api('GET', '/exercises')).body
   const same = JSON.stringify(nowCat.map((x) => [x.id, x.name, x.active]).sort()) === JSON.stringify(catalogBefore.map((x) => [x.id, x.name, x.active]).sort())
-  check('limpeza: registros de teste apagados, nenhum aberto em Exercício físico, catálogo igual ao do começo', left === 0 && openLeft === 0 && same, `${left} ${openLeft} ${same}`)
+  check('limpeza: registros e tag de teste apagados, nenhum aberto em Exercício físico, catálogo igual ao do começo', left === 0 && openLeft === 0 && same, `${left} ${openLeft} ${same}`)
   await pool.end()
   const ok = results.filter(Boolean).length
   console.log(`\n${ok} de ${results.length}`)

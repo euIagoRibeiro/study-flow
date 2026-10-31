@@ -120,14 +120,17 @@ INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
   ('5eed0000-0000-4000-9000-000000000120', 'Física',     2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
   ('5eed0000-0000-4000-9000-000000000130', 'Pesquisa',   2, '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100', true),
   ('5eed0000-0000-4000-9000-000000000210', 'Álgebra',    2, '5eed0000-0000-4000-9000-000000000200', '5eed0000-0000-4000-9000-000000000200', true),
-  ('5eed0000-0000-4000-9000-000000000310', 'Academia',   2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
-  ('5eed0000-0000-4000-9000-000000000320', 'Casa',       2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
+  ('5eed0000-0000-4000-9000-000000000310', 'Treino',     2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
   ('5eed0000-0000-4000-9000-000000000330', 'Corrida',    2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', true),
   ('5eed0000-0000-4000-9000-000000000340', 'Natação',    2, '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300', false);
 
 INSERT INTO tags (id, name, level, parent_id, root_id, active) VALUES
   ('5eed0000-0000-4000-9000-000000000111', 'Álgebra', 3, '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', true),
-  ('5eed0000-0000-4000-9000-000000000112', 'Frações', 3, '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', true);
+  ('5eed0000-0000-4000-9000-000000000112', 'Frações', 3, '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', true),
+  ('5eed0000-0000-4000-9000-000000000311', 'Peito, tríceps e ombro',    3, '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', true),
+  ('5eed0000-0000-4000-9000-000000000312', 'Costas, trapézio e bíceps', 3, '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', true),
+  ('5eed0000-0000-4000-9000-000000000313', 'Perna',                     3, '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', true),
+  ('5eed0000-0000-4000-9000-000000000314', 'Abdômen',                   3, '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', true);
 
 -- Execuções com tags: aqui no fim porque a raiz (root_tag_id) tem que
 -- apontar pra uma tag que já existe. Cada caso de marcação aparece uma
@@ -150,7 +153,7 @@ WHERE id IN ('5eed0000-0000-4000-8000-000000000601', '5eed0000-0000-4000-8000-00
 -- Gravado como a API grava: o FECHAMENTO (nível 3 traz o nível 2 pai).
 -- 901 Álgebra · 902 Frações · 903 Física · 904 só a raiz (sem matéria) ·
 -- 905 Pesquisa · 906 Álgebra · 907 Matemática sem tema ·
--- 1001 Matemática (solta) › Álgebra · 601 Corrida · 602 Academia
+-- 1001 Matemática (solta) › Álgebra · 601 Corrida · 602 Treino, sem grupo
 INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id) VALUES
   ('5eed0000-0000-4000-8000-000000000901', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100', '5eed0000-0000-4000-9000-000000000100'),
   ('5eed0000-0000-4000-8000-000000000901', '5eed0000-0000-4000-9000-000000000111', '5eed0000-0000-4000-9000-000000000110', '5eed0000-0000-4000-9000-000000000100'),
@@ -272,20 +275,20 @@ INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated) VA
 
 -- Medidas por contexto (etapa M). A tag declara o que se mede; descendentes
 -- herdam; subtag substitui (Vestibular "questões" → Matemática "exercícios",
--- dado só de seed, pra testar a herança). Linguagens é raiz nova.
+-- dado só de seed, pra testar a herança). Idiomas é raiz nova, medida sem tipos.
 -- Totais: Código 9 exercícios (3 refatoração, 2 leitura, 4 questões),
--- Linguagens 3 de escuta, Matemática 12, Vestibular 6 questões, Corrida 5,2 km
+-- Idiomas 3, Matemática 12, Vestibular 6 questões, Corrida 5,2 km
 -- (7 registros, 8 valores). Natação: metros, decimal, sem tipos, sem uso
 -- (a tag continua arquivada). Ids: medidas 5eed…a000, tipos 5eed…a100
 INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
-  ('5eed0000-0000-4000-9000-000000000500', 'Linguagens', 1, NULL, NULL);
+  ('5eed0000-0000-4000-9000-000000000500', 'Idiomas', 1, NULL, NULL);
 INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
   ('5eed0000-0000-4000-9000-000000000510', 'Inglês',  2, '5eed0000-0000-4000-9000-000000000500', '5eed0000-0000-4000-9000-000000000500'),
   ('5eed0000-0000-4000-9000-000000000520', 'Japonês', 2, '5eed0000-0000-4000-9000-000000000500', '5eed0000-0000-4000-9000-000000000500');
 
 INSERT INTO measures (id, tag_id, name, singular, allows_decimal) VALUES
   ('5eed0000-0000-4000-a000-000000000001', '5eed0000-0000-4000-9000-000000000400', 'exercícios', 'exercício', false), -- Código
-  ('5eed0000-0000-4000-a000-000000000002', '5eed0000-0000-4000-9000-000000000500', 'exercícios', 'exercício', false), -- Linguagens
+  ('5eed0000-0000-4000-a000-000000000002', '5eed0000-0000-4000-9000-000000000500', 'exercícios', 'exercício', false), -- Idiomas
   ('5eed0000-0000-4000-a000-000000000003', '5eed0000-0000-4000-9000-000000000100', 'questões',   'questão',   false), -- Vestibular
   ('5eed0000-0000-4000-a000-000000000004', '5eed0000-0000-4000-9000-000000000110', 'exercícios', 'exercício', false), -- Vestibular › Matemática
   ('5eed0000-0000-4000-a000-000000000005', '5eed0000-0000-4000-9000-000000000330', 'km',         'km',        true),  -- Exercícios › Corrida
@@ -294,13 +297,9 @@ INSERT INTO measures (id, tag_id, name, singular, allows_decimal) VALUES
 INSERT INTO measure_kinds (id, measure_id, name) VALUES
   ('5eed0000-0000-4000-a100-000000000011', '5eed0000-0000-4000-a000-000000000001', 'refatoração'),
   ('5eed0000-0000-4000-a100-000000000012', '5eed0000-0000-4000-a000-000000000001', 'leitura'),
-  ('5eed0000-0000-4000-a100-000000000013', '5eed0000-0000-4000-a000-000000000001', 'questões'),
-  ('5eed0000-0000-4000-a100-000000000021', '5eed0000-0000-4000-a000-000000000002', 'escuta'),
-  ('5eed0000-0000-4000-a100-000000000022', '5eed0000-0000-4000-a000-000000000002', 'leitura'),
-  ('5eed0000-0000-4000-a100-000000000023', '5eed0000-0000-4000-a000-000000000002', 'escrita'),
-  ('5eed0000-0000-4000-a100-000000000024', '5eed0000-0000-4000-a000-000000000002', 'fala');
+  ('5eed0000-0000-4000-a100-000000000013', '5eed0000-0000-4000-a000-000000000001', 'questões');
 
--- Inglês ganha tag: o gameplay (1301) e o podcast (202) passam a Linguagens › Inglês
+-- Inglês ganha tag: o gameplay (1301) e o podcast (202) passam a Idiomas › Inglês
 UPDATE task_executions SET root_tag_id = '5eed0000-0000-4000-9000-000000000500'
 WHERE id IN ('5eed0000-0000-4000-8000-000000001301', '5eed0000-0000-4000-8000-000000000202');
 INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id) VALUES
@@ -325,11 +324,12 @@ INSERT INTO execution_measure_values (task_execution_id, measure_id, kind_id, qu
   ('5eed0000-0000-4000-8000-000000000902', '5eed0000-0000-4000-a000-000000000004', NULL, 12),
   ('5eed0000-0000-4000-8000-000000000903', '5eed0000-0000-4000-a000-000000000003', NULL, 6),
   ('5eed0000-0000-4000-8000-000000000601', '5eed0000-0000-4000-a000-000000000005', NULL, 5.2),
-  ('5eed0000-0000-4000-8000-000000001301', '5eed0000-0000-4000-a000-000000000002', '5eed0000-0000-4000-a100-000000000021', 1),
-  ('5eed0000-0000-4000-8000-000000000202', '5eed0000-0000-4000-a000-000000000002', '5eed0000-0000-4000-a100-000000000021', 2);
+  ('5eed0000-0000-4000-8000-000000001301', '5eed0000-0000-4000-a000-000000000002', NULL, 1),
+  ('5eed0000-0000-4000-8000-000000000202', '5eed0000-0000-4000-a000-000000000002', NULL, 2);
 
--- Treino (A3). Academia e Casa usam treino; o equipamento faz parte do nome
--- do exercício. 1401 e 1402 são as duas sessões das notas (cronômetro com os
+-- Treino (A3). Exercícios › Treino usa treino, e as subtags herdam (o grupo
+-- muscular é o assunto; o lugar é a seleção Local); o equipamento faz parte do
+-- nome do exercício. 1401 e 1402 são as duas sessões das notas (cronômetro com os
 -- segundos: 49:25 e 1:15); 602 (já existia) e 1403 dão a evolução da puxada
 -- com barra: carga máxima 40 (há 11 dias) → 45 (há 4) → 50 (ontem).
 -- Totais: 4 treinos, 8 exercícios nas sessões, 22 séries; volume (reps × kg)
@@ -338,7 +338,7 @@ INSERT INTO execution_measure_values (task_execution_id, measure_id, kind_id, qu
 -- Horários pelo dia LOCAL (lição da A1c). Ids: exercícios 5eed…b000,
 -- exercícios das sessões 5eed…b100
 UPDATE tags SET tracks_workout = true
-WHERE id IN ('5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000320');
+WHERE id = '5eed0000-0000-4000-9000-000000000310';
 
 CREATE TEMP TABLE dia_local ON COMMIT DROP AS
 SELECT date_trunc('day', (SELECT t FROM ancora) AT TIME ZONE 'America/Sao_Paulo') AS d;
@@ -366,8 +366,11 @@ FROM (VALUES
 
 INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id) VALUES
   ('5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300'),
-  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-9000-000000000320', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300'),
-  ('5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300');
+  ('5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-9000-000000000312', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-9000-000000000313', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-9000-000000000312', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300');
 
 INSERT INTO time_entries (task_execution_id, started_at, ended_at)
 SELECT e.id, e.completed_at - v.duration, e.completed_at
@@ -381,7 +384,7 @@ JOIN (VALUES
 -- A marcadora é a tag mais funda do caminho que usa treino (como a API resolve)
 INSERT INTO execution_workouts (task_execution_id, tag_id, root_tag_id) VALUES
   ('5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300'),
-  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-9000-000000000320', '5eed0000-0000-4000-9000-000000000300'),
+  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300'),
   ('5eed0000-0000-4000-8000-000000000602', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300'),
   ('5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-9000-000000000310', '5eed0000-0000-4000-9000-000000000300');
 
@@ -413,13 +416,13 @@ INSERT INTO exercise_sets (execution_exercise_id, position, reps, weight_kg) VAL
 --   ter 19:00 Vestibular › Matemática › Álgebra, 90 min (todas as semanas)
 --   qui 19:30 Vestibular › Física, 60 min (sem nas semanas 5 e 9; na 3,
 --             23:20 → 00:40: cruza a meia-noite, 40 + 40)
---   sáb 10:00 Linguagens › Inglês, 45 min
+--   sáb 10:00 Idiomas › Inglês, 45 min
 --   dom 07:00 Exercícios › Corrida, 40 min (semanas pares; a 6 ESTIMADA)
 --   qua 21:00 Matemática (solta) › Álgebra, 60 min (semanas 3, 7, 11)
 --   qua 20:00 Ler livro técnico, sem tag, 40 min (semanas 2, 4, 6)
 --   + Inglês da virada pro MÊS ANTERIOR: 23:30 → 00:30 (30 + 30); sempre a
 --     28 dias ou mais de hoje
--- Totais: Vestibular 1700 (Matemática 1080, Física 620), Linguagens 600,
+-- Totais: Vestibular 1700 (Matemática 1080, Física 620), Idiomas 600,
 -- Exercícios 240, Matemática 180, sem tag 120 = 2840 min. Por semana k:
 -- 195 275 275 275 135 275 255 235 135 235 255 235 (+ 60 da virada do mês).
 -- Ids: 5eed…8000-0000000015kk (ter), 16kk (qui), 17kk (sáb), 18kk (dom),
@@ -504,6 +507,12 @@ SELECT id, ini AT TIME ZONE 'America/Sao_Paulo', (ini + dur) AT TIME ZONE 'Ameri
 -- existia, sem tag (estudo). Totais: 10 registros, 159:05 de sessões; 17
 -- escolhas. Ids: tags 6xx/7xx/8xx/140, tarefas 13/14, registros 22xx, medida
 -- a000…07, seleções c000, opções c100
+--
+-- S3b reestrutura: Exercícios › Treino › grupo muscular + Local (academia,
+-- casa, rua; 1401, 1403 e 602 academia, 1402 casa, 601 rua; as outras corridas
+-- sem Local) · Idiomas (era Linguagens), medida sem tipos + Habilidade múltipla
+-- (1301 e 202 escuta; 1701 escrita + pensamento, duas opções) + Tipo de input
+-- (1301 raw, 202 comprehensible). Total: 28 escolhas
 INSERT INTO tasks (id, title, frequency, active, created_at) VALUES
   ('5eed0000-0000-4000-8000-000000000013', 'Desenhar',          'none', true, now() - interval '40 days'),
   ('5eed0000-0000-4000-8000-000000000014', 'Praticar guitarra', 'none', true, now() - interval '39 days');
@@ -566,7 +575,10 @@ INSERT INTO selections (id, tag_id, name, multiple) VALUES
   ('5eed0000-0000-4000-c000-000000000001', NULL,                                   'Natureza',    false),
   ('5eed0000-0000-4000-c000-000000000002', '5eed0000-0000-4000-9000-000000000600', 'Meio',        false),
   ('5eed0000-0000-4000-c000-000000000003', '5eed0000-0000-4000-9000-000000000700', 'Abordagem',   false),
-  ('5eed0000-0000-4000-c000-000000000004', '5eed0000-0000-4000-9000-000000000800', 'Instrumento', false);
+  ('5eed0000-0000-4000-c000-000000000004', '5eed0000-0000-4000-9000-000000000800', 'Instrumento', false),
+  ('5eed0000-0000-4000-c000-000000000005', '5eed0000-0000-4000-9000-000000000500', 'Habilidade',    true),
+  ('5eed0000-0000-4000-c000-000000000006', '5eed0000-0000-4000-9000-000000000500', 'Tipo de input', false),
+  ('5eed0000-0000-4000-c000-000000000007', '5eed0000-0000-4000-9000-000000000300', 'Local',         false);
 
 INSERT INTO selection_options (id, selection_id, name, position) VALUES
   ('5eed0000-0000-4000-c100-000000000011', '5eed0000-0000-4000-c000-000000000001', 'estudo',      1),
@@ -579,7 +591,17 @@ INSERT INTO selection_options (id, selection_id, name, position) VALUES
   ('5eed0000-0000-4000-c100-000000000031', '5eed0000-0000-4000-c000-000000000003', 'vibecode',    1),
   ('5eed0000-0000-4000-c100-000000000032', '5eed0000-0000-4000-c000-000000000003', 'tradicional', 2),
   ('5eed0000-0000-4000-c100-000000000041', '5eed0000-0000-4000-c000-000000000004', 'guitarra',    1),
-  ('5eed0000-0000-4000-c100-000000000042', '5eed0000-0000-4000-c000-000000000004', 'violão',      2);
+  ('5eed0000-0000-4000-c100-000000000042', '5eed0000-0000-4000-c000-000000000004', 'violão',      2),
+  ('5eed0000-0000-4000-c100-000000000051', '5eed0000-0000-4000-c000-000000000005', 'escuta', 1),
+  ('5eed0000-0000-4000-c100-000000000052', '5eed0000-0000-4000-c000-000000000005', 'leitura', 2),
+  ('5eed0000-0000-4000-c100-000000000053', '5eed0000-0000-4000-c000-000000000005', 'escrita', 3),
+  ('5eed0000-0000-4000-c100-000000000054', '5eed0000-0000-4000-c000-000000000005', 'fala', 4),
+  ('5eed0000-0000-4000-c100-000000000055', '5eed0000-0000-4000-c000-000000000005', 'pensamento', 5),
+  ('5eed0000-0000-4000-c100-000000000061', '5eed0000-0000-4000-c000-000000000006', 'raw', 1),
+  ('5eed0000-0000-4000-c100-000000000062', '5eed0000-0000-4000-c000-000000000006', 'comprehensible', 2),
+  ('5eed0000-0000-4000-c100-000000000071', '5eed0000-0000-4000-c000-000000000007', 'academia', 1),
+  ('5eed0000-0000-4000-c100-000000000072', '5eed0000-0000-4000-c000-000000000007', 'casa', 2),
+  ('5eed0000-0000-4000-c100-000000000073', '5eed0000-0000-4000-c000-000000000007', 'rua', 3);
 
 -- Como a API grava: cópias da seleção; declarante e raiz NULL só na global
 INSERT INTO execution_selections
@@ -603,7 +625,18 @@ FROM (VALUES
   ('5eed0000-0000-4000-8000-000000002208', '5eed0000-0000-4000-c100-000000000013'),
   ('5eed0000-0000-4000-8000-000000002209', '5eed0000-0000-4000-c100-000000000012'),
   ('5eed0000-0000-4000-8000-000000002210', '5eed0000-0000-4000-c100-000000000013'),
-  ('5eed0000-0000-4000-8000-000000000501', '5eed0000-0000-4000-c100-000000000011')
+  ('5eed0000-0000-4000-8000-000000000501', '5eed0000-0000-4000-c100-000000000011'),
+  ('5eed0000-0000-4000-8000-000000001401', '5eed0000-0000-4000-c100-000000000071'),
+  ('5eed0000-0000-4000-8000-000000001403', '5eed0000-0000-4000-c100-000000000071'),
+  ('5eed0000-0000-4000-8000-000000000602', '5eed0000-0000-4000-c100-000000000071'),
+  ('5eed0000-0000-4000-8000-000000001402', '5eed0000-0000-4000-c100-000000000072'),
+  ('5eed0000-0000-4000-8000-000000000601', '5eed0000-0000-4000-c100-000000000073'),
+  ('5eed0000-0000-4000-8000-000000001301', '5eed0000-0000-4000-c100-000000000051'),
+  ('5eed0000-0000-4000-8000-000000001301', '5eed0000-0000-4000-c100-000000000061'),
+  ('5eed0000-0000-4000-8000-000000000202', '5eed0000-0000-4000-c100-000000000051'),
+  ('5eed0000-0000-4000-8000-000000000202', '5eed0000-0000-4000-c100-000000000062'),
+  ('5eed0000-0000-4000-8000-000000001701', '5eed0000-0000-4000-c100-000000000053'),
+  ('5eed0000-0000-4000-8000-000000001701', '5eed0000-0000-4000-c100-000000000055')
 ) AS c (execution_id, option_id)
 JOIN task_executions e ON e.id = c.execution_id
 JOIN selection_options o ON o.id = c.option_id

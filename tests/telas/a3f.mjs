@@ -30,12 +30,17 @@ const sets = (w) => (w ?? []).map((x) => `${x.exerciseId.slice(-2)}:` + x.sets.m
 const catalogBefore = (await api('GET', '/exercises')).body
 const original1403 = await serverExec(E1403)
 const created = []
+let testTag
 const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const tags = (await api('GET', '/tags')).body
   const EXERC = tags.find((t) => t.name === 'Exercícios' && !t.parentId)
   const sub = (n) => tags.find((t) => t.name === n && t.parentId === EXERC.id)
-  const ACAD = sub('Academia'), CASA = sub('Casa')
+  // Segunda marcadora, só da bateria: a exceção do caminho vale quando a
+  // marcadora antiga sai, e o seed só marca Exercícios › Treino
+  testTag = (await api('POST', '/tags', { name: 'teste-casa', parentId: EXERC.id })).body.id
+  const CASA = (await api('PATCH', `/tags/${testTag}`, { tracksWorkout: true })).body
+  const ACAD = sub('Treino')
   const ex = (n) => catalogBefore.find((x) => x.name === n)
   const TRI = ex('Puxada alta com triângulo'), AGACH = ex('Agachamento livre'), SUPINO = ex('Supino reto com barra'), ROSCA = ex('Rosca direta com barra')
 
@@ -189,14 +194,14 @@ try {
   let srv = await serverExec(R)
   check('série nova + Salvar: treino inteiro enviado e gravado', puts.length === 1 && Array.isArray(puts[0].body.workout) && sets(srv.workout).join() === `${TRI.id.slice(-2)}:10x20,10xc,${AGACH.id.slice(-2)}:15xc,12xc,10xc`, sets(srv.workout).join())
 
-  // Academia → Casa sem mexer no treino: mantém
+  // Treino → teste-casa sem mexer no treino: mantém
   await cardSel(`${DESC} 2`)
   await openEdit()
   puts = []
-  await choose('Em Exercícios', 'Casa')
+  await choose('Em Exercícios', 'teste-casa')
   await save()
   srv = await serverExec(R)
-  check('Academia → Casa sem mexer no treino: o treino vai junto e fica', srv.tagIds.includes(CASA.id) && srv.workout?.length === 2 && Array.isArray(puts[0]?.body.workout), `${srv.tagIds} ${sets(srv.workout)}`)
+  check('Treino → teste-casa sem mexer no treino: o treino vai junto e fica', srv.tagIds.includes(CASA.id) && srv.workout?.length === 2 && Array.isArray(puts[0]?.body.workout), `${srv.tagIds} ${sets(srv.workout)}`)
 
   // Corrida: aviso, voltar desfaz, salvar remove
   await cardSel(`${DESC} 2`)
@@ -205,9 +210,9 @@ try {
   let t = await cardText()
   check('Corrida: seção some, aviso "Salvar com esse caminho vai remover o treino (2 exercícios, 5 séries)."',
     !(await page.evaluate((S) => !!document.querySelector(S), S)) && t.includes('Salvar com esse caminho vai remover o treino (2 exercícios, 5 séries).'), t.slice(-250))
-  await choose('Em Exercícios', 'Casa')
+  await choose('Em Exercícios', 'teste-casa')
   t = await cardText()
-  check('de volta a Casa: aviso some, seção volta', !t.includes('vai remover o treino') && (await page.evaluate((S) => !!document.querySelector(S), S)))
+  check('de volta a teste-casa: aviso some, seção volta', !t.includes('vai remover o treino') && (await page.evaluate((S) => !!document.querySelector(S), S)))
   await choose('Em Exercícios', 'Corrida')
   await save()
   srv = await serverExec(R)
@@ -216,7 +221,7 @@ try {
   // Registro sem treino ganha treino pelo lápis
   await cardSel(`${DESC} 2`)
   await openEdit()
-  await choose('Em Exercícios', 'Academia')
+  await choose('Em Exercícios', 'Treino')
   sec = await page.evaluate((S) => document.querySelector(S)?.querySelectorAll('ol[aria-label="Exercícios do treino"] > li').length ?? -1, S)
   check('registro sem treino, caminho com treino: seção vazia, com "+ Exercício"', sec === 0)
   await pick('triang', TRI.name)
@@ -281,14 +286,15 @@ try {
     for (const t of ['execution_exercises', 'execution_workouts', 'execution_measure_values', 'execution_measures', 'task_execution_tags', 'time_entries']) await pool.query(`DELETE FROM ${t} WHERE task_execution_id = $1`, [id])
     await pool.query('DELETE FROM task_executions WHERE id = $1', [id])
   }
+  if (testTag) await pool.query('DELETE FROM tags WHERE id = $1', [testTag])
   for (const x of catalogBefore) await pool.query('UPDATE exercises SET name = $2, active = $3 WHERE id = $1', [x.id, x.name, x.active])
   await api('PUT', `/executions/${E1403}/workout`, { workout: original1403.workout })
   await pool.query('DELETE FROM exercises WHERE NOT (id = ANY($1::uuid[]))', [catalogBefore.map((x) => x.id)])
   const now1403 = await serverExec(E1403)
   const nowCat = (await api('GET', '/exercises')).body
   const same = JSON.stringify(nowCat.map((x) => [x.id, x.name, x.active]).sort()) === JSON.stringify(catalogBefore.map((x) => [x.id, x.name, x.active]).sort())
-  const left = (await pool.query('SELECT count(*)::int AS n FROM task_executions WHERE id = ANY($1::uuid[])', [created])).rows[0].n
-  check('limpeza: registros de teste apagados, 1403 igual ao original, catálogo igual', left === 0 && same && JSON.stringify(now1403.workout) === JSON.stringify(original1403.workout) && now1403.description === original1403.description, `${left} ${same}`)
+  const left = (await pool.query("SELECT (SELECT count(*) FROM task_executions WHERE id = ANY($1::uuid[]))::int + (SELECT count(*) FROM tags WHERE name = 'teste-casa')::int AS n", [created])).rows[0].n
+  check('limpeza: registros e tag de teste apagados, 1403 igual ao original, catálogo igual', left === 0 && same && JSON.stringify(now1403.workout) === JSON.stringify(original1403.workout) && now1403.description === original1403.description, `${left} ${same}`)
   await pool.end()
   const ok = results.filter(Boolean).length
   console.log(`\n${ok} de ${results.length}`)

@@ -1,6 +1,6 @@
 // B1 (2026-10-26): "Iniciar cronômetro" leva o que foi preenchido no
 // formulário de baixo: caminho (com fase) e descrição. Antes, criava o
-// registro vazio e descartava tudo em silêncio (com Exercícios › Academia
+// registro vazio e descartava tudo em silêncio (com Exercícios › Treino
 // escolhida embaixo, o painel abria só com o contexto e sem Treino). Sem
 // mexer no formulário, igual a antes. "Quando", estimativa e medida não vão
 // (decidido: são do registro manual). Tarefa de teste própria, apagada no
@@ -91,13 +91,13 @@ try {
   await page.goto(url, { waitUntil: 'networkidle0' })
   await type('O que foi feito (opcional)', 'Costas e bíceps hoje')
   await choose('Contexto', 'Exercícios')
-  await choose('Em Exercícios', 'Academia')
+  await choose('Em Exercícios', 'Treino')
   await start()
   let p = await panel(), f = await fields(), db = await saved()
-  check('Exercícios › Academia embaixo → painel aberto já com Contexto e "Em Exercícios" escolhidos', p.open && f['Contexto'] === 'Exercícios' && f['Em Exercícios'] === 'Academia', JSON.stringify(f))
-  check('a seção Treino aparece na hora (Academia marca treino)', p.treino, p.text.slice(0, 120))
+  check('Exercícios › Treino embaixo → painel aberto já com Contexto e "Em Exercícios" escolhidos', p.open && f['Contexto'] === 'Exercícios' && f['Em Exercícios'] === 'Treino', JSON.stringify(f))
+  check('a seção Treino aparece na hora (Treino marca treino)', p.treino, p.text.slice(0, 120))
   check('a descrição veio pro painel', f['O que foi feito (opcional)'] === 'Costas e bíceps hoje', JSON.stringify(f))
-  check('banco: registro aberto com Exercícios › Academia, a descrição e a sessão rodando', db.length === 1 && db[0].raiz === 'Exercícios' && db[0].subtags === 'Academia' && db[0].description === 'Costas e bíceps hoje' && db[0].rodando === 1, JSON.stringify(db))
+  check('banco: registro aberto com Exercícios › Treino, a descrição e a sessão rodando', db.length === 1 && db[0].raiz === 'Exercícios' && db[0].subtags === 'Treino' && db[0].description === 'Costas e bíceps hoje' && db[0].rodando === 1, JSON.stringify(db))
   await clearExecutions()
 
   // ---- 2. caminho com fase

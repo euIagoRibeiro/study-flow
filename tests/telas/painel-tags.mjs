@@ -187,7 +187,7 @@ try {
   check('arquivada pode ser escolhida', r.chips.some((c) => c.text === pathOf(archived)), JSON.stringify(r.chips))
 
   // ---- limite de 5
-  for (const p of ['Linguagens', 'Exercícios']) { await search(p); await pick(p) }
+  for (const p of ['Idiomas', 'Exercícios']) { await search(p); await pick(p) }
   r = await search('fisica')
   check('com 5: a busca não lista e diz o motivo', r.results.length === 0 && r.notes.some((n) => n.startsWith('Já são 5 tags, o máximo.')), JSON.stringify({ results: r.results, notes: r.notes }))
   check('com 5: URL com 5 ids', new URL(`http://x${r.url}`).searchParams.get('tags').split(',').length === 5, r.url)

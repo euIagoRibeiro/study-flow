@@ -19,7 +19,7 @@ try {
     names.set(s.id, s.name)
     for (const o of s.options) names.set(o.id, o.name)
   }
-  check('as 4 seleções do seed (11 opções) vêm da API', names.size === 15, `${names.size} nomes`)
+  check('as 7 seleções do seed (21 opções) vêm da API', names.size === 28, `${names.size} nomes`)
   const shape = (items) => items.map((i) => `${names.get(i.selectionId)}:${i.optionIds.map((id) => names.get(id)).join(',')}@${i.from}`).sort().join('|')
   const cases = [
     ['Desenho › Fundamentos › Perspectiva: do próprio caminho (2203)', '600', '622', 'Meio:tradicional@path|Natureza:estudo@path'],
@@ -30,7 +30,14 @@ try {
     ['Tecnologia só a raiz (nenhum registro sem subtag): cai pra raiz', '700', null, 'Abordagem:vibecode@root|Natureza:criação@root'],
     ['Vestibular › Redação: prática do 2210', '100', '140', 'Natureza:prática@path'],
     ['Vestibular › Matemática: Natureza cai pra raiz (Redação, 2210)', '100', '110', 'Natureza:prática@root'],
-    ['Exercícios: nenhum registro com escolha, nenhuma sugestão', '300', null, ''],
+    ['Exercícios só a raiz (nenhum registro sem subtag com Local): cai pra raiz, o mais recente (601)', '300', null, 'Local:rua@root'],
+    ['Exercícios › Corrida: rua do 601', '300', '330', 'Local:rua@path'],
+    ['Treino, sem grupo: academia do 602', '300', '310', 'Local:academia@path'],
+    ['Treino › Costas: academia do 1401', '300', '312', 'Local:academia@path'],
+    ['Treino › Perna: casa do 1402', '300', '313', 'Local:casa@path'],
+    ['Treino › Abdômen (sem registro): cai pra raiz (601)', '300', '314', 'Local:rua@root'],
+    ['Idiomas › Inglês: escuta + raw do 1301, não as duas do 1701, mais antigo', '500', '510', 'Habilidade:escuta@path|Tipo de input:raw@path'],
+    ['Idiomas › Japonês (sem registro): cai pra raiz (1301)', '500', '520', 'Habilidade:escuta@root|Tipo de input:raw@root'],
   ]
   for (const [name, root, leaf, expected] of cases) {
     const q = new URLSearchParams({ rootTagId: tag(root), ...(leaf ? { tagId: tag(leaf) } : {}) })
@@ -42,8 +49,11 @@ try {
   const e2208 = executions.find((e) => e.id === '5eed0000-0000-4000-8000-000000002208')
   check('2208 continua com o violão (arquivado) no GET do registro',
     shape((e2208?.selections ?? []).map((s) => ({ ...s, from: '' }))) === 'Instrumento:violão@|Natureza:prática@')
+  const choices = (id) => shape((executions.find((e) => e.id === `5eed0000-0000-4000-8000-00000000${id}`)?.selections ?? []).map((s) => ({ ...s, from: '' })))
+  check('1701: a múltipla com as duas opções, em ordem', choices('1701') === 'Habilidade:escrita,pensamento@', choices('1701'))
+  check('1301 e 202: escuta + o tipo de input', choices('1301') === 'Habilidade:escuta@|Tipo de input:raw@' && choices('0202') === 'Habilidade:escuta@|Tipo de input:comprehensible@', `${choices('1301')} ${choices('0202')}`)
   const withChoices = executions.filter((e) => e.id.startsWith('5eed') && e.selections.length > 0).length
-  check('11 registros do seed com escolha (os 10 novos + o 501)', withChoices === 11, String(withChoices))
+  check('19 registros do seed com escolha (os 10 do S3a + o 501 + 5 com Local + 1301, 202, 1701)', withChoices === 19, String(withChoices))
 } catch (err) {
   check('rodou sem erro', false, err.stack?.split('\n').slice(0, 2).join(' '))
 } finally {

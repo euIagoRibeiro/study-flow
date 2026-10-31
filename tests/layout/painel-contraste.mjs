@@ -28,7 +28,7 @@ const codigo = tags.find((t) => t.name === 'Código' && t.level === 1).id
 const byId = new Map(tags.map((t) => [t.id, t]))
 const pathOf = (t) => (t.parentId ? `${pathOf(byId.get(t.parentId))} › ${t.name}` : t.name)
 const idOf = (path) => tags.find((t) => pathOf(t) === path).id
-const five = ['Vestibular › Matemática › Álgebra', 'Matemática › Álgebra', 'Vestibular', 'Código › Empresa › equipamentos-medicos', 'Linguagens'].map(idOf)
+const five = ['Vestibular › Matemática › Álgebra', 'Matemática › Álgebra', 'Vestibular', 'Código › Empresa › equipamentos-medicos', 'Idiomas'].map(idOf)
 const monday = new Date(); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) - 7)
 const ymdOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const ymd = ymdOf(monday)
