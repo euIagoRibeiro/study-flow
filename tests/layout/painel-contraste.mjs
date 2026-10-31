@@ -3,8 +3,10 @@
 // barras: ≥ 3:1 contra o fundo de verdade (página ou cartão do detalhe).
 // Texto dos gráficos (% e valores, dias): ≥ 4,5:1, pelo pixel mais forte do
 // glifo. Confere também que o pixel lido É a cor do token (não mediu o
-// lugar errado). Semana passada com o detalhe de Código (6 contextos: a
-// fatia cinza de "outros" entra). D7c: "Comparar tags" com 5 escolhidas (as 5
+// lugar errado). Semana passada com o detalhe de Código; a resposta de tempo
+// por contexto ganha contextos reais a mais (nada no banco), pra fatia cinza
+// de "outros" existir em qualquer semana, e o esperado sai da API, não do
+// calendário. D7c: "Comparar tags" com 5 escolhidas (as 5
 // cores): barras contra o fundo, bolinha do chip contra o fundo DO CHIP,
 // texto do chip, bolinhas da tabela. Barras e chips são HTML: print da
 // janela + coordenadas da tela (o print por elemento da seção saiu cortado).
@@ -28,11 +30,50 @@ const pathOf = (t) => (t.parentId ? `${pathOf(byId.get(t.parentId))} › ${t.nam
 const idOf = (path) => tags.find((t) => pathOf(t) === path).id
 const five = ['Vestibular › Matemática › Álgebra', 'Matemática › Álgebra', 'Vestibular', 'Código › Empresa › equipamentos-medicos', 'Linguagens'].map(idOf)
 const monday = new Date(); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) - 7)
-const ymd = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
+const ymdOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const ymd = ymdOf(monday)
+const nextMonday = new Date(monday); nextMonday.setDate(nextMonday.getDate() + 7)
+const weekStart = `${ymd}T00:00:00-03:00`
+const query = new URLSearchParams({ de: weekStart, ate: `${ymdOf(nextMonday)}T00:00:00-03:00`, fuso: 'America/Sao_Paulo' })
+const week = await (await fetch(`${API}/dashboard/tempo-por-contexto?${query}`)).json()
+const subtags = (await (await fetch(`${API}/dashboard/tempo-por-subtag?contexto=${codigo}&${query}`)).json()).items
+// Contextos sem tempo na semana, no fim da lista: os 5 primeiros têm cor, o
+// resto vira "outros". Pelo menos 2, cada um com 10% do total: a fatia cinza
+// nunca fica fina demais pra ler
+const free = tags.filter((t) => t.level === 1 && t.active && !week.items.some((i) => i.tagId === t.id))
+const extraSeconds = Math.max(3600, Math.ceil(week.totalSeconds / 10))
+const extras = free.slice(0, Math.max(2, 7 - week.items.length)).map((t) => ({ tagId: t.id, seconds: extraSeconds }))
+const injected = { ...week, items: [...week.items, ...extras], totalSeconds: week.totalSeconds + extras.length * extraSeconds }
+// O que toSlices desenha: até 5 itens + "outros"
+const slicesOf = (items) => {
+  const rest = items.slice(5).reduce((sum, i) => sum + i.seconds, 0)
+  return [...items.slice(0, 5).map((i) => i.seconds), ...(rest > 0 ? [rest] : [])]
+}
+const pies = [injected.items, subtags].map(slicesOf).filter((s) => s.length > 0)
+const expected = {
+  pies: pies.length,
+  slices: pies.flat().length,
+  // Fatia com menos de 3% não tem ponto a 4px da borda: é desenhada, não lida
+  thick: pies.flatMap((s) => s.filter((v) => v / s.reduce((a, b) => a + b, 0) >= 0.03)).length,
+  dots: injected.items.length + subtags.length,
+}
 
 const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
+  await page.setRequestInterception(true)
+  page.on('request', (req) => {
+    const url = new URL(req.url())
+    if (req.method() === 'GET' && `${url.origin}${url.pathname}` === `${API}/dashboard/tempo-por-contexto` &&
+        Date.parse(url.searchParams.get('de')) === Date.parse(weekStart)) {
+      req.respond({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify(injected),
+      })
+    } else req.continue()
+  })
   await page.emulateTimezone('America/Sao_Paulo')
   await page.setViewport({ width: 375, height: 900, deviceScaleFactor: 1 })
   for (const theme of ['light', 'dark']) {
@@ -45,7 +86,7 @@ try {
       probe.remove(); return o
     })
     const tokens = palette.map(rgbOf)
-    let slicesMeasured = 0, textsMeasured = 0, dotsMeasured = 0, barsMeasured = 0
+    let slicesMeasured = 0, slicesDrawn = 0, othersMeasured = 0, textsMeasured = 0, dotsMeasured = 0, barsMeasured = 0
     const lowest = { fatia: Infinity, barra: Infinity, texto: Infinity, bolinha: Infinity }
     // Cada gráfico: pixel de cada fatia/barra e de cada texto, contra o fundo dele
     const charts = await page.$$('svg[role="img"]')
@@ -79,18 +120,23 @@ try {
           return best && best.d >= 4 ? { fill, x: best.x * k, y: best.y * k } : null
         }).filter(Boolean)
         const texts = [...s.querySelectorAll('text')].map((t) => { const b = t.getBBox(); return { text: t.textContent, x: b.x * k, y: b.y * k, w: b.width * k, h: b.height * k } })
-        return { label: s.getAttribute('aria-label').slice(0, 24), shapes, texts, w: box.width, h: box.height }
+        return { label: s.getAttribute('aria-label').slice(0, 24), shapes, texts, paths: s.querySelectorAll('path').length, w: box.width, h: box.height }
       })
+      if (geo.label.startsWith('Pizza')) slicesDrawn += geo.paths
       const png = PNG.sync.read(await svg.screenshot())
       const px = (x, y) => { const i = (Math.round(y) * png.width + Math.round(x)) * 4; return [png.data[i], png.data[i + 1], png.data[i + 2]] }
       const bg = px(2, 2) // canto do SVG: o fundo de verdade atrás dele
       for (const sh of geo.shapes) {
         const c = px(sh.x, sh.y)
-        const expected = rgbOf(sh.fill)
-        check(near(c, expected), `${theme} ${geo.label}: o pixel ${c} não é a cor da forma ${expected}`)
+        const expectedColor = rgbOf(sh.fill)
+        check(near(c, expectedColor), `${theme} ${geo.label}: o pixel ${c} não é a cor da forma ${expectedColor}`)
         const cr = contrast(c, bg)
         check(cr >= 3, `${theme} ${geo.label}: forma ${c} sobre ${bg} = ${cr.toFixed(2)} (< 3)`)
-        if (geo.label.startsWith('Pizza')) { slicesMeasured++; lowest.fatia = Math.min(lowest.fatia, cr) } else { barsMeasured++; lowest.barra = Math.min(lowest.barra, cr) }
+        if (geo.label.startsWith('Pizza')) {
+          slicesMeasured++
+          if (near(expectedColor, tokens[5])) othersMeasured++
+          lowest.fatia = Math.min(lowest.fatia, cr)
+        } else { barsMeasured++; lowest.barra = Math.min(lowest.barra, cr) }
       }
       for (const t of geo.texts) {
         let best = 1
@@ -119,9 +165,10 @@ try {
       dotsMeasured++
       lowest.bolinha = Math.min(lowest.bolinha, contrast(c, bg))
     }
-    const pies = (await Promise.all(charts.map((c) => c.evaluate((s) => s.getAttribute('aria-label'))))).filter((l) => l.startsWith('Pizza')).length
-    check(pies === 2 && slicesMeasured >= 7, `${theme}: mediu ${slicesMeasured} fatias em ${pies} pizzas (esperado: as 6 do contexto + as do detalhe)`)
-    check(barsMeasured >= 3 && textsMeasured >= 10 && dotsMeasured >= 7, `${theme}: mediu ${barsMeasured} barras, ${textsMeasured} textos, ${dotsMeasured} bolinhas`)
+    const piesShown = (await Promise.all(charts.map((c) => c.evaluate((s) => s.getAttribute('aria-label'))))).filter((l) => l.startsWith('Pizza')).length
+    check(piesShown === expected.pies && slicesDrawn === expected.slices && slicesMeasured >= expected.thick, `${theme}: ${slicesDrawn} fatias desenhadas, ${slicesMeasured} medidas, em ${piesShown} pizzas (esperado: ${JSON.stringify(expected)})`)
+    check(othersMeasured >= 1, `${theme}: fatia cinza de "outros" não medida`)
+    check(barsMeasured >= 3 && textsMeasured >= 10 && dotsMeasured === expected.dots, `${theme}: mediu ${barsMeasured} barras, ${textsMeasured} textos, ${dotsMeasured} bolinhas (esperado ${expected.dots})`)
     console.log(`${theme}: ${slicesMeasured} fatias, ${barsMeasured} barras, ${textsMeasured} textos, ${dotsMeasured} bolinhas medidos; menor contraste: ${Object.entries(lowest).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(', ')}`)
 
     // ---- Comparar tags (D7c): as 5 cores
