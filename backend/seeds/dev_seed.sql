@@ -512,7 +512,8 @@ SELECT id, ini AT TIME ZONE 'America/Sao_Paulo', (ini + dur) AT TIME ZONE 'Ameri
 -- casa, rua; 1401, 1403 e 602 academia, 1402 casa, 601 rua; as outras corridas
 -- sem Local) · Idiomas (era Linguagens), medida sem tipos + Habilidade múltipla
 -- (1301 e 202 escuta; 1701 escrita + pensamento, duas opções) + Tipo de input
--- (1301 raw, 202 comprehensible). Total: 28 escolhas
+-- (1301 raw, 202 comprehensible). Total: 28 escolhas. O 1701 ganha descrição
+-- própria, coerente com as duas habilidades (a do bloco D1 fala em série)
 INSERT INTO tasks (id, title, frequency, active, created_at) VALUES
   ('5eed0000-0000-4000-8000-000000000013', 'Desenhar',          'none', true, now() - interval '40 days'),
   ('5eed0000-0000-4000-8000-000000000014', 'Praticar guitarra', 'none', true, now() - interval '39 days');
@@ -555,6 +556,8 @@ INSERT INTO task_executions
 SELECT id, task, descricao, titulo, 'none', (ini + dur) AT TIME ZONE 'America/Sao_Paulo', raiz FROM s3;
 UPDATE task_executions SET task_frequency_at_time = 'daily'
 WHERE id IN ('5eed0000-0000-4000-8000-000000002209', '5eed0000-0000-4000-8000-000000002210');
+UPDATE task_executions SET description = 'Elaborando frases em inglês'
+WHERE id = '5eed0000-0000-4000-8000-000000001701';
 
 INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id)
 SELECT s3.id, t.id, t.parent_id, s3.raiz

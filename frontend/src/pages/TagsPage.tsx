@@ -13,8 +13,10 @@ import {
   UnarchiveIcon,
 } from '../components/icons'
 import ExerciseCatalog from '../components/ExerciseCatalog'
+import GeneralSelections from '../components/GeneralSelections'
 import MeasureForm from '../components/MeasureForm'
 import TagForm from '../components/TagForm'
+import { describeSelection } from '../selections'
 import { cardClass, chipClass, focusRing } from '../styles'
 import { compareNames, indexTags, tagPath } from '../tags'
 import type {
@@ -22,6 +24,7 @@ import type {
   ExerciseActions,
   Measure,
   MeasureActions,
+  Selection,
   Tag,
   TaskExecution,
 } from '../types'
@@ -70,6 +73,7 @@ function TagsPage(props: {
   tags: Tag[]
   measures: Measure[]
   measureActions: MeasureActions
+  selections: Selection[]
   exercises: Exercise[]
   exerciseActions: ExerciseActions
   executions: TaskExecution[]
@@ -168,6 +172,14 @@ function TagsPage(props: {
     props.tags.filter((tag) => tag.parentId === id)
   const measureByTag = new Map(
     props.measures.map((measure) => [measure.tagId, measure]),
+  )
+
+  // Arquivadas só com "Mostrar arquivadas", como as tags
+  const visibleSelections = props.selections
+    .filter((selection) => showArchived || selection.active)
+    .sort((a, b) => compareNames(a.name, b.name))
+  const generalSelections = visibleSelections.filter(
+    (selection) => selection.tagId === null,
   )
 
   // A herança em uma linha: as herdeiras não mostram chip, então é aqui
@@ -332,7 +344,9 @@ function TagsPage(props: {
             ? `Em uso em ${registros(uses)}. Arquive em vez de apagar.`
             : measureByTag.has(tag.id)
               ? 'Declara uma medida: apague a medida antes.'
-              : undefined
+              : props.selections.some((s) => s.tagId === tag.id)
+                ? 'Declara uma seleção: apague a seleção antes.'
+                : undefined
     actions.push({
       label: 'Apagar',
       icon: <TrashIcon />,
@@ -434,6 +448,16 @@ function TagsPage(props: {
             {measure.active ? '' : ' · arquivada'}
           </p>
         )}
+        {visibleSelections
+          .filter((selection) => selection.tagId === tag.id)
+          .map((selection) => (
+            <p
+              key={selection.id}
+              className="-mt-1.5 pr-2 pb-1.5 font-dados text-meta break-words text-tinta-suave"
+            >
+              Seleção: {describeSelection(selection)}
+            </p>
+          ))}
         {/* Fechada: nem renderiza, então o Tab não para em nada escondido */}
         {((children.length > 0 && isOpen) || addingHere) && (
           <ul id={listId} className="ml-1.5 border-l border-linha pl-3">
@@ -479,6 +503,11 @@ function TagsPage(props: {
           <TagForm
             label="Nova tag"
             submitLabel="Adicionar"
+            hint={
+              activeRoots >= 3
+                ? `Você já tem ${activeRoots} contextos. Antes de criar outro: se é um assunto, pode ser subtag de um deles; se é como, onde ou com o quê, pode ser seleção.`
+                : undefined
+            }
             onSubmit={async (name) => {
               await props.onCreate(name, null)
               setForm(null)
@@ -487,22 +516,14 @@ function TagsPage(props: {
           />
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => setForm({ kind: 'root' })}
-            className={`flex h-13 w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-tinta-suave/55 font-semibold text-tinta-suave hover:bg-tinta/[0.07] hover:text-tinta ${focusRing}`}
-          >
-            <PlusIcon />
-            Nova tag
-          </button>
-          {activeRoots >= 3 && (
-            <p className="px-0.5 font-texto text-meta text-tinta-suave">
-              Você já tem {activeRoots} contextos. A ideia é ter poucos; antes
-              de criar outro, veja se ele cabe dentro de um que já existe.
-            </p>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setForm({ kind: 'root' })}
+          className={`flex h-13 w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-tinta-suave/55 font-semibold text-tinta-suave hover:bg-tinta/[0.07] hover:text-tinta ${focusRing}`}
+        >
+          <PlusIcon />
+          Nova tag
+        </button>
       )}
       {props.tags.length > 0 && (
         <label className="flex items-center gap-2 px-0.5 text-sm text-tinta-suave">
@@ -531,6 +552,9 @@ function TagsPage(props: {
             </li>
           ))}
         </ul>
+      )}
+      {generalSelections.length > 0 && (
+        <GeneralSelections selections={generalSelections} />
       )}
       <ExerciseCatalog
         exercises={props.exercises}

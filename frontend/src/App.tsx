@@ -4,6 +4,7 @@ import { ApiError } from './api/client'
 import * as executionsApi from './api/executions'
 import * as exercisesApi from './api/exercises'
 import * as measuresApi from './api/measures'
+import * as selectionsApi from './api/selections'
 import * as tagsApi from './api/tags'
 import * as tasksApi from './api/tasks'
 import * as timeEntriesApi from './api/timeEntries'
@@ -23,6 +24,7 @@ import type {
   MeasureValue,
   NewTask,
   SavedExecution,
+  Selection,
   StartDraft,
   Tag,
   TagChoice,
@@ -52,6 +54,7 @@ function App() {
   const [tags, setTags] = useState<Tag[]>([])
   const [measures, setMeasures] = useState<Measure[]>([])
   const [exercises, setExercises] = useState<Exercise[]>([])
+  const [selections, setSelections] = useState<Selection[]>([])
 
   useEffect(() => {
     let ignore = false
@@ -63,6 +66,7 @@ function App() {
       tagsApi.listTags(),
       measuresApi.listMeasures(),
       exercisesApi.listExercises(),
+      selectionsApi.listSelections(),
     ])
       .then(
         ([
@@ -72,6 +76,7 @@ function App() {
           tagList,
           measureList,
           exerciseList,
+          selectionList,
         ]) => {
           if (ignore) return
           setTasks(taskList)
@@ -80,6 +85,7 @@ function App() {
           setTags(tagList)
           setMeasures(measureList)
           setExercises(exerciseList)
+          setSelections(selectionList)
           setStatus('ready')
         },
       )
@@ -619,6 +625,7 @@ function App() {
               tags={tags}
               measures={measures}
               measureActions={measureActions}
+              selections={selections}
               exercises={exercises}
               exerciseActions={exerciseActions}
               executions={executions}

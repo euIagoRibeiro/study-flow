@@ -31,6 +31,28 @@ export type TaskExecution = {
   measure: ExecutionMeasure | null
   // Treino (A3), em ordem; null = sem treino
   workout: WorkoutExercise[] | null
+  // Escolhas de seleção, agrupadas por seleção; [] = nenhuma
+  selections: ExecutionSelection[]
+}
+
+export type ExecutionSelection = { selectionId: string; optionIds: string[] }
+
+// Lista fechada declarada numa tag (a herança SOMA) ou global (tagId null).
+// Opções na ordem de cadastro
+export type SelectionOption = {
+  id: string
+  name: string
+  position: number
+  active: boolean
+}
+
+export type Selection = {
+  id: string
+  tagId: string | null
+  name: string
+  multiple: boolean
+  active: boolean
+  options: SelectionOption[]
 }
 
 // Uma série: repetições e peso (null = peso do corpo)

@@ -23,11 +23,12 @@ const groups = {
     ['a3e1.mjs', 'en-US'], 'a3e2.mjs', 'a3f.mjs', 'chips-medida.mjs', 'painel.mjs',
     'painel-graficos.mjs', 'painel-periodos.mjs', 'painel-comparacao.mjs', 'painel-tags.mjs',
     'cronometro-inicio.mjs', 'cronometro-escolha.mjs', 'navegacao.mjs', 'cartoes.mjs', 'rascunhos.mjs',
+    's4-selecoes.mjs',
   ],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
-    'painel-layout.mjs', 'painel-contraste.mjs',
+    'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs',
   ],
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'

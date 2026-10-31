@@ -11,6 +11,7 @@ function TagForm(props: {
   initialName?: string
   maxLength?: number // padrão: o das tags (50)
   emptyError?: string
+  hint?: string
   onSubmit: (name: string) => Promise<unknown>
   onCancel: () => void
 }) {
@@ -57,6 +58,9 @@ function TagForm(props: {
           className={fieldClass}
         />
       </label>
+      {props.hint && (
+        <p className="font-texto text-meta text-tinta-suave">{props.hint}</p>
+      )}
       {error && <FormError>{error}</FormError>}
       <div className="flex gap-2">
         <button
