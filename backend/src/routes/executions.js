@@ -665,7 +665,9 @@ class TagError extends Error {}
 // Valida e grava as tags de uma execução (já dentro de uma transação).
 // Grava o fechamento: cada nível 3 escolhido leva o nível 2 pai junto.
 // Tag arquivada só pode continuar se já estava; nova, não.
-// A fase troca na mesma instrução que a raiz (o banco recusa separado)
+// A fase troca na mesma instrução que a raiz (o banco recusa separado).
+// As tags ficam travadas (FOR KEY SHARE) desde a conferência, antes de soltar
+// as ligações: apagar uma delas no meio espera aqui ou chega antes e dá 400
 async function applyTags(
   client,
   executionId,
@@ -676,9 +678,10 @@ async function applyTags(
 ) {
   if (rootTagId) {
     const root = (
-      await client.query('SELECT level, active FROM tags WHERE id = $1', [
-        rootTagId,
-      ])
+      await client.query(
+        'SELECT level, active FROM tags WHERE id = $1 FOR KEY SHARE',
+        [rootTagId],
+      )
     ).rows[0]
     if (!root) throw new TagError('rootTagId não existe')
     if (root.level !== 1) {
@@ -695,7 +698,8 @@ async function applyTags(
         await client.query(
           `SELECT id, level, parent_id AS "parentId",
                   effective_root AS "rootId", active
-           FROM tags WHERE id = ANY($1)`,
+           FROM tags WHERE id = ANY($1)
+           FOR KEY SHARE`,
           [ids],
         )
       ).rows
