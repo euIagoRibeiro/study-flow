@@ -55,6 +55,29 @@ export type Selection = {
   options: SelectionOption[]
 }
 
+export type SelectionFields = { name: string; multiple: boolean }
+
+// O que a tela de tags faz com as seleções. Os erros sobem pro formulário
+export type SelectionActions = {
+  create: (
+    tagId: string | null,
+    fields: SelectionFields,
+    options: string[],
+  ) => Promise<void>
+  update: (
+    id: string,
+    changes: Partial<SelectionFields> & { active?: boolean },
+  ) => Promise<void>
+  remove: (id: string) => Promise<void>
+  createOption: (selectionId: string, name: string) => Promise<void>
+  updateOption: (
+    selectionId: string,
+    optionId: string,
+    changes: { name?: string; active?: boolean },
+  ) => Promise<void>
+  removeOption: (selectionId: string, optionId: string) => Promise<void>
+}
+
 // Uma série: repetições e peso (null = peso do corpo)
 export type WorkoutSet = { reps: number; weightKg: number | null }
 

@@ -15,8 +15,9 @@ import {
 import ExerciseCatalog from '../components/ExerciseCatalog'
 import GeneralSelections from '../components/GeneralSelections'
 import MeasureForm from '../components/MeasureForm'
+import SelectionForm from '../components/SelectionForm'
 import TagForm from '../components/TagForm'
-import { describeSelection } from '../selections'
+import { describeSelection, selectionError, selectionNote } from '../selections'
 import { cardClass, chipClass, focusRing } from '../styles'
 import { compareNames, indexTags, tagPath } from '../tags'
 import type {
@@ -25,6 +26,7 @@ import type {
   Measure,
   MeasureActions,
   Selection,
+  SelectionActions,
   Tag,
   TaskExecution,
 } from '../types'
@@ -67,6 +69,8 @@ type FormState =
   | { kind: 'child'; parentId: string }
   | { kind: 'rename'; tagId: string }
   | { kind: 'measure'; tagId: string }
+  | { kind: 'selection-new'; tagId: string | null }
+  | { kind: 'selection-edit'; selectionId: string; error?: string }
   | null
 
 function TagsPage(props: {
@@ -74,6 +78,7 @@ function TagsPage(props: {
   measures: Measure[]
   measureActions: MeasureActions
   selections: Selection[]
+  selectionActions: SelectionActions
   exercises: Exercise[]
   exerciseActions: ExerciseActions
   executions: TaskExecution[]
@@ -89,7 +94,7 @@ function TagsPage(props: {
   const location = useLocation()
   const [showArchived, setShowArchived] = useState(false)
   const [open, setOpen] = useState(() => readOpen(props.tags))
-  // Um formulário por vez (criar raiz, criar subtag, renomear ou medida)
+  // Um formulário por vez (criar raiz, criar subtag, renomear, medida ou seleção)
   const [form, setForm] = useState<FormState>(null)
 
   useEffect(() => {
@@ -126,7 +131,19 @@ function TagsPage(props: {
   // Medidas e tipos usados: com uso, apagar vira arquivar
   const usedMeasures = new Set<string>()
   const usedKinds = new Set<string>()
+  // Registros por seleção e por opção: com uso, apagar vira arquivar
+  const selectionUses = new Map<string, number>()
+  const optionUses = new Map<string, number>()
   for (const execution of props.executions) {
+    for (const choice of execution.selections) {
+      selectionUses.set(
+        choice.selectionId,
+        (selectionUses.get(choice.selectionId) ?? 0) + 1,
+      )
+      for (const id of choice.optionIds) {
+        optionUses.set(id, (optionUses.get(id) ?? 0) + 1)
+      }
+    }
     if (execution.measure) {
       usedMeasures.add(execution.measure.measureId)
       for (const value of execution.measure.values) {
@@ -232,6 +249,83 @@ function TagsPage(props: {
     }
   }
 
+  // O menu não tem onde mostrar um erro: abre o formulário com a mensagem
+  async function runOnSelection(id: string, action: () => Promise<void>) {
+    try {
+      await action()
+    } catch (err) {
+      setForm({
+        kind: 'selection-edit',
+        selectionId: id,
+        error: selectionError(err),
+      })
+    }
+  }
+
+  function selectionActionsFor(selection: Selection): MenuAction[] {
+    const tag = selection.tagId ? byId.get(selection.tagId) : undefined
+    const blocked = tag !== undefined && !tag.active
+    const uses = selectionUses.get(selection.id) ?? 0
+    const { id, name } = selection
+    const { update, remove } = props.selectionActions
+    return [
+      {
+        label: 'Editar',
+        icon: <PencilIcon />,
+        onSelect: () => setForm({ kind: 'selection-edit', selectionId: id }),
+      },
+      selection.active
+        ? {
+            label: 'Arquivar',
+            icon: <ArchiveIcon />,
+            onSelect: () =>
+              runOnSelection(id, () => update(id, { active: false })),
+          }
+        : {
+            label: 'Reativar',
+            icon: <UnarchiveIcon />,
+            onSelect: () =>
+              runOnSelection(id, () => update(id, { active: true })),
+            disabled: blocked,
+            hint: blocked ? `Reative ${tag.name} primeiro.` : undefined,
+          },
+      {
+        label: 'Apagar',
+        icon: <TrashIcon />,
+        onSelect: () => {
+          if (
+            window.confirm(`Apagar a seleção "${name}"? Não dá pra desfazer.`)
+          ) {
+            runOnSelection(id, () => remove(id))
+          }
+        },
+        disabled: uses > 0,
+        hint:
+          uses > 0
+            ? `Em uso em ${registros(uses)}. Arquive em vez de apagar.`
+            : undefined,
+      },
+    ]
+  }
+
+  function selectionForm(tag: Tag | null, selection?: Selection) {
+    return (
+      <SelectionForm
+        key={selection?.id ?? `nova-${tag?.id}`}
+        tag={tag}
+        selection={selection}
+        note={selectionNote(tag, props.selections, byId, selection?.id)}
+        optionUses={optionUses}
+        actions={props.selectionActions}
+        initialError={form?.kind === 'selection-edit' ? form.error : undefined}
+        onClose={() => setForm(null)}
+      />
+    )
+  }
+
+  const editing = (selection: Selection) =>
+    form?.kind === 'selection-edit' && form.selectionId === selection.id
+
   function actionsFor(tag: Tag): MenuAction[] {
     const actions: MenuAction[] = [
       {
@@ -314,6 +408,11 @@ function TagsPage(props: {
         label: measureByTag.has(tag.id) ? 'Editar medida' : 'Definir medida',
         icon: <RulerIcon />,
         onSelect: () => setForm({ kind: 'measure', tagId: tag.id }),
+      })
+      actions.push({
+        label: 'Nova seleção',
+        icon: <PlusIcon />,
+        onSelect: () => setForm({ kind: 'selection-new', tagId: tag.id }),
       })
     }
     if (tag.active) {
@@ -450,14 +549,28 @@ function TagsPage(props: {
         )}
         {visibleSelections
           .filter((selection) => selection.tagId === tag.id)
-          .map((selection) => (
-            <p
-              key={selection.id}
-              className="-mt-1.5 pr-2 pb-1.5 font-dados text-meta break-words text-tinta-suave"
-            >
-              Seleção: {describeSelection(selection)}
-            </p>
-          ))}
+          .map((selection) =>
+            editing(selection) ? (
+              selectionForm(tag, selection)
+            ) : (
+              <div
+                key={selection.id}
+                className="-mt-1.5 flex min-h-11 items-center gap-2 pb-1.5"
+              >
+                <p className="min-w-0 flex-1 font-dados text-meta break-words text-tinta-suave">
+                  Seleção: {describeSelection(selection)}
+                </p>
+                <ActionMenu
+                  label={`Mais ações da seleção ${selection.name}`}
+                  actions={selectionActionsFor(selection)}
+                  placement=""
+                />
+              </div>
+            ),
+          )}
+        {form?.kind === 'selection-new' &&
+          form.tagId === tag.id &&
+          selectionForm(tag)}
         {/* Fechada: nem renderiza, então o Tab não para em nada escondido */}
         {((children.length > 0 && isOpen) || addingHere) && (
           <ul id={listId} className="ml-1.5 border-l border-linha pl-3">
@@ -553,9 +666,19 @@ function TagsPage(props: {
           ))}
         </ul>
       )}
-      {generalSelections.length > 0 && (
-        <GeneralSelections selections={generalSelections} />
-      )}
+      <GeneralSelections
+        selections={generalSelections}
+        actionsFor={selectionActionsFor}
+        formFor={(selection) =>
+          editing(selection) ? selectionForm(null, selection) : null
+        }
+        newForm={
+          form?.kind === 'selection-new' && form.tagId === null
+            ? selectionForm(null)
+            : null
+        }
+        onNew={() => setForm({ kind: 'selection-new', tagId: null })}
+      />
       <ExerciseCatalog
         exercises={props.exercises}
         executions={props.executions}

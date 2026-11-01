@@ -37,7 +37,7 @@ try {
     const m = await page.evaluate(() => {
       const useful = document.documentElement.clientWidth
       const rows = [...document.querySelectorAll('p')].filter((p) => p.textContent.startsWith('Seleção:'))
-      const general = [...document.querySelectorAll('section[aria-label="Seleções gerais"] li')]
+      const general = [...document.querySelectorAll('section[aria-label="Seleções gerais"] li p')]
       const all = [...rows, ...general]
       // Pelo texto (Range), não pela caixa: o bloco não cresce quando o texto estoura
       const rects = (el) => {
@@ -56,12 +56,18 @@ try {
         longLines: new Set(rects(longGeneral).map((r) => Math.round(r.top))).size,
         wide: Math.round(wide),
         room: Math.round(contentRight(longGeneral) - longGeneral.getBoundingClientRect().left),
-        // Pares em sequência no mesmo cartão: a de baixo começa depois da de cima
+        // Pares em sequência na mesma tag: a de baixo começa depois da de cima
         overlaps: rows.filter((el, i) => {
           const next = rows[i + 1]
-          return next && next.parentElement === el.parentElement &&
-            next.getBoundingClientRect().top < el.getBoundingClientRect().bottom - 7
+          return next && next.closest('li') === el.closest('li') &&
+            next.getBoundingClientRect().top < el.getBoundingClientRect().bottom
         }).length,
+        // ⋯ da seleção: alvo de 44px, dentro do cartão, sem encostar no texto
+        menus: [...document.querySelectorAll('[aria-label^="Mais ações da seleção "]')].map((b) => {
+          const r = b.getBoundingClientRect()
+          const text = b.parentElement.previousElementSibling
+          return { w: r.width, h: r.height, right: r.right, gap: r.left - text.getBoundingClientRect().right, card: b.closest('ul').getBoundingClientRect().right }
+        }),
       }
     })
     check(`${width}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}`)
@@ -72,6 +78,9 @@ try {
         `${m.longLines} linhas, a maior com ${m.wide}px em ${m.room}px`)
     }
     check(`${width}: linhas sem cobrir umas às outras`, m.overlaps === 0, `${m.overlaps}`)
+    check(`${width}: um ⋯ por seleção, 44px, dentro do cartão, a 8px do texto`,
+      m.menus.length === m.count && m.menus.every((b) => b.w >= 44 && b.h >= 44 && b.right <= b.card && b.gap >= 7.5),
+      `${m.menus.length}; menor folga ${Math.min(...m.menus.map((b) => b.gap)).toFixed(1)}`)
     if (width === 320 || width === 375) await page.screenshot({ path: out(`s4a-${width}.png`) })
     await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Nova tag').click())
     await page.waitForSelector('form input')
@@ -83,6 +92,101 @@ try {
     })
     check(`${width}: formulário "Nova tag" com o aviso dentro`, f.hint && f.inside && f.scroll <= 0, JSON.stringify(f))
     if (width === 320) await page.screenshot({ path: out('s4a-nova-tag-320.png') })
+
+    // S4b: formulários abertos, na raiz, no neto e na geral, com o pior caso
+    const clickLabel = async (label, index = 0) => {
+      await page.evaluate((l, i) => {
+        const el = document.querySelectorAll(`[aria-label="${l}"]`)[i]
+        el.scrollIntoView({ block: 'center' })
+        el.click()
+      }, label, index)
+      await page.waitForFunction(() => document.querySelector('[role="menu"]') !== null)
+    }
+    const clickItem = (text) => page.evaluate((t) =>
+      [...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent.trim().startsWith(t)).click(), text)
+    const formState = (selector) => page.evaluate((s) => {
+      const useful = document.documentElement.clientWidth
+      const form = document.querySelector(s)
+      const box = form.getBoundingClientRect()
+      const inputs = [...form.querySelectorAll('input[type="text"]')]
+      // sr-only tem 1px, fora do fluxo: mediria o recorte, não o texto
+      const texts = [...form.querySelectorAll('p, span, legend, button')].filter((el) => el.textContent.trim() && !el.matches('.sr-only'))
+      const leak = texts.filter((el) => {
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        return [...range.getClientRects()].some((r) => r.right > box.right + 0.5 || r.left < box.left - 0.5)
+      })
+      return {
+        scroll: document.documentElement.scrollWidth - useful,
+        leak: leak.map((el) => el.textContent.slice(0, 20)),
+        inputs: inputs.length,
+        minInput: Math.round(Math.min(...inputs.map((i) => i.getBoundingClientRect().width))),
+        targets: [...form.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().height < 40).length,
+        outside: inputs.filter((i) => i.getBoundingClientRect().right > box.right + 0.5).length,
+      }
+    }, selector)
+    // Tudo dentro do form, foco sem cortar (4px do anel)
+    const focusRoom = (selector) => page.evaluate(async (s) => {
+      const form = document.querySelector(s)
+      const parent = form.parentElement.closest('li, div') ?? form
+      const card = parent.getBoundingClientRect()
+      let min = Infinity
+      for (const el of form.querySelectorAll('input, button')) {
+        min = Math.min(min, card.right - el.getBoundingClientRect().right)
+      }
+      return Math.round(min * 10) / 10
+    }, selector)
+    const judge = async (name, selector) => {
+      const s = await formState(selector)
+      check(`${width}: ${name}: sem rolagem, nada vaza, campos ≥ 100px, botões ≥ 40px`,
+        s.scroll <= 0 && s.leak.length === 0 && s.outside === 0 && s.minInput >= 100 && s.targets === 0 && s.inputs > 0, JSON.stringify(s))
+      check(`${width}: ${name}: folga pro anel de foco`, (await focusRoom(selector)) >= 4, `${await focusRoom(selector)}`)
+    }
+    await page.reload({ waitUntil: 'networkidle0' })
+
+    // Criar na raiz
+    await clickLabel('Mais ações de Desenho')
+    await clickItem('Nova seleção')
+    const fresh = 'form[aria-label="Nova seleção em Desenho"]'
+    await page.waitForSelector(fresh)
+    await page.evaluate((s) => {
+      const plus = [...document.querySelector(s).querySelectorAll('button')].find((b) => b.textContent.trim() === 'Opção')
+      plus.click(); plus.click()
+    }, fresh)
+    await page.waitForSelector(`${fresh} input[aria-label="Opção 3"]`)
+    await judge('criar na raiz', fresh)
+    if (width === 320) await page.screenshot({ path: out('s4b-criar-320.png') })
+    await page.reload({ waitUntil: 'networkidle0' })
+
+    // Criar e editar no neto, a linha mais estreita
+    await clickLabel('Mais ações de Desenho › Fundamentos › Perspectiva')
+    await clickItem('Nova seleção')
+    const leafNew = 'form[aria-label="Nova seleção em Perspectiva"]'
+    await page.waitForSelector(leafNew)
+    await judge('criar no neto', leafNew)
+    await page.reload({ waitUntil: 'networkidle0' })
+    await clickLabel(`Mais ações da seleção ${'y'.repeat(30)}`, 1)
+    await clickItem('Editar')
+    const longForm = `form[aria-label="Seleção ${'y'.repeat(30)}"]`
+    await page.waitForSelector(longForm)
+    await judge('editar no neto, 30 opções', longForm)
+    if (width === 320) await page.screenshot({ path: out('s4b-editar-320.png') })
+    await page.reload({ waitUntil: 'networkidle0' })
+
+    // Geral
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Nova seleção geral').click())
+    const generalNew = 'form[aria-label="Nova seleção geral"]'
+    await page.waitForSelector(generalNew)
+    await judge('criar geral', generalNew)
+    await page.reload({ waitUntil: 'networkidle0' })
+    await clickLabel(`Mais ações da seleção ${'y'.repeat(30)}`, 2)
+    await clickItem('Editar')
+    await page.waitForSelector(longForm)
+    await judge('editar geral, 30 opções', longForm)
+    if (width === 375) {
+      await page.evaluate((s) => document.querySelector(s).scrollIntoView({ block: 'start' }), longForm)
+      await page.screenshot({ path: out('s4b-editar-geral-375.png') })
+    }
   }
 } catch (err) {
   check('rodou sem erro', false, err.message)

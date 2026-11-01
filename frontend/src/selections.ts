@@ -1,4 +1,11 @@
-import type { Selection } from './types'
+import { ApiError } from './api/client'
+import { compareNames } from './tags'
+import type { Selection, Tag } from './types'
+
+export const MAX_ACTIVE_OPTIONS = 30
+export const TOO_MANY_OPTIONS = `Esta seleção já tem ${MAX_ACTIVE_OPTIONS} opções ativas, o limite. Arquive ou apague uma antes de incluir outra.`
+export const LAST_ACTIVE_OPTION =
+  'A seleção precisa de pelo menos uma opção ativa. Para parar de usá-la, arquive a seleção.'
 
 // "Meio (digital, tradicional) · várias · arquivada": só as opções ativas
 export function describeSelection(selection: Selection): string {
@@ -11,4 +18,59 @@ export function describeSelection(selection: Selection): string {
     ...(selection.multiple ? ['várias'] : []),
     ...(selection.active ? [] : ['arquivada']),
   ].join(' · ')
+}
+
+// Mensagem do servidor quando ele explica (400/409); senão, genérica
+export function selectionError(err: unknown) {
+  return err instanceof ApiError && (err.status === 400 || err.status === 409)
+    ? err.message
+    : 'Não foi possível salvar. Tente de novo.'
+}
+
+// A opção repetida como foi escrita, com a mesma comparação do banco
+export function findRepeated(names: string[]): string | undefined {
+  const seen = new Set<string>()
+  for (const name of names) {
+    const key = name.trim().toLowerCase()
+    if (seen.has(key)) return name.trim()
+    seen.add(key)
+  }
+  return undefined
+}
+
+// A herança em uma linha. "Soma com": as declaradas no caminho até aqui;
+// ownId tira a própria, ao editar
+export function selectionNote(
+  tag: Tag | null,
+  selections: Selection[],
+  byId: Map<string, Tag>,
+  ownId?: string,
+): string {
+  const others = selections
+    .filter((selection) => selection.active && selection.id !== ownId)
+    .sort((a, b) => compareNames(a.name, b.name))
+  const general = others
+    .filter((selection) => selection.tagId === null)
+    .map((selection) => `${selection.name} (geral)`)
+  const alsoHere = general.length
+    ? ` Também valem aqui: ${general.join(', ')}.`
+    : ''
+  if (!tag) return `Vale em todos os registros, com ou sem tag.${alsoHere}`
+
+  const path = new Set<string>()
+  for (
+    let current: Tag | undefined = tag;
+    current;
+    current = current.parentId ? byId.get(current.parentId) : undefined
+  ) {
+    path.add(current.id)
+  }
+  const sums = others.flatMap((selection) =>
+    selection.tagId && path.has(selection.tagId)
+      ? [`${selection.name} (${byId.get(selection.tagId)?.name})`]
+      : [],
+  )
+  const scope = tag.level < 3 ? `${tag.name} e as subtags` : tag.name
+  const sumsWith = sums.length ? ` Soma com: ${sums.join(', ')}.` : ''
+  return `Vale para ${scope}.${sumsWith}${alsoHere}`
 }

@@ -25,6 +25,7 @@ import type {
   NewTask,
   SavedExecution,
   Selection,
+  SelectionActions,
   StartDraft,
   Tag,
   TagChoice,
@@ -550,6 +551,61 @@ function App() {
     },
   }
 
+  // Seleções: os erros sobem pro formulário (mostra o motivo)
+  function replaceSelection(updated: Selection) {
+    setSelections((current) =>
+      current.map((s) => (s.id === updated.id ? updated : s)),
+    )
+  }
+  const selectionActions: SelectionActions = {
+    async create(tagId, fields, options) {
+      const created = await selectionsApi.createSelection(
+        tagId,
+        fields,
+        options,
+      )
+      setSelections((current) => [...current, created])
+    },
+    async update(id, changes) {
+      replaceSelection(await selectionsApi.updateSelection(id, changes))
+    },
+    async remove(id) {
+      await selectionsApi.deleteSelection(id)
+      setSelections((current) => current.filter((s) => s.id !== id))
+    },
+    async createOption(selectionId, name) {
+      const option = await selectionsApi.createOption(selectionId, name)
+      setSelections((current) =>
+        current.map((s) =>
+          s.id === selectionId ? { ...s, options: [...s.options, option] } : s,
+        ),
+      )
+    },
+    async updateOption(selectionId, optionId, changes) {
+      const option = await selectionsApi.updateOption(optionId, changes)
+      setSelections((current) =>
+        current.map((s) =>
+          s.id === selectionId
+            ? {
+                ...s,
+                options: s.options.map((o) => (o.id === optionId ? option : o)),
+              }
+            : s,
+        ),
+      )
+    },
+    async removeOption(selectionId, optionId) {
+      await selectionsApi.deleteOption(optionId)
+      setSelections((current) =>
+        current.map((s) =>
+          s.id === selectionId
+            ? { ...s, options: s.options.filter((o) => o.id !== optionId) }
+            : s,
+        ),
+      )
+    },
+  }
+
   return (
     <Routes>
       <Route
@@ -626,6 +682,7 @@ function App() {
               measures={measures}
               measureActions={measureActions}
               selections={selections}
+              selectionActions={selectionActions}
               exercises={exercises}
               exerciseActions={exerciseActions}
               executions={executions}
