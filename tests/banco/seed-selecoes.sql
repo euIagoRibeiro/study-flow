@@ -62,7 +62,7 @@ SELECT pg_temp.c('11. declarante no caminho gravado (a raiz ou uma ligação); u
    FROM execution_selections es JOIN task_executions e ON e.id = es.task_execution_id
    WHERE es.task_execution_id::text LIKE '5eed%'), '0 1');
 SELECT pg_temp.c('12. violão arquivado e mantido no 2208; as outras opções ativas',
-  (SELECT string_agg(o.name, ',') || ' ' || (SELECT count(*) FROM execution_selections WHERE option_id = '5eed0000-0000-4000-c100-000000000042')
+  (SELECT string_agg(o.name, ',') || ' ' || (SELECT count(*) FROM execution_selections WHERE option_id = '5eed0000-0000-4000-a300-000000000042')
    FROM selection_options o WHERE o.id::text LIKE '5eed%' AND NOT o.active), 'violão 1');
 SELECT pg_temp.c('13. "Nenhuma" de propósito: 2207 sem Natureza, 2204 sem Abordagem; 501 (sem tag) com estudo',
   (SELECT string_agg(substr(e.id::text, 33, 4) || ':' || coalesce((SELECT string_agg(s.name || '=' || o.name, ',' ORDER BY s.name)
