@@ -12,6 +12,8 @@ export const selectionOptionsRouter = Router()
 const NOT_FOUND = 'Seleção não encontrada'
 const OPTION_NOT_FOUND = 'Opção não encontrada'
 const DUPLICATE_OPTION = 'Opção repetida nesta seleção'
+const MAX_ACTIVE_OPTIONS = 30
+const TOO_MANY_OPTIONS = `Esta seleção já tem ${MAX_ACTIVE_OPTIONS} opções ativas, o limite. Arquive ou apague uma antes de incluir outra.`
 
 const label = (field) =>
   z
@@ -28,7 +30,7 @@ const newSelectionSchema = z.object({
   options: z
     .array(label('options'), 'options precisa ser uma lista')
     .min(1, 'A seleção precisa de pelo menos uma opção')
-    .max(30, 'No máximo 30 opções'),
+    .max(MAX_ACTIVE_OPTIONS, `No máximo ${MAX_ACTIVE_OPTIONS} opções`),
 })
 
 const selectionChangesSchema = z
@@ -121,8 +123,19 @@ async function pathConflict(client, tagId, name, ownId = null) {
   }, no mesmo caminho`
 }
 
+// Ordem de trava de toda escrita: tabela (quando muda selections), linha da
+// seleção, opções. Fora dessa ordem, duas escritas podem esperar uma pela outra
 const lockSelections = (client) =>
   client.query('LOCK TABLE selections IN SHARE ROW EXCLUSIVE MODE')
+
+// Quem chama já travou a linha da seleção: a contagem vale até o COMMIT
+async function hasRoomForOption(client, selectionId) {
+  const result = await client.query(
+    'SELECT count(*)::int AS n FROM selection_options WHERE selection_id = $1 AND active',
+    [selectionId],
+  )
+  return result.rows[0].n < MAX_ACTIVE_OPTIONS
+}
 
 selectionsRouter.get('/', async (req, res) => {
   const result = await pool.query(
@@ -283,7 +296,7 @@ selectionsRouter.patch('/:id', async (req, res) => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    if (changes.name !== undefined) await lockSelections(client)
+    await lockSelections(client)
     const current = await client.query(
       'SELECT tag_id AS "tagId", multiple FROM selections WHERE id = $1 FOR UPDATE',
       [req.params.id],
@@ -370,6 +383,12 @@ selectionsRouter.delete('/:id', async (req, res) => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await lockSelections(client)
+    // NO KEY: uma escolha sendo gravada termina, e a FK recusa o apagar
+    await client.query(
+      'SELECT 1 FROM selections WHERE id = $1 FOR NO KEY UPDATE',
+      [req.params.id],
+    )
     await client.query(
       'DELETE FROM selection_options WHERE selection_id = $1',
       [req.params.id],
@@ -418,6 +437,10 @@ selectionOptionsRouter.post('/', async (req, res) => {
       await client.query('ROLLBACK')
       return res.status(400).json({ error: 'selectionId não existe' })
     }
+    if (!(await hasRoomForOption(client, option.selectionId))) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({ error: TOO_MANY_OPTIONS })
+    }
     const result = await client.query(
       `INSERT INTO selection_options (selection_id, name, position)
        SELECT $1, $2, COALESCE(max(position), 0) + 1
@@ -444,8 +467,37 @@ selectionOptionsRouter.patch('/:id', async (req, res) => {
   }
   const { error, data: changes } = validate(optionChangesSchema, req.body)
   if (error) return res.status(400).json({ error })
+
+  const client = await pool.connect()
   try {
-    const result = await pool.query(
+    await client.query('BEGIN')
+    // Reativar disputa vaga: "arquivada → ativa" só vale lido sob a trava
+    if (changes.active === true) {
+      const owner = await client.query(
+        'SELECT selection_id AS "selectionId" FROM selection_options WHERE id = $1',
+        [req.params.id],
+      )
+      if (owner.rowCount === 0) {
+        await client.query('ROLLBACK')
+        return res.status(404).json({ error: OPTION_NOT_FOUND })
+      }
+      const { selectionId } = owner.rows[0]
+      await client.query('SELECT 1 FROM selections WHERE id = $1 FOR UPDATE', [
+        selectionId,
+      ])
+      const state = await client.query(
+        'SELECT active FROM selection_options WHERE id = $1',
+        [req.params.id],
+      )
+      if (
+        state.rows[0]?.active === false &&
+        !(await hasRoomForOption(client, selectionId))
+      ) {
+        await client.query('ROLLBACK')
+        return res.status(409).json({ error: TOO_MANY_OPTIONS })
+      }
+    }
+    const result = await client.query(
       `UPDATE selection_options
        SET name = COALESCE($1, name), active = COALESCE($2, active)
        WHERE id = $3
@@ -453,14 +505,19 @@ selectionOptionsRouter.patch('/:id', async (req, res) => {
       [changes.name ?? null, changes.active ?? null, req.params.id],
     )
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK')
       return res.status(404).json({ error: OPTION_NOT_FOUND })
     }
+    await client.query('COMMIT')
     res.json(result.rows[0])
   } catch (err) {
+    await client.query('ROLLBACK')
     if (isDuplicate(err, ['selection_options_name_unique'])) {
       return res.status(409).json({ error: DUPLICATE_OPTION })
     }
     throw err
+  } finally {
+    client.release()
   }
 })
 

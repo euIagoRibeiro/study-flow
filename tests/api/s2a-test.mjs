@@ -160,6 +160,87 @@ try {
   check('GET /selections: opções em position, com a arquivada',
     g?.options.map((o) => o.name).join(',') === 'estudo,pesquisa,prática livre,lazer', g?.options.map((o) => o.name).join(','))
 
+  // --- Teto de 30 opções ATIVAS
+  const names = (n, prefix) => Array.from({ length: n }, (_, i) => `${prefix}${i + 1}`)
+  const activeCount = async (id) =>
+    (await pool.query('SELECT count(*)::int AS n FROM selection_options WHERE selection_id = $1 AND active', [id])).rows[0].n
+  const addOption = (selectionId, name) => api('POST', '/selection-options', { selectionId, name })
+  const setActive = (optionId, active) => api('PATCH', `/selection-options/${optionId}`, { active })
+  const Top = (await sel(C.id, 'teto', names(29, 'o'))).body
+  r = await addOption(Top.id, 'o30')
+  check('30ª opção ativa: 201', r.status === 201 && (await activeCount(Top.id)) === 30, detail(r))
+  const thirtieth = r.body
+  r = await addOption(Top.id, 'o31')
+  check('31ª: 409, a mensagem diz o limite, nada gravado', r.status === 409 && /30 opções ativas/.test(r.body?.error ?? '') &&
+    (await allSelections()).find((s) => s.id === Top.id).options.length === 30, detail(r))
+  await setActive(Top.options[0].id, false)
+  r = await addOption(Top.id, 'o31')
+  check('arquivada não conta: com a vaga, a nova passa', r.status === 201 && (await activeCount(Top.id)) === 30, detail(r))
+  r = await setActive(Top.options[0].id, true)
+  check('reativar a 31ª: 409 com o limite, continua arquivada', r.status === 409 && /30 opções ativas/.test(r.body?.error ?? '') &&
+    (await allSelections()).find((s) => s.id === Top.id).options.find((o) => o.id === Top.options[0].id).active === false, detail(r))
+  r = await api('PATCH', `/selection-options/${Top.options[0].id}`, { name: 'renomeada', active: true })
+  check('reativar e renomear juntos no teto: 409, o nome não muda',
+    r.status === 409 && (await allSelections()).find((s) => s.id === Top.id).options.find((o) => o.id === Top.options[0].id).name === 'o1', detail(r))
+  r = await setActive(thirtieth.id, true)
+  check('opção já ativa no teto: "reativar" não conta como nova, 200', r.status === 200, detail(r))
+  r = await api('PATCH', `/selection-options/${thirtieth.id}`, { name: 'o30 novo' })
+  check('renomear no teto: 200', r.status === 200 && r.body?.name === 'o30 novo', detail(r))
+  await setActive(thirtieth.id, false)
+  r = await setActive(Top.options[0].id, true)
+  check('reativar com 29 ativas: 200', r.status === 200 && (await activeCount(Top.id)) === 30, detail(r))
+  r = await setActive('00000000-0000-4000-8000-000000000000', true)
+  check('reativar opção inexistente: 404', r.status === 404, detail(r))
+
+  // Simultâneas: 29 ativas + 3 arquivadas; 3 reativações e 3 criações ao mesmo tempo
+  const Race = (await sel(C.id, 'corrida', names(30, 'r'))).body
+  const archived = Race.options.slice(27).map((o) => o.id)
+  await pool.query('UPDATE selection_options SET active = false WHERE id = ANY($1)', [archived])
+  await addOption(Race.id, 'r31')
+  await addOption(Race.id, 'r32')
+  check('corrida começa com 29 ativas e 3 arquivadas', (await activeCount(Race.id)) === 29, `${await activeCount(Race.id)} ativas`)
+  let races = 0
+  const ROUNDS = 8
+  const seen = new Set()
+  for (let round = 0; round < ROUNDS; round++) {
+    const answers = await Promise.all([
+      ...archived.map((id) => setActive(id, true)),
+      ...[1, 2, 3].map((i) => addOption(Race.id, `nova ${round} ${i}`)),
+    ])
+    const passed = answers.filter((a) => a.status === 200 || a.status === 201).length
+    const refused = answers.filter((a) => a.status === 409).length
+    const total = await activeCount(Race.id)
+    answers.forEach((a) => seen.add(a.status))
+    if (passed === 1 && refused === 5 && total === 30) races++
+    await pool.query(`DELETE FROM selection_options WHERE selection_id = $1 AND name LIKE 'nova %'`, [Race.id])
+    await pool.query('UPDATE selection_options SET active = false WHERE id = ANY($1)', [archived])
+  }
+  check(`simultâneas: exatamente 1 passa e o total fica em 30, nas ${ROUNDS} rodadas`, races === ROUNDS, `${races} de ${ROUNDS}, status ${[...seen].join(',')}`)
+
+  // A mesma opção, várias vezes: quem chega depois já a vê ativa, sob a trava
+  let doubles = 0
+  for (let round = 0; round < ROUNDS; round++) {
+    const answers = await Promise.all([1, 2, 3, 4].map(() => setActive(archived[0], true)))
+    if (answers.every((a) => a.status === 200) && (await activeCount(Race.id)) === 30) doubles++
+    await setActive(archived[0], false)
+  }
+  check('reativar a mesma opção ao mesmo tempo, com 29: todas passam', doubles === ROUNDS, `${doubles} de ${ROUNDS}`)
+
+  // Ordem de trava: deadlock vira 500 (40P01) depois de 1s
+  const statuses = new Set()
+  for (let round = 0; round < 6; round++) {
+    const S = (await sel(C.id, `apagar ${round}`, ['a', 'b'])).body
+    await setActive(S.options[0].id, false)
+    const answers = await Promise.all([
+      api('DELETE', `/selections/${S.id}`),
+      setActive(S.options[0].id, true),
+      api('PATCH', `/selections/${S.id}`, { name: `apagar ${round} novo` }),
+      api('PATCH', `/selections/${S.id}`, { multiple: true }),
+    ])
+    answers.forEach((a) => statuses.add(a.status))
+  }
+  check('apagar seleção × reativar × editar ao mesmo tempo: nunca 500', !statuses.has(500), [...statuses].join(','))
+
   // --- Única ↔ múltipla, com registros
   const e1 = await record(V.id)
   const e2 = await record(V.id)
