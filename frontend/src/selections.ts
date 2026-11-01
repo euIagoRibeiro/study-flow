@@ -7,6 +7,59 @@ export const TOO_MANY_OPTIONS = `Esta seleção já tem ${MAX_ACTIVE_OPTIONS} op
 export const LAST_ACTIVE_OPTION =
   'A seleção precisa de pelo menos uma opção ativa. Para parar de usá-la, arquive a seleção.'
 
+// A ordem dos campos nos formulários de registro: mudar é mexer só aqui
+export const FORM_FIELD_ORDER = [
+  'tags',
+  'fase',
+  'selecoes-caminho',
+  'selecoes-gerais',
+  'medida',
+] as const
+
+export type FormField = (typeof FORM_FIELD_ORDER)[number]
+
+// Escolhas por seleção; lista vazia = "Nenhuma" escolhida de propósito
+export type SelectionChoiceMap = Record<string, string[]>
+
+const canChoose = (selection: Selection) =>
+  selection.active && selection.options.some((option) => option.active)
+
+// As declaradas no caminho, da raiz para a folha: a herança soma
+export function pathSelections(path: string[], selections: Selection[]) {
+  return path.flatMap((tagId) =>
+    selections
+      .filter((selection) => selection.tagId === tagId && canChoose(selection))
+      .sort((a, b) => compareNames(a.name, b.name)),
+  )
+}
+
+export function generalSelections(selections: Selection[]) {
+  return selections
+    .filter((selection) => selection.tagId === null && canChoose(selection))
+    .sort((a, b) => compareNames(a.name, b.name))
+}
+
+// O que volta de um rascunho: opção que saiu não conta, e a seleção que perdeu
+// a escolha toda deixa de estar tocada (a sugestão volta a valer). "Nenhuma"
+// continua tocada
+export function keepActiveChoices(
+  choices: SelectionChoiceMap,
+  selections: Selection[],
+): SelectionChoiceMap {
+  return Object.fromEntries(
+    Object.entries(choices).flatMap(([selectionId, optionIds]) => {
+      const selection = selections.find((s) => s.id === selectionId)
+      if (!selection) return []
+      const kept = optionIds.filter((id) =>
+        selection.options.some((option) => option.id === id && option.active),
+      )
+      return optionIds.length > 0 && kept.length === 0
+        ? []
+        : [[selectionId, kept]]
+    }),
+  )
+}
+
 // "Meio (digital, tradicional) · várias · arquivada": só as opções ativas
 export function describeSelection(selection: Selection): string {
   const options = selection.options

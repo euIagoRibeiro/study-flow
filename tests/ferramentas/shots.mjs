@@ -1,7 +1,9 @@
 // Prints das telas pra comparar antes × depois, em tests/out/<rótulo>/.
 // Uso: node ferramentas/shots.mjs antes|depois (passo a passo no README)
 // Relógio congelado (out/clock.txt): o cronômetro rodando do seed não muda
-// entre as rodadas. Apagar o clock.txt pra começar uma comparação nova
+// entre as rodadas. Apagar o clock.txt pra começar uma comparação nova.
+// Com --sem-selecoes, esconde os blocos de seleção dos formulários: o resto
+// tem que dar 0 pixels contra o "antes" (só o campo novo mudou)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
@@ -37,6 +39,13 @@ await page.evaluateOnNewDocument((t) => {
   }
   globalThis.Date = Frozen
 }, frozen)
+if (process.argv.includes('--sem-selecoes')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = '[data-selection-block] { display: none !important; }'
+    document.head.append(style)
+  }))
+}
 // Formulário de edição aberto num registro SEM treino ("Desenho da fase de
 // trabalho", Programar): no Histórico e no cartão da Lista
 const openEditOn = (desc) => page.evaluate((desc) => {

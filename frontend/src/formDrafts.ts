@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { MeasureTexts } from './measures'
 import { phases } from './phases'
+import type { SelectionChoiceMap } from './selections'
 import type { Phase, WorkoutExercise } from './types'
 
 // Rascunho de formulário só na TELA (sessão do navegador), N3 (2026-10-26):
@@ -62,6 +63,14 @@ export function isTexts(value: unknown): value is MeasureTexts {
     typeof value === 'object' &&
     value !== null &&
     Object.values(value).every((text) => typeof text === 'string')
+  )
+}
+
+export function isChoices(value: unknown): value is SelectionChoiceMap {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Object.values(value).every((ids) => Array.isArray(ids) && ids.every(isText))
   )
 }
 

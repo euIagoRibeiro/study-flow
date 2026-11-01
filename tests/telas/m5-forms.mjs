@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
 import { createDiagnostico } from '../diagnostico.mjs'
+import { deleteExecutions } from '../limpeza.mjs'
 const { Pool } = pg
 const diag = createDiagnostico()
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
@@ -64,12 +65,12 @@ async function measureFields(page) {
   return page.evaluate((s) => {
     const form = document.querySelector(s)
     const known = ['O que foi feito (opcional)', 'Duração estimada (min, opcional)']
-    const legend = form.querySelector('fieldset legend')
+    const legend = form.querySelector('fieldset:not([data-selection-block] *) legend')
     if (legend) {
-      const inputs = [...form.querySelectorAll('fieldset input')]
+      const inputs = [...form.querySelectorAll('fieldset:not([data-selection-block] *) input')]
       return {
         title: legend.textContent.trim(),
-        kinds: [...form.querySelectorAll('fieldset label span')].map((x) => x.textContent.trim()),
+        kinds: [...form.querySelectorAll('fieldset:not([data-selection-block] *) label span')].map((x) => x.textContent.trim()),
         inputMode: inputs[0]?.inputMode,
       }
     }
@@ -362,12 +363,8 @@ try {
   await send('PATCH', `/measures/${M_CORRIDA}`, { active: true }).catch(() => {})
   await send('PATCH', `/measure-kinds/${kindId(M_CODIGO, 'leitura')}`, { active: true }).catch(() => {})
   for (const e of Object.values(original)) await restore(e).catch((err) => console.log('restaurar', e.id, err.message))
-  const test = `SELECT id FROM task_executions WHERE description LIKE 'teste m5%'`
-  await pool.query(`DELETE FROM execution_measure_values WHERE task_execution_id IN (${test})`)
-  await pool.query(`DELETE FROM execution_measures WHERE task_execution_id IN (${test})`)
-  await pool.query(`DELETE FROM task_execution_tags WHERE task_execution_id IN (${test})`)
-  await pool.query(`DELETE FROM time_entries WHERE task_execution_id IN (${test})`)
-  await pool.query(`DELETE FROM task_executions WHERE description LIKE 'teste m5%'`)
+  const test = await pool.query(`SELECT id FROM task_executions WHERE description LIKE 'teste m5%'`)
+  await deleteExecutions(pool, test.rows.map((r) => r.id))
   const extra = await pool.query('SELECT count(*)::int n FROM time_entries WHERE task_execution_id = $1 AND created_at >= $2', [LIVRO_OPEN, startedAt])
   const after = await get('/executions')
   const same = (e) => {

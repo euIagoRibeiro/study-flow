@@ -1,6 +1,15 @@
 import type { Selection, SelectionFields, SelectionOption } from '../types'
 import { request } from './client'
 
+// Por seleção, a última escolha no mesmo caminho, caindo pra raiz
+export function suggestSelections(
+  rootTagId: string,
+  tagId?: string,
+): Promise<{ items: { selectionId: string; optionIds: string[] }[] }> {
+  const query = new URLSearchParams({ rootTagId, ...(tagId ? { tagId } : {}) })
+  return request(`/selections/sugestao?${query}`)
+}
+
 // Todas, inclusive as arquivadas: a tela decide o que mostrar
 export function listSelections(): Promise<Selection[]> {
   return request<Selection[]>('/selections')

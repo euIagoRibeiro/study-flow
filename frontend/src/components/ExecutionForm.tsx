@@ -1,8 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import {
   clearDraft,
+  isChoices,
   isPhase,
   isText,
   isTexts,
@@ -10,6 +18,11 @@ import {
   useDraftSync,
 } from '../formDrafts'
 import type { MeasureTexts } from '../measures'
+import {
+  FORM_FIELD_ORDER,
+  type FormField,
+  type SelectionChoiceMap,
+} from '../selections'
 import { fieldClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice, type TagIndex } from '../tags'
@@ -18,23 +31,27 @@ import type {
   Measure,
   MeasureValue,
   Phase,
+  Selection,
   StartDraft,
   Tag,
   TagChoice,
 } from '../types'
 import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import { useMeasure } from '../useMeasure'
+import { useSelectionChoices } from '../useSelectionChoices'
 import DraftNotice from './DraftNotice'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import MeasureFields from './MeasureFields'
 import PhaseField from './PhaseField'
+import SelectionChoices from './SelectionChoices'
 import TagFields from './TagFields'
 
 type FormProps = {
   draftKey: string // rascunho na tela (N3): por tarefa
   tags: Tag[]
   measures: Measure[]
+  selections: Selection[]
   initialPath: string[] // pré-seleção: o contexto do último registro
   suggestPhase: (path: string[]) => Phase | null
   onSubmit: (
@@ -43,15 +60,18 @@ type FormProps = {
     tags: TagChoice,
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
+    selectionOptionIds: string[],
   ) => Promise<unknown>
-  // A cada mudança no caminho, na fase ou na descrição: o "Iniciar
-  // cronômetro" (fora do formulário) leva o que estiver aqui; null = nada
+  // A cada mudança no caminho, na fase, na descrição ou nas seleções: o
+  // "Iniciar cronômetro" (fora do formulário) leva o que estiver aqui; null =
+  // nada
   // (o rascunho foi descartado)
   onDraftChange?: (draft: StartDraft | null) => void
 }
 
 // O que fica guardado do Registrar: o "Quando" só se foi mexido (sem mexer,
-// vale a hora do clique), os valores da medida sem os campos vazios
+// vale a hora do clique), os valores da medida sem os campos vazios, e das
+// seleções só o que foi tocado (sugestão não é rascunho)
 type RegistrarDraft = {
   description: string
   when: string | null
@@ -59,6 +79,7 @@ type RegistrarDraft = {
   path: string[]
   phase: Phase | null
   measureTexts: MeasureTexts
+  choices?: SelectionChoiceMap // ausente em rascunho de antes do S5a
 }
 
 function readRegistrarDraft(key: string, byId: TagIndex) {
@@ -72,7 +93,8 @@ function readRegistrarDraft(key: string, byId: TagIndex) {
     !d.path.every(isText) ||
     !isChoosablePath(d.path, byId) ||
     !isPhase(d.phase) ||
-    !isTexts(d.measureTexts)
+    !isTexts(d.measureTexts) ||
+    !(d.choices === undefined || isChoices(d.choices))
   ) {
     return null
   }
@@ -120,6 +142,7 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   )
   // Registro novo: nada gravado, nada pré-preenchido (ou o rascunho)
   const measure = useMeasure(path, props.measures, null, restored?.measureTexts)
+  const choices = useSelectionChoices(path, props.selections, restored?.choices)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const showPhase = phaseApplies(path, byId)
@@ -132,6 +155,7 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
     path: props.initialPath,
     phase: props.suggestPhase(props.initialPath),
     measureTexts: {},
+    choices: {},
   }))
   useDraftSync(
     props.draftKey,
@@ -142,25 +166,31 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       path,
       phase,
       measureTexts: filledTexts(measure.texts),
+      choices: choices.touched,
     } satisfies RegistrarDraft,
     pristine,
   )
-  // Rascunho recuperado também vale pro "Iniciar cronômetro" (B1): avisa a
-  // página uma vez, ao montar
+  // As escolhas mudam sem evento quando a sugestão chega; depois de mexido, o
+  // "Iniciar cronômetro" leva o que está na tela. Vale também pro rascunho
+  // recuperado (B1), que já começa mexido: avisa ao montar
+  const reported = useRef(restored !== null)
+  const optionIds = choices.optionIds.join()
   useEffect(() => {
-    if (restored) report(restored.path, restored.phase, restored.description)
-    // só na montagem: depois, quem avisa são os próprios campos
+    if (reported.current) report(path, phase, description)
+    // os outros campos avisam pelos próprios eventos
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [optionIds])
 
   // Avisa com os valores NOVOS (o estado só muda na próxima renderização);
-  // pelos eventos dos campos, sem useEffect. Sem mexer, nada é avisado: o
-  // Iniciar continua como antes
+  // pelos eventos dos campos. Sem mexer, nada é avisado: o Iniciar continua
+  // como antes
   function report(nextPath: string[], nextPhase: Phase | null, text: string) {
+    reported.current = true
     const applies = phaseApplies(nextPath, byId)
     props.onDraftChange?.({
       description: text,
       tags: pathToChoice(nextPath, applies ? nextPhase : null),
+      selectionOptionIds: choices.optionIds,
     })
   }
 
@@ -181,6 +211,11 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   function changeDescription(text: string) {
     setDescription(text)
     report(path, phase, text)
+  }
+
+  function changeChoice(selectionId: string, optionIds: string[]) {
+    choices.change(selectionId, optionIds)
+    report(path, phase, description)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -205,6 +240,7 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
         pathToChoice(path, showPhase ? phase : null),
         estimate === '' ? null : estimate,
         sent.values ?? [],
+        choices.optionIds,
       )
       clearDraft(props.draftKey)
     } catch (err) {
@@ -219,6 +255,32 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       setSubmitting(false)
     }
     setError('')
+  }
+
+  const blocks: Record<FormField, ReactNode> = {
+    tags: <TagFields tags={props.tags} value={path} onChange={changePath} />,
+    fase: showPhase && <PhaseField value={phase} onChange={changePhase} />,
+    'selecoes-caminho': (
+      <SelectionChoices
+        selections={choices.onPath}
+        valueOf={choices.valueOf}
+        onChange={changeChoice}
+      />
+    ),
+    'selecoes-gerais': (
+      <SelectionChoices
+        selections={choices.general}
+        valueOf={choices.valueOf}
+        onChange={changeChoice}
+      />
+    ),
+    medida: (
+      <MeasureFields
+        measure={measure.measure}
+        texts={measure.texts}
+        onChange={measure.change}
+      />
+    ),
   }
 
   return (
@@ -246,13 +308,9 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
         />
       </label>
       <EstimateField value={minutes} onChange={setMinutes} />
-      <TagFields tags={props.tags} value={path} onChange={changePath} />
-      {showPhase && <PhaseField value={phase} onChange={changePhase} />}
-      <MeasureFields
-        measure={measure.measure}
-        texts={measure.texts}
-        onChange={measure.change}
-      />
+      {FORM_FIELD_ORDER.map((field) => (
+        <Fragment key={field}>{blocks[field]}</Fragment>
+      ))}
       <button
         type="submit"
         disabled={submitting}

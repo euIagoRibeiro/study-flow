@@ -25,6 +25,7 @@ import type {
   NewTask,
   Measure,
   MeasureValue,
+  Selection,
   StartDraft,
   Tag,
   TagChoice,
@@ -46,6 +47,7 @@ function ExecutePage(props: {
   timeEntries: TimeEntry[]
   tags: Tag[]
   measures: Measure[]
+  selections: Selection[]
   exercises: Exercise[]
   onSaveWorkout: (
     executionId: string,
@@ -61,6 +63,7 @@ function ExecutePage(props: {
     tags: TagChoice,
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
+    selectionOptionIds: string[],
   ) => Promise<void>
   onStartTimer: (taskId: string, draft?: StartDraft) => Promise<string | null>
   onStopTimer: (timeEntryId: string) => Promise<void>
@@ -150,6 +153,7 @@ function ExecutePage(props: {
     tags: TagChoice,
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
+    selectionOptionIds: string[],
   ) {
     if (selectedTask === undefined) return
     await props.onExecute(
@@ -159,6 +163,7 @@ function ExecutePage(props: {
       tags,
       estimatedMinutes,
       measureValues,
+      selectionOptionIds,
     )
     navigate('/')
   }
@@ -475,6 +480,7 @@ function ExecutePage(props: {
             initialPath={preselected}
             suggestPhase={suggestPhase}
             measures={props.measures}
+            selections={props.selections}
             onSubmit={handleExecute}
             draftKey={draftKeys.registrar(selectedTask.id)}
             onDraftChange={(value) =>

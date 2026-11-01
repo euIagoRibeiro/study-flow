@@ -178,6 +178,7 @@ function App() {
     tags: TagChoice,
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
+    selectionOptionIds: string[],
   ) {
     keepSaved(
       await executionsApi.createExecution(
@@ -187,6 +188,7 @@ function App() {
         tags,
         estimatedMinutes,
         measureValues,
+        selectionOptionIds,
       ),
     )
   }
@@ -646,6 +648,7 @@ function App() {
               timeEntries={timeEntries}
               tags={tags}
               measures={measures}
+              selections={selections}
               exercises={exercises}
               onSaveWorkout={saveWorkout}
               onCreateExercise={createExercise}

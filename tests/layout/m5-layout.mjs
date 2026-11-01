@@ -36,9 +36,9 @@ function measure(page) {
     }
     const outOfForm = els.filter((el) => el.getBoundingClientRect().right > fr.right + 0.5).length
     const hasWarning = !!form.querySelector('p[role="status"]')
-    const kinds = form.querySelectorAll('fieldset input').length
+    const kinds = form.querySelectorAll('fieldset:not([data-selection-block] *) input').length
     // colunas da grade = quantos "lefts" diferentes os campos dos tipos têm
-    const columns = new Set([...form.querySelectorAll('fieldset label')].map((l) => Math.round(l.getBoundingClientRect().left))).size
+    const columns = new Set([...form.querySelectorAll('fieldset:not([data-selection-block] *) label')].map((l) => Math.round(l.getBoundingClientRect().left))).size
     return { page: doc.scrollWidth - doc.clientWidth, past, bars, ring: Math.round(ring * 10) / 10, outOfForm, hasWarning, kinds, columns }
   })
 }
@@ -134,7 +134,7 @@ try {
       console.log(`${fail ? 'FALHOU' : 'OK    '} ${name} ${width}px: página +${m.page}px, passa da borda ${m.past}, barras ${m.bars}, ` +
         `fora do formulário ${m.outOfForm}, folga do foco ${m.ring}px, tipos ${m.kinds}, aviso ${m.hasWarning}, colunas ${m.columns} (esperado ${columns})`)
       if (width === 320) {
-        await page.evaluate(() => document.querySelector('[data-form="f"] fieldset').scrollIntoView({ block: 'center' }))
+        await page.evaluate(() => document.querySelector('[data-form="f"] fieldset:not([data-selection-block] *)').scrollIntoView({ block: 'center' }))
         await page.screenshot({ path: out(`m5-form-${name}-320.png`) })
       }
     }

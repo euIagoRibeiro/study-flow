@@ -21,6 +21,7 @@ function postExecution(
     completedAt: string | null
     estimatedMinutes?: number
     measureValues?: MeasureValue[]
+    selectionOptionIds?: string[]
   } & Partial<TagChoice>,
 ): Promise<SavedExecution> {
   return request<SavedExecution>('/executions', {
@@ -56,6 +57,7 @@ export function createExecution(
   tags: TagChoice,
   estimatedMinutes: number | null,
   measureValues: MeasureValue[],
+  selectionOptionIds: string[],
 ): Promise<SavedExecution> {
   return postExecution({
     taskId,
@@ -64,11 +66,13 @@ export function createExecution(
     ...tags,
     ...(estimatedMinutes ? { estimatedMinutes } : {}),
     ...(measureValues.length > 0 ? { measureValues } : {}),
+    ...(selectionOptionIds.length > 0 ? { selectionOptionIds } : {}),
   })
 }
 
-// Aberta: cronômetro rodando. Com rascunho, já nasce com o caminho e a
-// descrição do formulário de baixo (a seção Treino aparece na hora)
+// Aberta: cronômetro rodando. Com rascunho, já nasce com o caminho, a
+// descrição e as seleções do formulário de baixo (a seção Treino aparece na
+// hora)
 export function startExecution(
   taskId: string,
   draft?: StartDraft,
@@ -78,6 +82,9 @@ export function startExecution(
     description: draft?.description ? draft.description : null,
     completedAt: null,
     ...draft?.tags,
+    ...(draft?.selectionOptionIds.length
+      ? { selectionOptionIds: draft.selectionOptionIds }
+      : {}),
   })
 }
 
