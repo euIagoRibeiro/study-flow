@@ -26,9 +26,8 @@ function SelectionChoices(props: {
           )
           .sort((a, b) => a.position - b.position)
         return selection.multiple ? (
-          // min-w-0: fieldset tem largura mínima = conteúdo (ver MeasureForm)
-          <fieldset key={selection.id} className="flex min-w-0 flex-col">
-            <legend className="mb-1.5 text-sm text-tinta-suave">
+          <fieldset key={selection.id} className="flex flex-col">
+            <legend className="mb-1.5 text-sm text-tinta-suave [overflow-wrap:anywhere]">
               {selection.name}
             </legend>
             {options.map((option) => (
@@ -57,7 +56,9 @@ function SelectionChoices(props: {
           </fieldset>
         ) : (
           <label key={selection.id} className="flex flex-col gap-1.5">
-            <span className="text-sm text-tinta-suave">{selection.name}</span>
+            <span className="text-sm text-tinta-suave [overflow-wrap:anywhere]">
+              {selection.name}
+            </span>
             <select
               value={value[0] ?? ''}
               onChange={(event) =>

@@ -636,6 +636,7 @@ function App() {
               timeEntries={timeEntries}
               tags={tags}
               measures={measures}
+              selections={selections}
               workoutCatalog={workoutCatalog}
               onCreate={addTask}
               onEdit={editTask}
@@ -678,6 +679,7 @@ function App() {
               timeEntries={timeEntries}
               tags={tags}
               measures={measures}
+              selections={selections}
               workoutCatalog={workoutCatalog}
               onEditExecution={editExecution}
               onEditTimeEntry={editTimeEntry}

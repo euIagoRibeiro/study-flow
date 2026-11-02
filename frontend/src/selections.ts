@@ -1,6 +1,6 @@
 import { ApiError } from './api/client'
 import { compareNames } from './tags'
-import type { Selection, Tag } from './types'
+import type { ExecutionSelection, Selection, Tag } from './types'
 
 export const MAX_ACTIVE_OPTIONS = 30
 export const TOO_MANY_OPTIONS = `Esta seleção já tem ${MAX_ACTIVE_OPTIONS} opções ativas, o limite. Arquive ou apague uma antes de incluir outra.`
@@ -50,6 +50,29 @@ export function generalSelections(
       (selection) => selection.tagId === null && canChoose(selection, keep),
     )
     .sort((a, b) => compareNames(a.name, b.name))
+}
+
+export const sameIds = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id))
+
+// O aviso do lápis: o que está gravado e vai sair com o caminho da tela. A
+// seleção limpa de propósito não conta
+export function removalWarning(
+  hidden: ExecutionSelection[],
+  touched: SelectionChoiceMap,
+  selections: Selection[],
+): string | undefined {
+  const lost = hidden.flatMap((item) => {
+    const selection = selections.find((s) => s.id === item.selectionId)
+    if (!selection || touched[item.selectionId]?.length === 0) return []
+    const names = item.optionIds.map(
+      (id) => selection.options.find((option) => option.id === id)?.name,
+    )
+    return [`${selection.name} (${names.join(', ')})`]
+  })
+  return lost.length
+    ? `Salvar com esse caminho vai remover: ${lost.join(', ')}.`
+    : undefined
 }
 
 // O que volta de um rascunho: opção que saiu não conta (as de `keep`, que o

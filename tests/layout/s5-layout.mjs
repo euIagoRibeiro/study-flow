@@ -1,5 +1,6 @@
-// S5: seleções no Registrar e no painel do cronômetro (rodando e pausado), janela
-// real com a barra de rolagem, 320 a 1280: seed (Desenho › Inktober) e pior caso
+// S5: seleções no Registrar, no painel do cronômetro (rodando e pausado) e no
+// lápis (Histórico e cartão da Lista, o lugar mais estreito), janela real com a
+// barra de rolagem, 320 a 1280: seed (Desenho › Inktober) e pior caso
 // injetado (múltipla de 30 opções de 30 letras sem espaço, seleção única e nome
 // no limite). No painel, o caminho é só escolhido na tela: nada é gravado.
 import puppeteer from 'puppeteer-core'
@@ -13,6 +14,7 @@ const check = (name, ok, detail = '') => {
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
 const RUNNING_TASK = '5eed0000-0000-4000-8000-000000000002'
 const PAUSED_TASK = '5eed0000-0000-4000-8000-000000000004'
+const EDIT = 'form[id^="editar-"]'
 const [selections, tags, tasks] = await Promise.all(['selections', 'tags', 'tasks'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
 const desenho = tags.find((t) => t.name === 'Desenho' && t.parentId === null)
 const task = tasks.find((t) => t.title === 'Desenhar')
@@ -20,6 +22,9 @@ const option = (i) => ({ id: crypto.randomUUID(), name: `${'x'.repeat(28)}${Stri
 const long = (multiple) => ({ id: crypto.randomUUID(), tagId: desenho.id, name: `${multiple ? 'y' : 'z'}`.repeat(30), multiple, active: true,
   options: Array.from({ length: 30 }, (_, i) => option(i)) })
 const worst = [...selections, long(true), long(false)]
+// Um registro do seed em Desenho, da tarefa Desenhar
+const executions = await (await fetch(`${API}/executions`)).json()
+const record = executions.find((e) => e.taskId === task.id && e.rootTagId === desenho.id && e.completedAt && e.description)
 
 let browser
 try {
@@ -47,15 +52,38 @@ try {
       await page.waitForNetworkIdle()
     }
   }
-  const forms = [['Registrar', task.id, 'registrar'], ['rodando', RUNNING_TASK, 'painel-rodando'], ['pausado', PAUSED_TASK, 'painel-pausado']]
-  for (const [state, data] of [['seed', null], ['30 opções', JSON.stringify(worst)]]) for (const [where, taskId, file] of forms) {
+  const article = (description) => `[...document.querySelectorAll('article')].find((x) => [...x.querySelectorAll(':scope > p')].some((p) => p.textContent.trim() === ${JSON.stringify(description)}))`
+  const pencil = async () => {
+    await page.evaluate(`${article(record.description)}.querySelector('button[aria-label^="Editar registro"]').click()`)
+    await page.waitForSelector(EDIT)
+    await page.waitForNetworkIdle()
+  }
+  const inHistory = async () => {
+    await page.goto(`${APP}/historico`, { waitUntil: 'networkidle0' })
+    await pencil()
+  }
+  const inList = async () => {
+    await page.goto(`${APP}/`, { waitUntil: 'networkidle0' })
+    await page.evaluate((title) => document.querySelector(`button[aria-label="Mais ações de ${title}"]`).click(), task.title)
+    await page.evaluate(() => [...document.querySelectorAll('[role="menuitem"]')].find((x) => x.textContent.trim() === 'Ver histórico').click())
+    await new Promise((r) => setTimeout(r, 200))
+    await pencil()
+  }
+  const forms = [
+    ['Registrar', () => open(task.id), 'registrar'],
+    ['rodando', () => open(RUNNING_TASK), 'painel-rodando'],
+    ['pausado', () => open(PAUSED_TASK), 'painel-pausado'],
+    ['lápis no Histórico', inHistory, 'lapis-historico'],
+    ['lápis na Lista', inList, 'lapis-lista'],
+  ]
+  for (const [state, data] of [['seed', null], ['30 opções', JSON.stringify(worst)]]) for (const [where, enter, file] of forms) {
     body = data
     for (const width of WIDTHS) {
       await page.setViewport({ width, height: 800 })
-      await open(taskId)
-      const m = await page.evaluate(() => {
+      await enter()
+      const m = await page.evaluate((EDIT) => {
         const useful = document.documentElement.clientWidth
-        const form = document.querySelector('main form')
+        const form = document.querySelector(EDIT) ?? document.querySelector('main form')
         const box = form.getBoundingClientRect()
         const blocks = [...document.querySelectorAll('[data-selection-block]')]
         const texts = blocks.flatMap((b) => [...b.querySelectorAll('span, legend')])
@@ -80,7 +108,7 @@ try {
           })),
           overlap: rows.some((r, i) => i > 0 && r.getBoundingClientRect().top < rows[i - 1].getBoundingClientRect().bottom - 0.5),
         }
-      })
+      }, EDIT)
       const tag = `${where}, ${state} ${width}px`
       check(`${tag}: dois blocos`, m.blocks === 2, `${m.blocks}`)
       check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)

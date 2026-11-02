@@ -7,6 +7,7 @@ import FrequencySelect, {
 import { matchesPeriod, type PeriodFilter } from '../dates'
 import type {
   Measure,
+  Selection,
   WorkoutCatalog,
   CompletedExecution,
   ExecutionChanges,
@@ -35,6 +36,7 @@ function HistoricoPage(props: {
   timeEntries: TimeEntry[]
   tags: Tag[]
   measures: Measure[]
+  selections: Selection[]
   workoutCatalog: WorkoutCatalog
   onEditExecution: (
     executionId: string,
@@ -77,6 +79,7 @@ function HistoricoPage(props: {
           timeEntries={props.timeEntries}
           tags={props.tags}
           measures={props.measures}
+          selections={props.selections}
           workoutCatalog={props.workoutCatalog}
           onEdit={props.onEditExecution}
           onEditTimeEntry={props.onEditTimeEntry}

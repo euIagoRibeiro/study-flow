@@ -14,6 +14,7 @@ import type {
   CompletedExecution,
   ExecutionChanges,
   Measure,
+  Selection,
   Tag,
   TimeEntry,
   WorkoutCatalog,
@@ -42,6 +43,7 @@ function ExecutionHistory(props: {
   timeEntries: TimeEntry[]
   tags: Tag[]
   measures: Measure[]
+  selections: Selection[]
   workoutCatalog: WorkoutCatalog
   onEdit: (executionId: string, changes: ExecutionChanges) => Promise<void>
   onEditTimeEntry: (
@@ -248,6 +250,7 @@ function ExecutionHistory(props: {
                 : null
             }
             measures={props.measures}
+            selections={props.selections}
             workoutCatalog={props.workoutCatalog}
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)

@@ -213,6 +213,8 @@ export type ExecutionChanges = {
   measureValues?: MeasureValue[]
   // Ausente: mantém (mas a marcadora fora do caminho apaga). [] remove
   workout?: WorkoutExercise[]
+  // Ausente: mantém (o que sair do caminho, o servidor tira). [] remove
+  selectionOptionIds?: string[]
 } & Partial<TagChoice>
 
 export type LoadStatus = 'loading' | 'error' | 'ready'

@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { Fragment, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import {
   clearDraft,
   draftKeys,
+  isChoices,
   isPhase,
   isText,
   isTexts,
@@ -16,6 +17,12 @@ import {
   valuesToTexts,
   type MeasureTexts,
 } from '../measures'
+import {
+  FORM_FIELD_ORDER,
+  removalWarning,
+  type FormField,
+  type SelectionChoiceMap,
+} from '../selections'
 import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
@@ -25,18 +32,21 @@ import type {
   ExecutionChanges,
   Measure,
   Phase,
+  Selection,
   Tag,
   WorkoutCatalog,
   WorkoutExercise,
 } from '../types'
 import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import { useMeasure } from '../useMeasure'
+import { useSelectionChoices } from '../useSelectionChoices'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
 import DraftNotice from './DraftNotice'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
 import PhaseField from './PhaseField'
+import SelectionChoices from './SelectionChoices'
 import TagFields from './TagFields'
 import WorkoutSection from './WorkoutSection'
 
@@ -44,6 +54,7 @@ type EditProps = {
   execution: CompletedExecution
   tags: Tag[]
   measures: Measure[]
+  selections: Selection[]
   estimateMinutes: number | null // a estimativa que o registro já tem
   workoutCatalog: WorkoutCatalog
   onSubmit: (changes: ExecutionChanges) => Promise<unknown>
@@ -63,6 +74,7 @@ type EditDraft = {
   phase: Phase | null
   measureTexts: MeasureTexts
   workout: WorkoutExercise[]
+  choices?: SelectionChoiceMap // só o tocado; ausente em rascunho de antes do S5c
 }
 
 const filledTexts = (texts: MeasureTexts) =>
@@ -118,6 +130,7 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
           ? filledTexts(valuesToTexts(recorded.values))
           : {},
       workout: execution.workout ?? [],
+      choices: {},
     }
   })
   // O que ficou digitado antes (ir às tags e voltar, por exemplo); cada parte
@@ -138,6 +151,7 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
       !isPhase(d.phase) ||
       !isTexts(d.measureTexts) ||
       !isWorkout(d.workout) ||
+      !(d.choices === undefined || isChoices(d.choices)) ||
       !d.workout.every((item) =>
         props.workoutCatalog.exercises.some((x) => x.id === item.exerciseId),
       )
@@ -169,6 +183,13 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     execution.measure,
     restored?.measureTexts,
   )
+  const choices = useSelectionChoices(
+    selection.path,
+    props.selections,
+    restored?.choices,
+    execution.selections,
+    false,
+  )
   // Treino: rascunho na tela, vai só no Salvar
   const [draft, setDraft] = useState<WorkoutExercise[]>(
     restored?.workout ?? execution.workout ?? [],
@@ -183,6 +204,7 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
       phase,
       measureTexts: filledTexts(measure.texts),
       workout: draft,
+      choices: choices.touched,
     } satisfies EditDraft,
     pristine,
   )
@@ -194,6 +216,10 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     marker === null && execution.workout
       ? `Salvar com esse caminho vai remover o treino (${describeWorkout(execution.workout)}).`
       : undefined
+  const selectionWarning =
+    selection.legacyCount > 0
+      ? undefined
+      : removalWarning(choices.hidden, choices.touched, props.selections)
   const [error, setError] = useState('')
 
   // Outro projeto: "Sem fase", sem chutar o passado com dado de hoje. De
@@ -231,6 +257,18 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
       marker !== null &&
       (JSON.stringify(draft) !== JSON.stringify(execution.workout ?? []) ||
         selection.path.join('/') !== originalPathKey)
+    // Só vai se mexeu numa seleção: com o caminho trocado, o servidor já tira
+    // o que saiu dele. A lista substitui tudo, então registro antigo com mais
+    // de uma folha leva junto as que a tela não mostra
+    const selectionOptionIds =
+      Object.keys(choices.touched).length > 0
+        ? [
+            ...choices.optionIds,
+            ...(selection.legacyCount > 0
+              ? choices.hidden.flatMap((item) => item.optionIds)
+              : []),
+          ]
+        : undefined
     setSubmitting(true)
     try {
       await props.onSubmit({
@@ -248,6 +286,7 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
         // Idem: sem mexer (nem no caminho), o servidor mantém a medida
         ...(sent.values ? { measureValues: sent.values } : {}),
         ...(sendWorkout ? { workout: draft } : {}),
+        ...(selectionOptionIds ? { selectionOptionIds } : {}),
       })
       clearDraft(draftKey)
     } catch (err) {
@@ -261,6 +300,45 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
       setSubmitting(false)
     }
     setError('')
+  }
+
+  const blocks: Record<FormField, ReactNode> = {
+    tags: (
+      <TagFields
+        tags={props.tags}
+        value={selection.path}
+        onChange={changePath}
+        // Tudo que o registro já tem continua escolhível, mesmo arquivado
+        keep={keep}
+        legacyCount={selection.legacyCount}
+      />
+    ),
+    fase: showPhase && <PhaseField value={phase} onChange={setPhase} />,
+    'selecoes-caminho': (
+      <SelectionChoices
+        selections={choices.onPath}
+        valueOf={choices.valueOf}
+        onChange={choices.change}
+        keptOptionIds={choices.keptOptionIds}
+      />
+    ),
+    'selecoes-gerais': (
+      <SelectionChoices
+        selections={choices.general}
+        valueOf={choices.valueOf}
+        onChange={choices.change}
+        keptOptionIds={choices.keptOptionIds}
+      />
+    ),
+    medida: (
+      <MeasureFields
+        measure={measure.measure}
+        texts={measure.texts}
+        onChange={measure.change}
+        keptKindIds={measure.keptKindIds}
+        oldValues={measure.oldValues}
+      />
+    ),
   }
 
   return (
@@ -299,23 +377,11 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
             />
           </label>
           <EstimateField value={minutes} onChange={setMinutes} />
-          <TagFields
-            tags={props.tags}
-            value={selection.path}
-            onChange={changePath}
-            // Tudo que o registro já tem continua escolhível, mesmo arquivado
-            keep={keep}
-            legacyCount={selection.legacyCount}
-          />
-          {showPhase && <PhaseField value={phase} onChange={setPhase} />}
-          <MeasureFields
-            measure={measure.measure}
-            texts={measure.texts}
-            onChange={measure.change}
-            keptKindIds={measure.keptKindIds}
-            oldValues={measure.oldValues}
-          />
+          {FORM_FIELD_ORDER.map((field) => (
+            <Fragment key={field}>{blocks[field]}</Fragment>
+          ))}
           <MeasureWarning text={measure.warning} />
+          <MeasureWarning text={selectionWarning} />
           <MeasureWarning text={workoutWarning} />
         </form>
         {marker !== null && (
