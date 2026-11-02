@@ -1,8 +1,6 @@
+import { optionLabel } from '../selections'
 import { fieldClass } from '../styles'
-import type { Selection, SelectionOption } from '../types'
-
-const optionLabel = (option: SelectionOption) =>
-  option.active ? option.name : `${option.name} (arquivada)`
+import type { Selection } from '../types'
 
 // Um grupo de seleções do formulário. Quem decide quais aparecem, e onde, é o
 // formulário; o valor vem do useSelectionChoices. Sempre empilhado: mora

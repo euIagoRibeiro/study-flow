@@ -1,6 +1,11 @@
 import { ApiError } from './api/client'
-import { compareNames } from './tags'
-import type { ExecutionSelection, Selection, Tag } from './types'
+import { compareNames, type TagIndex } from './tags'
+import type {
+  ExecutionSelection,
+  Selection,
+  SelectionOption,
+  Tag,
+} from './types'
 
 export const MAX_ACTIVE_OPTIONS = 30
 export const TOO_MANY_OPTIONS = `Esta seleção já tem ${MAX_ACTIVE_OPTIONS} opções ativas, o limite. Arquive ou apague uma antes de incluir outra.`
@@ -98,6 +103,45 @@ export function keepActiveChoices(
         : [[selectionId, kept]]
     }),
   )
+}
+
+export const optionLabel = (option: SelectionOption) =>
+  option.active ? option.name : `${option.name} (arquivada)`
+
+// Os chips de um registro, na ordem dos formulários. O que a tela não conhece
+// (criado em outra aba) fica de fora; sem nenhuma opção conhecida, sem chip
+export function selectionChips(
+  recorded: ExecutionSelection[],
+  selections: Selection[],
+  byId: TagIndex,
+) {
+  const rank = (selection: Selection) =>
+    FORM_FIELD_ORDER.indexOf(
+      selection.tagId === null ? 'selecoes-gerais' : 'selecoes-caminho',
+    )
+  const level = (selection: Selection) =>
+    byId.get(selection.tagId ?? '')?.level ?? 0
+  return recorded
+    .flatMap((item) => {
+      const selection = selections.find((s) => s.id === item.selectionId)
+      if (!selection) return []
+      const options = selection.options
+        .filter((option) => item.optionIds.includes(option.id))
+        .sort((a, b) => a.position - b.position)
+        .map(optionLabel)
+      return options.length > 0 ? [{ selection, options }] : []
+    })
+    .sort(
+      (a, b) =>
+        rank(a.selection) - rank(b.selection) ||
+        level(a.selection) - level(b.selection) ||
+        compareNames(a.selection.name, b.selection.name),
+    )
+    .map(({ selection, options }) => ({
+      id: selection.id,
+      name: selection.active ? selection.name : `${selection.name} (arquivada)`,
+      options,
+    }))
 }
 
 // "Meio (digital, tradicional) · várias · arquivada": só as opções ativas

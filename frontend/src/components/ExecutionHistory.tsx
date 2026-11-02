@@ -23,6 +23,7 @@ import { formatSets } from '../workouts'
 import CompactIconButton from './CompactIconButton'
 import ExecutionEditForm from './ExecutionEditForm'
 import { ChevronDownIcon, PencilIcon } from './icons'
+import SelectionChips from './SelectionChips'
 import TimeEntryEditForm from './TimeEntryEditForm'
 
 type Item = {
@@ -180,6 +181,11 @@ function ExecutionHistory(props: {
             )}
           </ul>
         )}
+        <SelectionChips
+          recorded={execution.selections}
+          selections={props.selections}
+          tagsById={tagsById}
+        />
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 font-dados text-meta text-tinta-suave">
             <span className="tabular-nums">
