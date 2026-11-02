@@ -1,4 +1,6 @@
+import { isChoices } from './formDrafts'
 import type { MeasureTexts } from './measures'
+import type { SelectionChoiceMap } from './selections'
 import type { TagIndex } from './tags'
 import type { Phase } from './types'
 
@@ -19,6 +21,9 @@ export type TimerMemory = {
 }
 
 const key = (executionId: string) => `studyflow:cronometro:${executionId}`
+// À parte do caminho: as escolhas não dependem de ele ter mudado no servidor
+const choicesKey = (executionId: string) =>
+  `studyflow:cronometro-escolhas:${executionId}`
 
 export function readTimerMemory(executionId: string): TimerMemory | null {
   try {
@@ -63,6 +68,32 @@ export function isChoosablePath(
   })
 }
 
+// O que foi tocado nas seleções, até o Finalizar: nasce no "Iniciar cronômetro"
+// e continua no painel
+export function readTimerChoices(
+  executionId: string,
+): SelectionChoiceMap | undefined {
+  try {
+    const value: unknown = JSON.parse(
+      sessionStorage.getItem(choicesKey(executionId)) ?? 'null',
+    )
+    return value !== null && isChoices(value) ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function writeTimerChoices(
+  executionId: string,
+  choices: SelectionChoiceMap,
+) {
+  try {
+    sessionStorage.setItem(choicesKey(executionId), JSON.stringify(choices))
+  } catch {
+    // sem a sessão do navegador: a escolha vive só enquanto a tela está aberta
+  }
+}
+
 export function writeTimerMemory(executionId: string, memory: TimerMemory) {
   try {
     sessionStorage.setItem(key(executionId), JSON.stringify(memory))
@@ -74,6 +105,7 @@ export function writeTimerMemory(executionId: string, memory: TimerMemory) {
 export function clearTimerMemory(executionId: string) {
   try {
     sessionStorage.removeItem(key(executionId))
+    sessionStorage.removeItem(choicesKey(executionId))
   } catch {
     // idem
   }

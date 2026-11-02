@@ -191,6 +191,7 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       description: text,
       tags: pathToChoice(nextPath, applies ? nextPhase : null),
       selectionOptionIds: choices.optionIds,
+      touchedChoices: choices.touched,
     })
   }
 

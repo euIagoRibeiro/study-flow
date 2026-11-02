@@ -7,6 +7,7 @@ import puppeteer from 'puppeteer-core'
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=backend/.env')
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { deleteExecutions } from '../limpeza.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const TASK = '5eed0000-0000-4000-8000-000000000006' // Exercício físico
@@ -404,13 +405,7 @@ try {
 } finally {
   await browser.close()
   await waitForApi()
-  for (const id of created) {
-    await pool.query('DELETE FROM exercise_sets WHERE execution_exercise_id IN (SELECT id FROM execution_exercises WHERE task_execution_id = $1)', [id])
-    for (const t of ['execution_exercises', 'execution_workouts', 'execution_measure_values', 'execution_measures', 'task_execution_tags', 'time_entries']) {
-      await pool.query(`DELETE FROM ${t} WHERE task_execution_id = $1`, [id])
-    }
-    await pool.query('DELETE FROM task_executions WHERE id = $1', [id])
-  }
+  await deleteExecutions(pool, created)
   if (testTag) await pool.query('DELETE FROM tags WHERE id = $1', [testTag])
   for (const x of catalogBefore) await pool.query('UPDATE exercises SET name = $2, active = $3 WHERE id = $1', [x.id, x.name, x.active])
   await pool.query('DELETE FROM exercises WHERE NOT (id = ANY($1::uuid[]))', [catalogBefore.map((x) => x.id)])

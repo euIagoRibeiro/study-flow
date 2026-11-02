@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { Fragment, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError } from '../api/client'
 import { formatClock, formatDuration } from '../dates'
 import {
@@ -19,6 +19,7 @@ import type {
   Measure,
   MeasureValue,
   Phase,
+  Selection,
   Tag,
   TagChoice,
   TaskExecution,
@@ -28,18 +29,23 @@ import type {
 import {
   clearTimerMemory,
   isChoosablePath,
+  readTimerChoices,
   readTimerMemory,
+  writeTimerChoices,
   writeTimerMemory,
 } from '../timerMemory'
 import { isTexts } from '../formDrafts'
 import type { MeasureTexts } from '../measures'
+import { FORM_FIELD_ORDER, type FormField } from '../selections'
 import { useMeasure } from '../useMeasure'
+import { useSelectionChoices } from '../useSelectionChoices'
 import { useWorkoutSync, type WorkoutTarget } from '../useWorkoutSync'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
 import PhaseField from './PhaseField'
+import SelectionChoices from './SelectionChoices'
 import TagFields from './TagFields'
 import WorkoutSection from './WorkoutSection'
 
@@ -49,6 +55,7 @@ function TimerPanel(props: {
   runningEntry: TimeEntry | undefined // undefined = pausado
   tags: Tag[]
   measures: Measure[]
+  selections: Selection[]
   exercises: Exercise[]
   // Recentes no contexto (pela tag marcadora)
   recentExerciseIds: (markerId: string) => string[]
@@ -70,6 +77,7 @@ function TimerPanel(props: {
     description: string,
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
+    selectionOptionIds: string[] | undefined,
   ) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
@@ -151,6 +159,21 @@ function TimerPanel(props: {
     openedMeasure,
     restoredTexts,
   )
+  // Só na tela até o Finalizar, como a descrição
+  const [rememberedChoices] = useState(() => readTimerChoices(execution.id))
+  const choices = useSelectionChoices(
+    selection.path,
+    props.selections,
+    rememberedChoices,
+    execution.selections,
+  )
+  function changeChoice(selectionId: string, optionIds: string[]) {
+    choices.change(selectionId, optionIds)
+    writeTimerChoices(execution.id, {
+      ...choices.touched,
+      [selectionId]: optionIds,
+    })
+  }
   const [mountedPathKey] = useState(serverPathKey)
   const targetFor = (path: string[], phaseValue: Phase | null) =>
     ({
@@ -229,6 +252,9 @@ function TimerPanel(props: {
           ? {}
           : pathToChoice(selection.path, showPhase ? phase : null),
         sent.values,
+        // A lista vai sempre: é o que está na tela, inclusive depois de a
+        // gravação do caminho (treino ao vivo) ter tirado escolhas do servidor
+        selection.legacyCount > 0 ? undefined : choices.optionIds,
       )
       // Gravado: a escolha da tela não tem mais o que guardar
       clearTimerMemory(execution.id)
@@ -243,6 +269,69 @@ function TimerPanel(props: {
       setSubmitting(false)
     }
     setError('')
+  }
+
+  const blocks: Record<FormField, ReactNode> = {
+    tags: (
+      <TagFields
+        tags={props.tags}
+        value={selection.path}
+        onChange={(path) => {
+          const nextPhase = props.suggestPhase(path)
+          setSelection({ path, legacyCount: 0 })
+          setPhase(nextPhase)
+          measure.changePath(path)
+          workout.retarget(targetFor(path, nextPhase))
+          // caminho novo, campos da medida nova (vazios)
+          remember(path, nextPhase, description, {})
+        }}
+        keep={[
+          ...(execution.rootTagId ? [execution.rootTagId] : []),
+          ...execution.tagIds,
+        ]}
+        legacyCount={selection.legacyCount}
+      />
+    ),
+    fase: showPhase && (
+      <PhaseField
+        value={phase}
+        onChange={(next) => {
+          setPhase(next)
+          remember(selection.path, next, description, measure.texts)
+        }}
+      />
+    ),
+    'selecoes-caminho': (
+      <SelectionChoices
+        selections={choices.onPath}
+        valueOf={choices.valueOf}
+        onChange={changeChoice}
+        keptOptionIds={choices.keptOptionIds}
+      />
+    ),
+    'selecoes-gerais': (
+      <SelectionChoices
+        selections={choices.general}
+        valueOf={choices.valueOf}
+        onChange={changeChoice}
+        keptOptionIds={choices.keptOptionIds}
+      />
+    ),
+    medida: (
+      <MeasureFields
+        measure={measure.measure}
+        texts={measure.texts}
+        onChange={(key, text) => {
+          measure.change(key, text)
+          remember(selection.path, phase, description, {
+            ...measure.texts,
+            [key]: text,
+          })
+        }}
+        keptKindIds={measure.keptKindIds}
+        oldValues={measure.oldValues}
+      />
+    ),
   }
 
   return (
@@ -316,46 +405,9 @@ function TimerPanel(props: {
               className={fieldClass}
             />
           </label>
-          <TagFields
-            tags={props.tags}
-            value={selection.path}
-            onChange={(path) => {
-              const nextPhase = props.suggestPhase(path)
-              setSelection({ path, legacyCount: 0 })
-              setPhase(nextPhase)
-              measure.changePath(path)
-              workout.retarget(targetFor(path, nextPhase))
-              // caminho novo, campos da medida nova (vazios)
-              remember(path, nextPhase, description, {})
-            }}
-            keep={[
-              ...(execution.rootTagId ? [execution.rootTagId] : []),
-              ...execution.tagIds,
-            ]}
-            legacyCount={selection.legacyCount}
-          />
-          {showPhase && (
-            <PhaseField
-              value={phase}
-              onChange={(next) => {
-                setPhase(next)
-                remember(selection.path, next, description, measure.texts)
-              }}
-            />
-          )}
-          <MeasureFields
-            measure={measure.measure}
-            texts={measure.texts}
-            onChange={(key, text) => {
-              measure.change(key, text)
-              remember(selection.path, phase, description, {
-                ...measure.texts,
-                [key]: text,
-              })
-            }}
-            keptKindIds={measure.keptKindIds}
-            oldValues={measure.oldValues}
-          />
+          {FORM_FIELD_ORDER.map((field) => (
+            <Fragment key={field}>{blocks[field]}</Fragment>
+          ))}
           <MeasureWarning text={measure.warning} />
           <MeasureWarning text={workoutWarning} />
         </form>

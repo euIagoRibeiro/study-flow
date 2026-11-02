@@ -23,7 +23,7 @@ const groups = {
     ['a3e1.mjs', 'en-US'], 'a3e2.mjs', 'a3f.mjs', 'chips-medida.mjs', 'painel.mjs',
     'painel-graficos.mjs', 'painel-periodos.mjs', 'painel-comparacao.mjs', 'painel-tags.mjs',
     'cronometro-inicio.mjs', 'cronometro-escolha.mjs', 'navegacao.mjs', 'cartoes.mjs', 'rascunhos.mjs',
-    's4-selecoes.mjs', 's5-forms.mjs',
+    's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs',
   ],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',

@@ -1,5 +1,8 @@
 import { fieldClass } from '../styles'
-import type { Selection } from '../types'
+import type { Selection, SelectionOption } from '../types'
+
+const optionLabel = (option: SelectionOption) =>
+  option.active ? option.name : `${option.name} (arquivada)`
 
 // Um grupo de seleções do formulário. Quem decide quais aparecem, e onde, é o
 // formulário; o valor vem do useSelectionChoices. Sempre empilhado: mora
@@ -8,6 +11,8 @@ function SelectionChoices(props: {
   selections: Selection[]
   valueOf: (selection: Selection) => string[]
   onChange: (selectionId: string, optionIds: string[]) => void
+  // Arquivadas que já estavam no registro: continuam escolhíveis aqui
+  keptOptionIds?: string[]
 }) {
   if (props.selections.length === 0) return null
   return (
@@ -15,7 +20,10 @@ function SelectionChoices(props: {
       {props.selections.map((selection) => {
         const value = props.valueOf(selection)
         const options = selection.options
-          .filter((option) => option.active)
+          .filter(
+            (option) =>
+              option.active || props.keptOptionIds?.includes(option.id),
+          )
           .sort((a, b) => a.position - b.position)
         return selection.multiple ? (
           // min-w-0: fieldset tem largura mínima = conteúdo (ver MeasureForm)
@@ -42,7 +50,7 @@ function SelectionChoices(props: {
                   className="h-4 w-4 shrink-0"
                 />
                 <span className="min-w-0 [overflow-wrap:anywhere]">
-                  {option.name}
+                  {optionLabel(option)}
                 </span>
               </label>
             ))}
@@ -63,7 +71,7 @@ function SelectionChoices(props: {
               <option value="">Nenhuma</option>
               {options.map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.name}
+                  {optionLabel(option)}
                 </option>
               ))}
             </select>

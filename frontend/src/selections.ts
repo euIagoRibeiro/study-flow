@@ -21,37 +21,54 @@ export type FormField = (typeof FORM_FIELD_ORDER)[number]
 // Escolhas por seleção; lista vazia = "Nenhuma" escolhida de propósito
 export type SelectionChoiceMap = Record<string, string[]>
 
-const canChoose = (selection: Selection) =>
-  selection.active && selection.options.some((option) => option.active)
+// `keep`: as que o registro já tem valem mesmo arquivadas
+const canChoose = (selection: Selection, keep: string[]) =>
+  keep.includes(selection.id) ||
+  (selection.active && selection.options.some((option) => option.active))
 
 // As declaradas no caminho, da raiz para a folha: a herança soma
-export function pathSelections(path: string[], selections: Selection[]) {
+export function pathSelections(
+  path: string[],
+  selections: Selection[],
+  keep: string[] = [],
+) {
   return path.flatMap((tagId) =>
     selections
-      .filter((selection) => selection.tagId === tagId && canChoose(selection))
+      .filter(
+        (selection) => selection.tagId === tagId && canChoose(selection, keep),
+      )
       .sort((a, b) => compareNames(a.name, b.name)),
   )
 }
 
-export function generalSelections(selections: Selection[]) {
+export function generalSelections(
+  selections: Selection[],
+  keep: string[] = [],
+) {
   return selections
-    .filter((selection) => selection.tagId === null && canChoose(selection))
+    .filter(
+      (selection) => selection.tagId === null && canChoose(selection, keep),
+    )
     .sort((a, b) => compareNames(a.name, b.name))
 }
 
-// O que volta de um rascunho: opção que saiu não conta, e a seleção que perdeu
-// a escolha toda deixa de estar tocada (a sugestão volta a valer). "Nenhuma"
-// continua tocada
+// O que volta de um rascunho: opção que saiu não conta (as de `keep`, que o
+// registro já tem, contam mesmo arquivadas), e a seleção que perdeu a escolha
+// toda deixa de estar tocada (a sugestão volta a valer). "Nenhuma" continua
+// tocada
 export function keepActiveChoices(
   choices: SelectionChoiceMap,
   selections: Selection[],
+  keep: string[] = [],
 ): SelectionChoiceMap {
   return Object.fromEntries(
     Object.entries(choices).flatMap(([selectionId, optionIds]) => {
       const selection = selections.find((s) => s.id === selectionId)
       if (!selection) return []
       const kept = optionIds.filter((id) =>
-        selection.options.some((option) => option.id === id && option.active),
+        selection.options.some(
+          (option) => option.id === id && (option.active || keep.includes(id)),
+        ),
       )
       return optionIds.length > 0 && kept.length === 0
         ? []

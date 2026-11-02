@@ -197,6 +197,9 @@ export type StartDraft = {
   description: string
   tags: TagChoice
   selectionOptionIds: string[]
+  // O que foi tocado: "Nenhuma" não vira escolha gravada, e o painel precisa
+  // saber dela pra não sugerir de novo
+  touchedChoices: Record<string, string[]>
 }
 
 // Editar um registro: tags ausentes = o servidor não mexe nelas (registro

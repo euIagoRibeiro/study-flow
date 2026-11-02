@@ -73,6 +73,7 @@ function ExecutePage(props: {
     description: string,
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
+    selectionOptionIds: string[] | undefined,
   ) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,
@@ -80,6 +81,7 @@ function ExecutePage(props: {
     previousTags: TagChoice,
     previousMeasureValues: MeasureValue[],
     previousWorkout: WorkoutExercise[],
+    previousSelectionOptionIds: string[],
     resumeEntryId: string | null,
   ) => Promise<void>
 }) {
@@ -98,6 +100,7 @@ function ExecutePage(props: {
     previousTags: TagChoice
     previousMeasureValues: MeasureValue[]
     previousWorkout: WorkoutExercise[]
+    previousSelectionOptionIds: string[]
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
@@ -191,13 +194,20 @@ function ExecutePage(props: {
     description: string,
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
+    selectionOptionIds: string[] | undefined,
   ) {
     const execution = props.executions.find((e) => e.id === executionId)
     const resumeEntry = props.timeEntries.find(
       (entry) =>
         entry.taskExecutionId === executionId && entry.endedAt === null,
     )
-    await props.onFinishExecution(executionId, description, tags, measureValues)
+    await props.onFinishExecution(
+      executionId,
+      description,
+      tags,
+      measureValues,
+      selectionOptionIds,
+    )
     setPendingUndo({
       taskId: selectedTask?.id ?? '',
       executionId,
@@ -211,6 +221,9 @@ function ExecutePage(props: {
       previousMeasureValues: execution?.measure?.values ?? [],
       // O Finalizar só sai com o treino gravado: o do estado é o da tela
       previousWorkout: execution?.workout ?? [],
+      // [] = nenhuma: idem
+      previousSelectionOptionIds:
+        execution?.selections.flatMap((item) => item.optionIds) ?? [],
       resumeEntryId: resumeEntry?.id ?? null,
     })
   }
@@ -224,6 +237,7 @@ function ExecutePage(props: {
       undo.previousTags,
       undo.previousMeasureValues,
       undo.previousWorkout,
+      undo.previousSelectionOptionIds,
       undo.resumeEntryId,
     )
     setUndoing(false)
@@ -419,6 +433,7 @@ function ExecutePage(props: {
           tags={props.tags}
           suggestPhase={suggestPhase}
           measures={props.measures}
+          selections={props.selections}
           exercises={props.exercises}
           recentExerciseIds={(markerId) =>
             recentExerciseIds(props.executions, markerId, tagsById)

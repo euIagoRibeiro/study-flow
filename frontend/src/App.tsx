@@ -36,6 +36,7 @@ import type {
   WorkoutExercise,
 } from './types'
 import { indexTags } from './tags'
+import { writeTimerChoices } from './timerMemory'
 import { recentExerciseIds } from './workouts'
 
 // 409: o banco recusou por conflito com um estado que essa página não
@@ -231,6 +232,8 @@ function App() {
       )
       return null
     }
+    // Antes do estado: o painel lê ao montar
+    if (draft) writeTimerChoices(execution.id, draft.touchedChoices)
     // A execução já existe no servidor: entra no estado mesmo se a sessão
     // falhar abaixo (fica aberta como "Pausado", com "Retomar" disponível)
     keepSaved(execution)
@@ -295,6 +298,7 @@ function App() {
     description: string,
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
+    selectionOptionIds: string[] | undefined,
   ) {
     keepSaved(
       await executionsApi.finishExecution(
@@ -302,6 +306,7 @@ function App() {
         description,
         tags,
         measureValues,
+        selectionOptionIds,
       ),
     )
   }
@@ -313,6 +318,7 @@ function App() {
     previousTags: TagChoice,
     previousMeasureValues: MeasureValue[],
     previousWorkout: WorkoutExercise[],
+    previousSelectionOptionIds: string[],
     resumeEntryId: string | null,
   ) {
     try {
@@ -323,6 +329,7 @@ function App() {
           previousTags,
           previousMeasureValues,
           previousWorkout,
+          previousSelectionOptionIds,
         ),
       )
     } catch (error) {

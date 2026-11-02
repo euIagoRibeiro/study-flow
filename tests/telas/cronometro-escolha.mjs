@@ -7,6 +7,7 @@
 import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { APP, CHROME } from '../config.mjs'
+import { deleteExecutions } from '../limpeza.mjs'
 
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=../backend/.env (npm run telas)')
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
@@ -27,11 +28,7 @@ const taskId = (await pool.query("INSERT INTO tasks (title, frequency) VALUES ($
 
 async function clearExecutions() {
   const ids = (await pool.query('SELECT id FROM task_executions WHERE task_id = $1', [taskId])).rows.map((r) => r.id)
-  for (const id of ids) {
-    await pool.query('DELETE FROM exercise_sets WHERE execution_exercise_id IN (SELECT id FROM execution_exercises WHERE task_execution_id = $1)', [id])
-    for (const t of ['execution_exercises', 'execution_workouts', 'execution_measure_values', 'execution_measures', 'task_execution_tags', 'time_entries']) await pool.query(`DELETE FROM ${t} WHERE task_execution_id = $1`, [id])
-    await pool.query('DELETE FROM task_executions WHERE id = $1', [id])
-  }
+  await deleteExecutions(pool, ids)
 }
 const saved = async () => (await pool.query(
   `SELECT e.id, r.name AS raiz, e.description, e.completed_at IS NOT NULL AS finalizado,

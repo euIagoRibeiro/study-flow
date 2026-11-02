@@ -1,6 +1,7 @@
-// S5a: seleções no Registrar, janela real com a barra de rolagem, 320 a 1280:
-// seed (Desenho › Inktober) e pior caso injetado (múltipla de 30 opções de 30
-// letras sem espaço, seleção única e nome no limite).
+// S5: seleções no Registrar e no painel do cronômetro (rodando e pausado), janela
+// real com a barra de rolagem, 320 a 1280: seed (Desenho › Inktober) e pior caso
+// injetado (múltipla de 30 opções de 30 letras sem espaço, seleção única e nome
+// no limite). No painel, o caminho é só escolhido na tela: nada é gravado.
 import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
 
@@ -10,6 +11,8 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${detail ? ` (${detail})` : ''}`)
 }
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
+const RUNNING_TASK = '5eed0000-0000-4000-8000-000000000002'
+const PAUSED_TASK = '5eed0000-0000-4000-8000-000000000004'
 const [selections, tags, tasks] = await Promise.all(['selections', 'tags', 'tasks'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
 const desenho = tags.find((t) => t.name === 'Desenho' && t.parentId === null)
 const task = tasks.find((t) => t.title === 'Desenhar')
@@ -30,23 +33,26 @@ try {
       req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body })
     } else req.continue()
   })
-  const open = async () => {
-    await page.goto(`${APP}/executar?tarefa=${task.id}`, { waitUntil: 'networkidle0' })
+  const open = async (taskId) => {
+    await page.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
     await page.evaluate(() => sessionStorage.clear())
-    await page.goto(`${APP}/executar?tarefa=${task.id}`, { waitUntil: 'networkidle0' })
-    await page.evaluate(() => {
-      const label = [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'Em Desenho')
-      const select = label.querySelector('select')
-      select.value = [...select.options].find((o) => o.textContent === 'Inktober').value
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    })
-    await page.waitForNetworkIdle()
+    await page.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
+    for (const [label, text] of [['Contexto', 'Desenho'], ['Em Desenho', 'Inktober']]) {
+      await page.evaluate((label, text) => {
+        const found = [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === label)
+        const select = found.querySelector('select')
+        select.value = [...select.options].find((o) => o.textContent === text).value
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+      }, label, text)
+      await page.waitForNetworkIdle()
+    }
   }
-  for (const [state, data] of [['seed', null], ['30 opções', JSON.stringify(worst)]]) {
+  const forms = [['Registrar', task.id, 'registrar'], ['rodando', RUNNING_TASK, 'painel-rodando'], ['pausado', PAUSED_TASK, 'painel-pausado']]
+  for (const [state, data] of [['seed', null], ['30 opções', JSON.stringify(worst)]]) for (const [where, taskId, file] of forms) {
     body = data
     for (const width of WIDTHS) {
       await page.setViewport({ width, height: 800 })
-      await open()
+      await open(taskId)
       const m = await page.evaluate(() => {
         const useful = document.documentElement.clientWidth
         const form = document.querySelector('main form')
@@ -75,7 +81,7 @@ try {
           overlap: rows.some((r, i) => i > 0 && r.getBoundingClientRect().top < rows[i - 1].getBoundingClientRect().bottom - 0.5),
         }
       })
-      const tag = `${state} ${width}px`
+      const tag = `${where}, ${state} ${width}px`
       check(`${tag}: dois blocos`, m.blocks === 2, `${m.blocks}`)
       check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)
       check(`${tag}: texto dentro do formulário`, m.textOut <= 0.5, `${m.textOut}px`)
@@ -87,7 +93,7 @@ try {
         check(`${tag}: linhas sem sobrepor`, !m.overlap)
       }
       if (width === 320) {
-        const name = state === 'seed' ? 's5-registrar-320.png' : 's5-registrar-30-opcoes-320.png'
+        const name = `s5-${file}${state === 'seed' ? '' : '-30-opcoes'}-320.png`
         await page.screenshot({ path: out(name), fullPage: false })
         await page.evaluate(() => document.querySelector('[data-selection-block]').scrollIntoView({ block: 'start' }))
         await page.screenshot({ path: out(name.replace('.png', '-campos.png')) })

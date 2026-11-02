@@ -40,6 +40,7 @@ function putExecution(
     estimatedMinutes?: number | null
     measureValues?: MeasureValue[]
     workout?: WorkoutExercise[]
+    selectionOptionIds?: string[]
   } & Partial<TagChoice>,
 ): Promise<SavedExecution> {
   return request<SavedExecution>(`/executions/${id}`, {
@@ -88,29 +89,32 @@ export function startExecution(
   })
 }
 
-// measureValues undefined = não mexer na medida (o servidor mantém)
+// measureValues e selectionOptionIds undefined = não mexer (o servidor mantém)
 export function finishExecution(
   id: string,
   description: string,
   tags: Partial<TagChoice>,
   measureValues: MeasureValue[] | undefined,
+  selectionOptionIds: string[] | undefined,
 ): Promise<SavedExecution> {
   return putExecution(id, {
     description,
     completedAt: new Date().toISOString(),
     ...tags,
     ...(measureValues ? { measureValues } : {}),
+    ...(selectionOptionIds ? { selectionOptionIds } : {}),
   })
 }
 
-// Desfazer volta tudo ao que era: descrição, tags, medida e treino de antes
-// (ausentes, o servidor manteria os do Finalizar)
+// Desfazer volta tudo ao que era: descrição, tags, medida, treino e seleções de
+// antes (ausentes, o servidor manteria os do Finalizar)
 export function reopenExecution(
   id: string,
   previousDescription: string | null,
   previousTags: TagChoice,
   previousMeasureValues: MeasureValue[],
   previousWorkout: WorkoutExercise[],
+  previousSelectionOptionIds: string[],
 ): Promise<SavedExecution> {
   return putExecution(id, {
     description: previousDescription,
@@ -118,6 +122,7 @@ export function reopenExecution(
     ...previousTags,
     measureValues: previousMeasureValues,
     workout: previousWorkout,
+    selectionOptionIds: previousSelectionOptionIds,
   })
 }
 
