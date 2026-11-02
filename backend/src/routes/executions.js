@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { pool } from '../db.js'
-import { isoDateTime, isUuid, validate } from '../validation.js'
+import { isoDateTime, isUuid, urlField, validate } from '../validation.js'
 import { TIME_ENTRY_COLUMNS } from './timeEntries.js'
 
 export const executionsRouter = Router()
@@ -15,6 +15,8 @@ const SELECT_EXECUTION = `SELECT e.id,
   e.task_frequency_at_time AS "taskFrequencyAtTime",
   e.root_tag_id AS "rootTagId",
   e.phase,
+  e.work_id AS "workId",
+  e.link_url AS "linkUrl",
   COALESCE(
     array_agg(et.tag_id ORDER BY et.tag_id) FILTER (WHERE et.tag_id IS NOT NULL),
     '{}'
@@ -175,6 +177,12 @@ const workout = z
 
 const workoutSchema = z.object({ workout })
 
+// Obra e link: ausente mantém, null limpa (link vazio também). O servidor NÃO
+// preenche o caminho a partir da obra: quem preenche é a tela, e o caminho do
+// registro é livre
+const workId = z.uuid('workId precisa ser um uuid').nullable().optional()
+const linkUrl = urlField('linkUrl').optional()
+
 function withTagRule(schema) {
   return schema
     .refine(
@@ -201,6 +209,8 @@ const newExecutionSchema = withTagRule(
     estimatedMinutes,
     measureValues,
     selectionOptionIds,
+    workId,
+    linkUrl,
     ...tagFields,
   }),
 )
@@ -214,6 +224,8 @@ const executionChangesSchema = withTagRule(
     measureValues,
     workout: workout.optional(),
     selectionOptionIds,
+    workId,
+    linkUrl,
     ...tagFields,
   }),
 )
@@ -661,6 +673,51 @@ function isOpenExecutionConflict(err) {
 const CONFLICT_ERROR = 'Essa tarefa já tem uma execução em andamento'
 
 class TagError extends Error {}
+class WorkError extends Error {}
+
+const WORK_NOT_FOUND = 'Obra não encontrada'
+
+// A obra fica travada (FOR KEY SHARE) antes de ligar: apagá-la no meio espera
+// aqui ou chega antes e dá 400. Ordem no PUT: registro, obra, tags. Tem que vir
+// antes do applyTags: o UPDATE da raiz trava o registro forte e só depois confere
+// as FKs; nesse intervalo, o DELETE da obra a seguraria esperando o registro
+async function lockWork(client, id) {
+  const found = await client.query(
+    'SELECT 1 FROM works WHERE id = $1 FOR KEY SHARE',
+    [id],
+  )
+  if (found.rowCount === 0) throw new WorkError(WORK_NOT_FOUND)
+}
+
+async function setWorkAndLink(client, executionId, changes) {
+  if (changes.workId === undefined && changes.linkUrl === undefined) return
+  await client.query(
+    `UPDATE task_executions
+     SET work_id = CASE WHEN $1 THEN $2::uuid ELSE work_id END,
+         link_url = CASE WHEN $3 THEN $4 ELSE link_url END
+     WHERE id = $5`,
+    [
+      changes.workId !== undefined,
+      changes.workId ?? null,
+      changes.linkUrl !== undefined,
+      changes.linkUrl ?? null,
+      executionId,
+    ],
+  )
+}
+
+function workConstraintError(err) {
+  if (err.code === '23503' && err.constraint === 'task_executions_work') {
+    return WORK_NOT_FOUND
+  }
+  if (
+    err.code === '23514' &&
+    err.constraint === 'task_executions_link_url_valid'
+  ) {
+    return 'linkUrl precisa ser um endereço http ou https'
+  }
+  return null
+}
 
 // Valida e grava as tags de uma execução (já dentro de uma transação).
 // Grava o fechamento: cada nível 3 escolhido leva o nível 2 pai junto.
@@ -756,15 +813,23 @@ executionsRouter.post('/', async (req, res) => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    if (execution.workId) await lockWork(client, execution.workId)
     // Snapshot copiado da própria tarefa, na mesma query — o cliente não manda
     const result = await client.query(
       `INSERT INTO task_executions
-         (task_id, description, completed_at, task_title_at_time, task_frequency_at_time)
-       SELECT id, $2, $3, title, frequency
+         (task_id, description, completed_at, task_title_at_time, task_frequency_at_time,
+          work_id, link_url)
+       SELECT id, $2, $3, title, frequency, $4::uuid, $5
        FROM tasks
        WHERE id = $1 AND active
        RETURNING id`,
-      [execution.taskId, execution.description, execution.completedAt],
+      [
+        execution.taskId,
+        execution.description,
+        execution.completedAt,
+        execution.workId ?? null,
+        execution.linkUrl ?? null,
+      ],
     )
     if (result.rowCount === 0) {
       await client.query('ROLLBACK')
@@ -805,9 +870,13 @@ executionsRouter.post('/', async (req, res) => {
     if (
       err instanceof TagError ||
       err instanceof MeasureError ||
-      err instanceof SelectionError
+      err instanceof SelectionError ||
+      err instanceof WorkError
     ) {
       return res.status(400).json({ error: err.message })
+    }
+    if (workConstraintError(err)) {
+      return res.status(400).json({ error: workConstraintError(err) })
     }
     if (measureConstraintError(err)) {
       return res.status(400).json({ error: 'Medida não confere com o caminho' })
@@ -871,6 +940,8 @@ executionsRouter.put('/:id', async (req, res) => {
       )
     }
     const current = result.rows[0]
+    if (changes.workId) await lockWork(client, changes.workId)
+    await setWorkAndLink(client, req.params.id, changes)
     // Antes de qualquer troca: as arquivadas que podem continuar
     const previousChoices = await choicesOf(client, req.params.id)
     if (hasTags(changes)) {
@@ -949,9 +1020,13 @@ executionsRouter.put('/:id', async (req, res) => {
       err instanceof TagError ||
       err instanceof MeasureError ||
       err instanceof WorkoutError ||
-      err instanceof SelectionError
+      err instanceof SelectionError ||
+      err instanceof WorkError
     ) {
       return res.status(400).json({ error: err.message })
+    }
+    if (workConstraintError(err)) {
+      return res.status(400).json({ error: workConstraintError(err) })
     }
     // Inclui as FKs adiáveis do caminho, que só são conferidas no COMMIT
     if (measureConstraintError(err)) {
