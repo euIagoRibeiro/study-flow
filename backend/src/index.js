@@ -11,6 +11,7 @@ import {
 import { tagsRouter } from './routes/tags.js'
 import { tasksRouter } from './routes/tasks.js'
 import { timeEntriesRouter } from './routes/timeEntries.js'
+import { worksRouter } from './routes/works.js'
 
 // Sem origem configurada, o cors() liberaria qualquer site ('*')
 if (!process.env.CORS_ORIGIN) {
@@ -30,6 +31,7 @@ app.use('/measure-kinds', measureKindsRouter)
 app.use('/exercises', exercisesRouter)
 app.use('/selections', selectionsRouter)
 app.use('/selection-options', selectionOptionsRouter)
+app.use('/works', worksRouter)
 app.use('/dashboard', dashboardRouter)
 
 // Os 4 parâmetros são obrigatórios: é pela contagem que o Express

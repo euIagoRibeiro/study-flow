@@ -242,13 +242,16 @@ tagsRouter.delete('/:id', async (req, res) => {
     res.status(204).end()
   } catch (err) {
     // Usada: como raiz de uma execução, ligada a uma (0005), com fase (0007),
-    // marcadora de treino (0012) ou declarante de uma escolha (0013).
+    // declarante da medida de um registro (0010), marcadora de treino (0012) ou
+    // declarante de uma escolha (0013).
     // Qual FK recusa primeiro muda depois de pg_dump/restore: traduzir todas
     if (
       isPhaseInUse(err) ||
       isWorkoutInUse(err) ||
       (err.code === '23503' &&
         err.constraint?.startsWith('execution_selections_')) ||
+      (err.code === '23503' &&
+        err.constraint?.startsWith('execution_measures_')) ||
       (err.code === '23503' &&
         (err.constraint === 'task_executions_root_tag_is_root' ||
           err.constraint?.startsWith('task_execution_tags_')))
@@ -269,6 +272,13 @@ tagsRouter.delete('/:id', async (req, res) => {
       return res.status(409).json({
         error:
           'Esta tag declara seleções: apague as seleções antes, ou arquive a tag',
+      })
+    }
+    // Caminho padrão de uma obra (0014): qual FK recusa primeiro também muda
+    if (err.code === '23503' && err.constraint === 'works_default_tag') {
+      return res.status(409).json({
+        error:
+          'Esta tag é o caminho padrão de uma obra: troque a tag da obra antes, ou arquive a tag',
       })
     }
     if (err.code === '23503' && err.constraint?.startsWith('tags_')) {

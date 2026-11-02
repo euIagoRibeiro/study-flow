@@ -208,6 +208,12 @@ measuresRouter.delete('/:id', async (req, res) => {
         error: 'Esta medida está em uso em registros: arquive em vez de apagar',
       })
     }
+    if (err.code === '23503' && err.constraint === 'works_measure') {
+      return res.status(409).json({
+        error:
+          'Esta medida soma o progresso de uma obra: arquive em vez de apagar',
+      })
+    }
     throw err
   } finally {
     client.release()
