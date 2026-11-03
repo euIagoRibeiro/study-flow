@@ -9,10 +9,42 @@ export const worksRouter = Router()
 
 const NOT_FOUND = 'Obra não encontrada'
 const DUPLICATE = 'Já existe uma obra com esse título nesse caminho'
+// As tags do caminho até `tag`, a mais funda primeiro: a medida mais próxima é a
+// da tag mais funda que declara uma, a mesma regra dos registros
+const NEAREST_MEASURE = (
+  tag,
+) => `SELECT m.id, m.active, m.allows_decimal AS "allowsDecimal"
+  FROM measures m JOIN tags t ON t.id = m.tag_id
+  WHERE t.id = ${tag}
+     OR t.id = (SELECT parent_id FROM tags WHERE id = ${tag})
+     OR t.id = (SELECT p.parent_id FROM tags c
+                JOIN tags p ON p.id = c.parent_id WHERE c.id = ${tag})
+  ORDER BY t.level DESC
+  LIMIT 1`
+
+// Progresso derivado: subconsultas, pra um registro com várias sessões não somar
+// os valores mais de uma vez. Conta registros abertos e fechados; só a medida da
+// obra entra na soma, de todos os tipos. `measureCurrent` falso = a árvore mudou
+// depois do cadastro (obra sem medida num caminho que ganhou uma também)
 const SELECT_WORK = `SELECT w.id, w.title, w.status,
   w.default_tag_id AS "defaultTagId", w.default_task_id AS "defaultTaskId",
   w.measure_id AS "measureId", w.total::float8 AS total, w.url,
-  tag.active AS "defaultTagActive", task.active AS "defaultTaskActive"
+  tag.active AS "defaultTagActive", task.active AS "defaultTaskActive",
+  (SELECT count(*)::int FROM task_executions e WHERE e.work_id = w.id) AS records,
+  (SELECT COALESCE(round(extract(epoch FROM
+            sum(COALESCE(s.ended_at, now()) - s.started_at))), 0)::int
+   FROM time_entries s
+   JOIN task_executions e ON e.id = s.task_execution_id
+   WHERE e.work_id = w.id) AS seconds,
+  CASE WHEN w.measure_id IS NOT NULL THEN
+    (SELECT COALESCE(sum(v.quantity), 0)::float8
+     FROM execution_measure_values v
+     JOIN task_executions e ON e.id = v.task_execution_id
+     WHERE e.work_id = w.id AND v.measure_id = w.measure_id)
+  END AS progress,
+  w.measure_id IS NOT DISTINCT FROM
+    (SELECT nearest.id FROM (${NEAREST_MEASURE('w.default_tag_id')}) nearest)
+    AS "measureCurrent"
 FROM works w
 JOIN tags tag ON tag.id = w.default_tag_id
 JOIN tasks task ON task.id = w.default_task_id`
@@ -64,20 +96,9 @@ const workChangesSchema = z
 
 class WorkError extends Error {}
 
-// A medida que vale pro caminho padrão: a da tag mais funda que declara uma,
-// a mesma regra dos registros (arquivada continua sendo a mais próxima)
+// A medida que vale pro caminho padrão (arquivada continua sendo a mais próxima)
 async function nearestMeasure(db, tagId) {
-  const result = await db.query(
-    `SELECT m.id, m.active, m.allows_decimal AS "allowsDecimal"
-     FROM measures m JOIN tags t ON t.id = m.tag_id
-     WHERE t.id = $1
-        OR t.id = (SELECT parent_id FROM tags WHERE id = $1)
-        OR t.id = (SELECT p.parent_id FROM tags c
-                   JOIN tags p ON p.id = c.parent_id WHERE c.id = $1)
-     ORDER BY t.level DESC
-     LIMIT 1`,
-    [tagId],
-  )
+  const result = await db.query(NEAREST_MEASURE('$1::uuid'), [tagId])
   return result.rows[0] ?? null
 }
 
