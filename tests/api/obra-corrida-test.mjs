@@ -157,6 +157,24 @@ try {
     check('troca de raiz: registro com a raiz nova e a obra', (await workOf(id)) === w.id)
   }
 
+  // 5b. PUT SEM workId trocando a raiz de registro já ligado. Só confere o resultado
+  // (fila, 200 e 409): a janela do deadlock não abre por fora, e este caso passa
+  // mesmo sem a trava da obra atual. Quem prova a trava é ferramentas/sonda-janela.mjs
+  {
+    const w = await work()
+    const id = await record({ workId: w.id })
+    await parkAfterRoot()
+    const gravar = put(id, { rootTagId: R2.id, tagIds: [L.id] })
+    check('sem workId: PUT parado depois de trocar a raiz', await blocked(1, mine))
+    const apagar = api('DELETE', `/works/${w.id}`)
+    check('sem workId: DELETE também parado', await blocked(2, mine))
+    await hold.query('ROLLBACK')
+    const [p, d] = await Promise.all([gravar, apagar])
+    check('sem workId: PUT grava', p.status === 200, detail(p))
+    check('sem workId: DELETE responde 409', d.status === 409, detail(d))
+    check('sem workId: a obra fica no registro', (await workOf(id)) === w.id)
+  }
+
   // 6. Dois registros na mesma obra não fazem fila
   {
     const w = await work()

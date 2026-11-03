@@ -911,7 +911,7 @@ executionsRouter.put('/:id', async (req, res) => {
       `UPDATE task_executions
        SET description = $1, completed_at = $2
        WHERE id = $3
-       RETURNING id, root_tag_id AS "rootTagId", phase`,
+       RETURNING id, root_tag_id AS "rootTagId", phase, work_id AS "workId"`,
       [changes.description, changes.completedAt, req.params.id],
     )
     if (result.rowCount === 0) {
@@ -940,7 +940,9 @@ executionsRouter.put('/:id', async (req, res) => {
       )
     }
     const current = result.rows[0]
-    if (changes.workId) await lockWork(client, changes.workId)
+    // A obra que o registro terá depois do pedido, venha ela no pedido ou não
+    const work = changes.workId === undefined ? current.workId : changes.workId
+    if (work) await lockWork(client, work)
     await setWorkAndLink(client, req.params.id, changes)
     // Antes de qualquer troca: as arquivadas que podem continuar
     const previousChoices = await choicesOf(client, req.params.id)
