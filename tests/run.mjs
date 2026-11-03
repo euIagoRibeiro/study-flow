@@ -14,10 +14,10 @@ import { API, APP, TESTS } from './config.mjs'
 const groups = {
   banco: ['phase-cases.sql', 'a1-cases.sql', 'm1-cases.sql', 'a3-cases.sql', 'dashboard-cases.sql', 'tags-cases.sql',
     'selecoes-cases.sql', 'obras-cases.sql',
-    'seed-dashboard.sql', 'seed-selecoes.sql'],
+    'seed-dashboard.sql', 'seed-selecoes.sql', 'seed-obras.sql'],
   api: ['p2-test.mjs', 'a1b-test.mjs', 'm2-test.mjs', 'a3b-test.mjs', 'dashboard-test.mjs', 's2a-test.mjs',
     's2b-test.mjs', 's2c-test.mjs', 'seed-selecoes.mjs', 'tag-corrida-test.mjs', 'o2a-test.mjs', 'o2b-test.mjs',
-    'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs'],
+    'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs', 'seed-obras.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
@@ -74,7 +74,17 @@ const seed = await pool.query(
    FROM task_executions WHERE id::text LIKE '5eed%'
    HAVING count(*) > 0`,
 )
+// As baterias de obras conferem a limpeza pela diferença de contagem: uma obra
+// que sobrou de uma rodada interrompida não apareceria nessa conta
+const strayWorks = await pool.query(
+  `SELECT string_agg(title, ', ' ORDER BY title) AS titles FROM works
+   WHERE id::text NOT LIKE '5eed%' HAVING count(*) > 0`,
+)
 await pool.end()
+if (strayWorks.rowCount > 0) {
+  stop(`há obras fora do seed (${strayWorks.rows[0].titles}): sobra de uma ` +
+    'rodada interrompida? Apague antes de rodar as baterias; se são obras suas, use o outro banco')
+}
 if (seed.rowCount === 0) {
   stop('o seed não está aplicado. Rode (na raiz): docker exec -i ' +
     `${PG_CONTAINER} psql -U studyflow -d studyflow -v ON_ERROR_STOP=1 < backend/seeds/dev_seed.sql`)

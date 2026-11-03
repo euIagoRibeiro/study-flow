@@ -41,11 +41,11 @@ SELECT pg_temp.c('8. seleções: opções em ordem; a Natureza é a única globa
           || ' ' || string_agg(s.name, ',') FILTER (WHERE s.multiple)
    FROM selections s LEFT JOIN tags g ON g.id = s.tag_id WHERE s.id::text LIKE '5eed%'),
   'Abordagem@Tecnologia:vibecode,tradicional Habilidade@Idiomas:escuta,leitura,escrita,fala,pensamento Instrumento@Música:guitarra,violão Local@Exercícios:academia,casa,rua Meio@Desenho:digital,tradicional Natureza@global:estudo,pesquisa,prática,criação,lazer Tipo de input@Idiomas:raw,comprehensible Habilidade');
-SELECT pg_temp.c('9. escolhas por seleção: Natureza 10, Local 5, Habilidade 4, Meio 3, Instrumento 3, Tipo de input 2, Abordagem 1 (28)',
+SELECT pg_temp.c('9. escolhas por seleção: Natureza 11 (com o 2304, O3a), Local 5, Habilidade 4, Meio 3, Instrumento 3, Tipo de input 2, Abordagem 1 (29)',
   (SELECT string_agg(n || '=' || c, ' ' ORDER BY n) FROM (
      SELECT s.name n, count(*) c FROM execution_selections es JOIN selections s ON s.id = es.selection_id
      WHERE es.task_execution_id::text LIKE '5eed%' GROUP BY s.name) x),
-  'Abordagem=1 Habilidade=4 Instrumento=3 Local=5 Meio=3 Natureza=10 Tipo de input=2');
+  'Abordagem=1 Habilidade=4 Instrumento=3 Local=5 Meio=3 Natureza=11 Tipo de input=2');
 SELECT pg_temp.c('10. cópias iguais às da seleção; raiz do registro (NULL só na global)',
   (SELECT count(*)::text FROM execution_selections es JOIN selections s ON s.id = es.selection_id
    JOIN task_executions e ON e.id = es.task_execution_id
@@ -85,7 +85,7 @@ SELECT pg_temp.c('15. reestruturação: Casa, Academia e Linguagens fora; Treino
           || string_agg(name, ',') FILTER (WHERE tracks_workout) || ' '
           || (SELECT string_agg(c.name, ',' ORDER BY c.id) FROM tags c WHERE c.parent_id = '5eed0000-0000-4000-9000-000000000310') || ' '
           || count(*) FROM tags WHERE id::text LIKE '5eed%'),
-  '0 Treino Peito, tríceps e ombro,Costas, trapézio e bíceps,Perna,Abdômen 35');
+  '0 Treino Peito, tríceps e ombro,Costas, trapézio e bíceps,Perna,Abdômen 39');
 SELECT pg_temp.c('16. treinos: caminho gravado (com o fechamento), marcadora = a tag mais funda marcada (regra da API), Local',
   (SELECT string_agg(substr(w.task_execution_id::text, 33, 4) || ':' || (SELECT string_agg(t.name, '>' ORDER BY t.level) FROM task_execution_tags x JOIN tags t ON t.id = x.tag_id WHERE x.task_execution_id = w.task_execution_id)
           || '@' || (SELECT t.name FROM tags t WHERE t.id = w.tag_id) || '=' || (SELECT t.name FROM task_execution_tags x JOIN tags t ON t.id = x.tag_id WHERE x.task_execution_id = w.task_execution_id AND t.tracks_workout ORDER BY t.level DESC LIMIT 1)
@@ -96,7 +96,7 @@ SELECT pg_temp.c('17. Idiomas: medida sem tipos; 1301 e 202 sem tipo, com 1 e 2;
   (SELECT (SELECT count(*) FROM measure_kinds WHERE measure_id = '5eed0000-0000-4000-a000-000000000002') || ' '
           || (SELECT string_agg(substr(task_execution_id::text, 33, 4) || '=' || quantity::int || coalesce(kind_id::text, ''), ' ' ORDER BY task_execution_id) FROM execution_measure_values WHERE measure_id = '5eed0000-0000-4000-a000-000000000002') || ' '
           || (SELECT count(*) FROM execution_measure_values WHERE task_execution_id::text LIKE '5eed%')),
-  '0 0202=2 1301=1 9');
+  '0 0202=2 1301=1 10');
 SELECT pg_temp.c('18. Idiomas: 1301 escuta + raw, 202 escuta + comprehensible, 1701 escrita + pensamento (a múltipla com duas)',
   (SELECT string_agg(r, ' ' ORDER BY r) FROM (
      SELECT substr(es.task_execution_id::text, 33, 4) || ':' || s.name || '=' || string_agg(o.name, ',' ORDER BY o.position) r

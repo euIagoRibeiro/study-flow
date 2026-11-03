@@ -647,4 +647,76 @@ JOIN selections s ON s.id = o.selection_id;
 
 UPDATE selection_options SET active = false WHERE id = '5eed0000-0000-4000-a300-000000000042';
 
+-- Obras (O3a): só acrescenta. Raízes novas Leitura › Mangá (medida "capítulos"),
+-- Finanças e Perfume; tarefas avulsas "Ler" e "Pesquisar" (Finanças usa a
+-- "Organizar finanças"). Sessões das anotações de 27 e 28/10, hora LOCAL fixa:
+--   2301 Soul Eater anteontem 01:00, 51:00, 6 capítulos · 2302 Soul Eater ontem
+--   01:00, 31:20, sem capítulos · 2303 Finanças anteontem 09:00, 14:30 ·
+--   2304 Perfume ontem 15:00, 5:35, Natureza = pesquisa
+-- Obras: Soul Eater (Leitura › Mangá, Ler, capítulos, 113, em andamento: 6 de
+-- 113 · 2 registros · 82:20); Inktober (Desenho › Inktober, Desenhar, sem medida,
+-- em andamento: 2201 e 2202, 54:30); Vagabond (mangá, 327, pausada, sem
+-- registro); Curso de Docker (Tecnologia, sem medida como o caminho, tarefa
+-- arquivada, concluída, sem registro). O 1301 ganha o link do vídeo. Totais do seed: 106 registros, 100
+-- sessões, 39 tags, 16 tarefas, 29 escolhas, 10 valores.
+-- Ids: tags 900/910/1000/1100, tarefas 15/16, registros 23xx, medida a000…08, obras a400
+INSERT INTO tasks (id, title, frequency, active, created_at) VALUES
+  ('5eed0000-0000-4000-8000-000000000015', 'Ler',       'none', true, now() - interval '38 days'),
+  ('5eed0000-0000-4000-8000-000000000016', 'Pesquisar', 'none', true, now() - interval '37 days');
+
+INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
+  ('5eed0000-0000-4000-9000-000000000900', 'Leitura',  1, NULL, NULL),
+  ('5eed0000-0000-4000-9000-000000001000', 'Finanças', 1, NULL, NULL),
+  ('5eed0000-0000-4000-9000-000000001100', 'Perfume',  1, NULL, NULL);
+INSERT INTO tags (id, name, level, parent_id, root_id) VALUES
+  ('5eed0000-0000-4000-9000-000000000910', 'Mangá', 2, '5eed0000-0000-4000-9000-000000000900', '5eed0000-0000-4000-9000-000000000900');
+
+INSERT INTO measures (id, tag_id, name, singular, allows_decimal) VALUES
+  ('5eed0000-0000-4000-a000-000000000008', '5eed0000-0000-4000-9000-000000000910', 'capítulos', 'capítulo', false); -- Leitura › Mangá
+
+INSERT INTO works (id, title, status, default_tag_id, default_task_id, measure_id, total) VALUES
+  ('5eed0000-0000-4000-a400-000000000001', 'Soul Eater',      'em_andamento', '5eed0000-0000-4000-9000-000000000910', '5eed0000-0000-4000-8000-000000000015', '5eed0000-0000-4000-a000-000000000008', 113),
+  ('5eed0000-0000-4000-a400-000000000002', 'Inktober',        'em_andamento', '5eed0000-0000-4000-9000-000000000610', '5eed0000-0000-4000-8000-000000000013', NULL, NULL),
+  ('5eed0000-0000-4000-a400-000000000003', 'Vagabond',        'pausado',      '5eed0000-0000-4000-9000-000000000910', '5eed0000-0000-4000-8000-000000000015', '5eed0000-0000-4000-a000-000000000008', 327),
+  ('5eed0000-0000-4000-a400-000000000004', 'Curso de Docker', 'concluido',    '5eed0000-0000-4000-9000-000000000700','5eed0000-0000-4000-8000-000000000007', NULL, NULL);
+
+CREATE TEMP TABLE o3 ON COMMIT DROP AS
+SELECT v.id::uuid, v.task::uuid, v.titulo, v.freq::frequency, v.descricao, v.raiz::uuid, v.folha::uuid, v.obra::uuid,
+       (SELECT d FROM dia_local) + v.ini AS ini, v.dur
+FROM (VALUES
+  ('5eed0000-0000-4000-8000-000000002301', '5eed0000-0000-4000-8000-000000000015', 'Ler',                'none',    'Soul Eater: lendo de madrugada', '5eed0000-0000-4000-9000-000000000900', '5eed0000-0000-4000-9000-000000000910', '5eed0000-0000-4000-a400-000000000001', interval '-2 days 1 hour',  interval '51 minutes'),
+  ('5eed0000-0000-4000-8000-000000002302', '5eed0000-0000-4000-8000-000000000015', 'Ler',                'none',    'Soul Eater: continuando',        '5eed0000-0000-4000-9000-000000000900', '5eed0000-0000-4000-9000-000000000910', '5eed0000-0000-4000-a400-000000000001', interval '-1 day 1 hour',   interval '31 minutes 20 seconds'),
+  ('5eed0000-0000-4000-8000-000000002303', '5eed0000-0000-4000-8000-000000000005', 'Organizar finanças', 'monthly', 'Conferindo os gastos',           '5eed0000-0000-4000-9000-000000001000', NULL,                                   NULL,                                   interval '-2 days 9 hours',  interval '14 minutes 30 seconds'),
+  ('5eed0000-0000-4000-8000-000000002304', '5eed0000-0000-4000-8000-000000000016', 'Pesquisar',          'none',    'Notas de perfumes amadeirados',  '5eed0000-0000-4000-9000-000000001100', NULL,                                   NULL,                                   interval '-1 day 15 hours',  interval '5 minutes 35 seconds')
+) AS v (id, task, titulo, freq, descricao, raiz, folha, obra, ini, dur);
+
+-- O registro termina no fim da sessão (como a API grava)
+INSERT INTO task_executions
+  (id, task_id, description, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id, work_id)
+SELECT id, task, descricao, titulo, freq, (ini + dur) AT TIME ZONE 'America/Sao_Paulo', raiz, obra FROM o3;
+
+INSERT INTO task_execution_tags (task_execution_id, tag_id, tag_parent_id, root_tag_id)
+SELECT o3.id, t.id, t.parent_id, o3.raiz
+FROM o3
+JOIN tags t ON t.id = o3.folha;
+
+INSERT INTO time_entries (task_execution_id, started_at, ended_at)
+SELECT id, ini AT TIME ZONE 'America/Sao_Paulo', (ini + dur) AT TIME ZONE 'America/Sao_Paulo' FROM o3;
+
+-- 2302 sem capítulos (28/10 não anotou): sem linha de medida, como a tela grava sem valor
+INSERT INTO execution_measures (task_execution_id, measure_id, tag_id, root_tag_id) VALUES
+  ('5eed0000-0000-4000-8000-000000002301', '5eed0000-0000-4000-a000-000000000008', '5eed0000-0000-4000-9000-000000000910', '5eed0000-0000-4000-9000-000000000900');
+INSERT INTO execution_measure_values (task_execution_id, measure_id, kind_id, quantity) VALUES
+  ('5eed0000-0000-4000-8000-000000002301', '5eed0000-0000-4000-a000-000000000008', NULL, 6);
+
+INSERT INTO execution_selections
+  (task_execution_id, selection_id, option_id, selection_multiple, selection_global, tag_id, root_tag_id)
+VALUES
+  ('5eed0000-0000-4000-8000-000000002304', '5eed0000-0000-4000-a200-000000000001', '5eed0000-0000-4000-a300-000000000012', false, true, NULL, NULL);
+
+UPDATE task_executions SET work_id = '5eed0000-0000-4000-a400-000000000002'
+WHERE id IN ('5eed0000-0000-4000-8000-000000002201', '5eed0000-0000-4000-8000-000000002202');
+UPDATE task_executions SET link_url = 'https://www.youtube.com/watch?v=jNQXAC9IVRw'
+WHERE id = '5eed0000-0000-4000-8000-000000001301';
+
 COMMIT;

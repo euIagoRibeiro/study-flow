@@ -53,7 +53,7 @@ try {
   check('1701: a múltipla com as duas opções, em ordem', choices('1701') === 'Habilidade:escrita,pensamento@', choices('1701'))
   check('1301 e 202: escuta + o tipo de input', choices('1301') === 'Habilidade:escuta@|Tipo de input:raw@' && choices('0202') === 'Habilidade:escuta@|Tipo de input:comprehensible@', `${choices('1301')} ${choices('0202')}`)
   const withChoices = executions.filter((e) => e.id.startsWith('5eed') && e.selections.length > 0).length
-  check('19 registros do seed com escolha (os 10 do S3a + o 501 + 5 com Local + 1301, 202, 1701)', withChoices === 19, String(withChoices))
+  check('20 registros do seed com escolha (os 10 do S3a + o 501 + 5 com Local + 1301, 202, 1701 + o 2304 do O3a)', withChoices === 20, String(withChoices))
 } catch (err) {
   check('rodou sem erro', false, err.stack?.split('\n').slice(0, 2).join(' '))
 } finally {

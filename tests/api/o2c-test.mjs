@@ -12,6 +12,8 @@ if (!process.env.DATABASE_URL) {
   process.exit(2)
 }
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+// Obras antes da bateria: a limpeza confere a diferença, não depende do que o seed tem
+const worksBefore = (await pool.query('SELECT count(*)::int AS n FROM works')).rows[0].n
 const P = 'teste-o2c'
 const results = []
 const check = (name, ok, detail = '') => {
@@ -127,8 +129,8 @@ try {
   for (const id of tagIds) await pool.query('DELETE FROM tags WHERE id = $1', [id])
   await resumeRunning(pool, paused)
   const left = await pool.query(
-    `SELECT (SELECT count(*) FROM works)::int + (SELECT count(*) FROM tags WHERE name LIKE '${P}%')::int +
-            (SELECT count(*) FROM tasks WHERE title LIKE '${P}%')::int AS n`)
+    `SELECT abs((SELECT count(*) FROM works)::int - $1) + (SELECT count(*) FROM tags WHERE name LIKE '${P}%')::int +
+            (SELECT count(*) FROM tasks WHERE title LIKE '${P}%')::int AS n`, [worksBefore])
   check('dados de teste apagados', left.rows[0].n === 0, `${left.rows[0].n} sobrando`)
   await pool.end()
   const ok = results.filter(Boolean).length
