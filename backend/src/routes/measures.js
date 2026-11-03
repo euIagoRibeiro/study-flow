@@ -214,6 +214,12 @@ measuresRouter.delete('/:id', async (req, res) => {
           'Esta medida soma o progresso de uma obra: arquive em vez de apagar',
       })
     }
+    // Um tipo criado depois de os tipos irem embora, antes de a medida ir
+    if (err.code === '23503' && err.constraint === 'measure_kinds_measure') {
+      return res.status(409).json({
+        error: 'Esta medida acabou de ganhar um tipo: confira e tente de novo',
+      })
+    }
     throw err
   } finally {
     client.release()

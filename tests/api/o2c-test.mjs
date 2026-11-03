@@ -5,7 +5,7 @@
 // Pausa a sessão rodando do seed e devolve no fim; apaga tudo no finally.
 import pg from 'pg'
 import { API } from '../config.mjs'
-import { deleteExecutions } from '../limpeza.mjs'
+import { deleteExecutions, pauseRunning, resumeRunning } from '../limpeza.mjs'
 const { Pool } = pg
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL ausente: rode com --env-file=backend/.env (a limpeza usa o banco)')
@@ -40,7 +40,7 @@ const session = (id, started, minutes) => pool.query(
   'INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES ($1, $2, $3)',
   [id, new Date(started).toISOString(), new Date(started + minutes * 60000).toISOString()])
 
-const paused = (await pool.query('UPDATE time_entries SET ended_at = now() WHERE ended_at IS NULL RETURNING id')).rows.map((r) => r.id)
+const paused = await pauseRunning(pool)
 let taskId = null
 const tagIds = []
 
@@ -125,7 +125,7 @@ try {
   await pool.query('DELETE FROM measure_kinds WHERE measure_id IN (SELECT id FROM measures WHERE tag_id = ANY($1::uuid[]))', [tagIds])
   await pool.query('DELETE FROM measures WHERE tag_id = ANY($1::uuid[])', [tagIds])
   for (const id of tagIds) await pool.query('DELETE FROM tags WHERE id = $1', [id])
-  if (paused.length) await pool.query('UPDATE time_entries SET ended_at = NULL WHERE id = ANY($1::uuid[])', [paused])
+  await resumeRunning(pool, paused)
   const left = await pool.query(
     `SELECT (SELECT count(*) FROM works)::int + (SELECT count(*) FROM tags WHERE name LIKE '${P}%')::int +
             (SELECT count(*) FROM tasks WHERE title LIKE '${P}%')::int AS n`)

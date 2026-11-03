@@ -17,7 +17,7 @@ const groups = {
     'seed-dashboard.sql', 'seed-selecoes.sql'],
   api: ['p2-test.mjs', 'a1b-test.mjs', 'm2-test.mjs', 'a3b-test.mjs', 'dashboard-test.mjs', 's2a-test.mjs',
     's2b-test.mjs', 's2c-test.mjs', 'seed-selecoes.mjs', 'tag-corrida-test.mjs', 'o2a-test.mjs', 'o2b-test.mjs',
-    'obra-corrida-test.mjs', 'o2c-test.mjs'],
+    'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
