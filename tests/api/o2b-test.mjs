@@ -39,7 +39,7 @@ const must = async (...args) => {
   return r.body
 }
 const GHOST = '00000000-0000-4000-8000-00000000abcd'
-const LINK = 'https://youtu.be/53UGUF39CKM?is=BZ0Y'
+const LINK = 'https://exemplo.com/video?t=42'
 const now = () => new Date().toISOString()
 let task = null
 const tags = []

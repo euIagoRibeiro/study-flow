@@ -100,7 +100,7 @@ SELECT pg_temp.aceita('D1. registro aponta pra obra',
   format('UPDATE task_executions SET work_id = (SELECT id FROM works WHERE title = ''Bleach'') WHERE id = %L', pg_temp.id('registro')));
 SELECT pg_temp.aceita('D2. caminho diferente do padrão da obra',
   format('UPDATE task_executions SET root_tag_id = %L WHERE id = %L', pg_temp.id('outra'), pg_temp.id('registro')));
-SELECT pg_temp.aceita('D3. com link', format('UPDATE task_executions SET link_url = ''https://youtu.be/53UGUF39CKM?is=BZ0Y'' WHERE id = %L', pg_temp.id('registro')));
+SELECT pg_temp.aceita('D3. com link', format('UPDATE task_executions SET link_url = ''https://exemplo.com/video?t=42'' WHERE id = %L', pg_temp.id('registro')));
 SELECT pg_temp.recusa('D4. obra inexistente', format('UPDATE task_executions SET work_id = %L WHERE id = %L', pg_temp.id('nao-existe'), pg_temp.id('registro')), 'task_executions_work');
 SELECT pg_temp.recusa('D5. link javascript:', format('UPDATE task_executions SET link_url = ''javascript:alert(1)'' WHERE id = %L', pg_temp.id('registro')), 'task_executions_link_url_valid');
 SELECT pg_temp.recusa('D6. link com quebra de linha', format('UPDATE task_executions SET link_url = %L WHERE id = %L', E'http://exemplo.com\n', pg_temp.id('registro')), 'task_executions_link_url_valid');

@@ -490,9 +490,14 @@ JOIN tags t ON t.id = leaf.id OR (leaf.level = 3 AND t.id = leaf.parent_id);
 INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated)
 SELECT id, ini AT TIME ZONE 'America/Sao_Paulo', (ini + dur) AT TIME ZONE 'America/Sao_Paulo', estimada FROM d1;
 
--- Seleções (S3a): só acrescenta. Sessões das anotações de 27 e 28/10, com as
--- durações delas (cronômetro com os segundos), ontem e anteontem em hora LOCAL
--- fixa; nada hoje e nada nas semanas 7–12 (janela fixa da dashboard-test).
+-- Seleções (S3a): só acrescenta. Ontem e anteontem em hora LOCAL fixa; nada hoje
+-- e nada nas semanas 7–12 (janela fixa da dashboard-test).
+-- Das anotações de 27 e 28/10: os tempos (cronômetro com os segundos), os
+-- contextos, as descrições (resumidas), o 1 exercício do 2210; o período do dia
+-- quando a nota o dá (Redação à noite). Inventado: 2203 (Perspectiva) e 2208
+-- (violão), a tarefa Desenhar e a hora exata dentro do período. IA (18:00) e
+-- guitarra (18:30) CONTRADIZEM as notas (manhã e tarde); o Inktober não tem
+-- período nas notas.
 -- Raízes novas Desenho, Tecnologia, Música; Vestibular › Redação com medida
 -- própria "exercícios" (substitui a "questões" herdada). Tarefas novas avulsas.
 --   Natureza (global): estudo, pesquisa, prática, criação, lazer
@@ -649,7 +654,11 @@ UPDATE selection_options SET active = false WHERE id = '5eed0000-0000-4000-a300-
 
 -- Obras (O3a): só acrescenta. Raízes novas Leitura › Mangá (medida "capítulos"),
 -- Finanças e Perfume; tarefas avulsas "Ler" e "Pesquisar" (Finanças usa a
--- "Organizar finanças"). Sessões das anotações de 27 e 28/10, hora LOCAL fixa:
+-- "Organizar finanças"). Hora LOCAL fixa. Das anotações de 27 e 28/10: os tempos,
+-- os contextos, Soul Eater e Inktober, os 6 capítulos (e o 31:20 sem capítulos), a
+-- pesquisa do perfume e o período do dia (madrugada, manhã, tarde). Inventado: as
+-- descrições dos 2301–2304, Vagabond, Curso de Docker, as tarefas Ler e Pesquisar,
+-- a hora exata dentro do período e o link do 1301 (vídeo público, não das notas):
 --   2301 Soul Eater anteontem 01:00, 51:00, 6 capítulos · 2302 Soul Eater ontem
 --   01:00, 31:20, sem capítulos · 2303 Finanças anteontem 09:00, 14:30 ·
 --   2304 Perfume ontem 15:00, 5:35, Natureza = pesquisa
