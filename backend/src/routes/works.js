@@ -134,6 +134,22 @@ async function checkMeasure(db, work, measureChanged) {
   }
 }
 
+// Só o total, contra a medida que a obra já soma (mesmo que não seja mais a
+// mais próxima do caminho)
+async function checkTotal(db, work) {
+  if (work.total === null) return
+  if (work.measureId === null) {
+    throw new WorkError('total precisa de uma medida')
+  }
+  const found = await db.query(
+    'SELECT allows_decimal AS "allowsDecimal" FROM measures WHERE id = $1',
+    [work.measureId],
+  )
+  if (!found.rows[0].allowsDecimal && !Number.isInteger(work.total)) {
+    throw new WorkError('Essa medida não aceita decimal')
+  }
+}
+
 function writeError(err) {
   if (err instanceof WorkError) return { status: 400, error: err.message }
   if (err.code === '23505' && err.constraint === 'works_title_unique') {
@@ -220,7 +236,14 @@ worksRouter.patch('/:id', async (req, res) => {
     if (next.defaultTaskId !== current.defaultTaskId) {
       await checkChoice(client, 'tasks', next.defaultTaskId, 'A tarefa')
     }
-    await checkMeasure(client, next, next.measureId !== current.measureId)
+    // Obra com a medida antiga (a árvore mudou depois) guarda a medida até a
+    // pessoa decidir: só medida ou caminho no pedido (mesmo o mesmo valor) pedem
+    // a conferência completa; total sozinho confere contra a medida gravada
+    if ('measureId' in changes || 'defaultTagId' in changes) {
+      await checkMeasure(client, next, next.measureId !== current.measureId)
+    } else if ('total' in changes) {
+      await checkTotal(client, next)
+    }
     await client.query(
       `UPDATE works
        SET title = COALESCE($1, title),
