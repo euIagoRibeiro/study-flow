@@ -35,11 +35,13 @@ import type {
   TimeEntry,
   Work,
   WorkActions,
+  WorkLink,
   WorkoutCatalog,
   WorkoutExercise,
 } from './types'
 import { indexTags } from './tags'
 import { writeTimerChoices } from './timerMemory'
+import { recordError } from './works'
 import { recentExerciseIds } from './workouts'
 
 // 409: o banco recusou por conflito com um estado que essa página não
@@ -187,6 +189,7 @@ function App() {
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
     selectionOptionIds: string[],
+    link: WorkLink,
   ) {
     keepSaved(
       await executionsApi.createExecution(
@@ -197,6 +200,7 @@ function App() {
         estimatedMinutes,
         measureValues,
         selectionOptionIds,
+        link,
       ),
     )
   }
@@ -234,7 +238,7 @@ function App() {
         isConflict(error)
           ? 'Essa tarefa já está em andamento em outro lugar. Recarregue a página.'
           : error instanceof ApiError && error.status === 400
-            ? error.message
+            ? recordError(error.message)
             : 'Não foi possível iniciar o cronômetro. Tente de novo.',
       )
       return null
@@ -719,6 +723,7 @@ function App() {
               measures={measures}
               selections={selections}
               exercises={exercises}
+              works={works}
               onSaveWorkout={saveWorkout}
               onCreateExercise={createExercise}
               onCreate={addTask}

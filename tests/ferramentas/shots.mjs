@@ -4,7 +4,7 @@
 // entre as rodadas. Apagar o clock.txt pra começar uma comparação nova.
 // Com --sem-selecoes, esconde os blocos de seleção e os chips delas: o resto
 // tem que dar 0 pixels contra o "antes" (só o campo novo mudou); --sem-obras,
-// o mesmo pra seção Obras
+// o mesmo pra seção Obras; --sem-obra-campo, pros campos Obra e Link
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
@@ -52,6 +52,14 @@ if (process.argv.includes('--sem-obras')) {
   await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style')
     style.textContent = '[data-works-block] { display: none !important; }'
+    document.head.append(style)
+  }))
+}
+// Com --sem-obra-campo, esconde os campos Obra e Link do Registrar (O4a)
+if (process.argv.includes('--sem-obra-campo')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = '[data-work-field], [data-link-field] { display: none !important; }'
     document.head.append(style)
   }))
 }

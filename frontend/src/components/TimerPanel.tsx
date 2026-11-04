@@ -271,7 +271,11 @@ function TimerPanel(props: {
     setError('')
   }
 
+  // Obra e link no painel: O4b (a obra gravada pelo Iniciar fica: o Finalizar
+  // não manda workId, e ausente mantém)
   const blocks: Record<FormField, ReactNode> = {
+    obra: null,
+    link: null,
     tags: (
       <TagFields
         tags={props.tags}

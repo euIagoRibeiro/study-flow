@@ -2,8 +2,8 @@ import { ApiError } from './api/client'
 import { formatDuration } from './dates'
 import { applicableMeasure } from './measures'
 import { formatQuantity } from './numbers'
-import { indexTags, tagLineage } from './tags'
-import type { Measure, Tag, Work, WorkStatus } from './types'
+import { compareNames, indexTags, tagLineage } from './tags'
+import type { Measure, Tag, Task, Work, WorkStatus } from './types'
 
 // Ordem do menu, do filtro e do formulário
 export const WORK_STATUSES: WorkStatus[] = [
@@ -119,6 +119,66 @@ export function workMarks(
     ...(work.defaultTagActive ? [] : ['Caminho arquivado.']),
     ...(work.defaultTaskActive ? [] : ['Tarefa arquivada.']),
   ]
+}
+
+// O campo Obra dos formulários de registro: em andamento primeiro; as outras
+// na ordem do filtro, com o status no nome
+export function workGroups(works: Work[]) {
+  const byTitle = (a: Work, b: Work) => compareNames(a.title, b.title)
+  return {
+    inProgress: works.filter((w) => w.status === 'em_andamento').sort(byTitle),
+    others: works
+      .filter((w) => w.status !== 'em_andamento')
+      .sort(
+        (a, b) =>
+          WORK_STATUSES.indexOf(a.status) - WORK_STATUSES.indexOf(b.status) ||
+          byTitle(a, b),
+      ),
+  }
+}
+
+export const workOptionLabel = (work: Work) =>
+  work.status === 'em_andamento'
+    ? work.title
+    : `${work.title} (${statusLabel[work.status].toLowerCase()})`
+
+// A medida do registro sai do caminho (regra do servidor); a obra soma só a
+// dela. `measure` é a do campo do formulário. Obra sem medida: nada a dizer
+export function workMeasureNote(
+  work: Work,
+  measure: Measure | null,
+  measures: Measure[],
+): string | null {
+  if (work.measureId === null || measure?.id === work.measureId) return null
+  const own = measures.find((m) => m.id === work.measureId)
+  if (!own) return null
+  return measure
+    ? `Esta obra soma «${own.name}»: o que for registrado em «${measure.name}» não entra no progresso dela.`
+    : `Este caminho não mede «${own.name}»: este registro não entra no progresso da obra.`
+}
+
+// No Registrar a tarefa é a da página (a obra não troca de tarefa): avisa
+// quando a padrão da obra é outra
+export function defaultTaskLine(
+  work: Work,
+  taskId: string,
+  tasks: Task[],
+): string | null {
+  if (work.defaultTaskId === taskId) return null
+  const task = tasks.find((t) => t.id === work.defaultTaskId)
+  return task ? `A tarefa padrão desta obra é «${task.title}».` : null
+}
+
+// As frases do servidor sobre obra e link, no texto da tela
+export function recordError(message: string): string {
+  if (message.startsWith('linkUrl pode ter')) {
+    return 'Link: no máximo 2000 caracteres.'
+  }
+  if (message.startsWith('linkUrl')) return LINK_ERROR
+  if (message === 'Obra não encontrada') {
+    return 'Esta obra não existe mais. Escolha outra.'
+  }
+  return message
 }
 
 export const TITLE_ERROR = 'Escreva um título.'

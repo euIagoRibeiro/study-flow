@@ -35,10 +35,20 @@ import type {
   StartDraft,
   Tag,
   TagChoice,
+  Task,
+  Work,
+  WorkLink,
 } from '../types'
 import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import { useMeasure } from '../useMeasure'
 import { useSelectionChoices } from '../useSelectionChoices'
+import {
+  defaultPath,
+  LINK_ERROR,
+  LINK_PATTERN,
+  recordError,
+  workMeasureNote,
+} from '../works'
 import DraftNotice from './DraftNotice'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
@@ -46,12 +56,16 @@ import MeasureFields from './MeasureFields'
 import PhaseField from './PhaseField'
 import SelectionChoices from './SelectionChoices'
 import TagFields from './TagFields'
+import WorkField from './WorkField'
 
 type FormProps = {
   draftKey: string // rascunho na tela (N3): por tarefa
   tags: Tag[]
   measures: Measure[]
   selections: Selection[]
+  works: Work[]
+  taskId: string // a tarefa da página (a obra não a troca)
+  tasks: Task[]
   initialPath: string[] // pré-seleção: o contexto do último registro
   suggestPhase: (path: string[]) => Phase | null
   onSubmit: (
@@ -61,11 +75,11 @@ type FormProps = {
     estimatedMinutes: number | null,
     measureValues: MeasureValue[],
     selectionOptionIds: string[],
+    link: WorkLink,
   ) => Promise<unknown>
-  // A cada mudança no caminho, na fase, na descrição ou nas seleções: o
-  // "Iniciar cronômetro" (fora do formulário) leva o que estiver aqui; null =
-  // nada
-  // (o rascunho foi descartado)
+  // A cada mudança no caminho, na fase, na descrição, nas seleções, na obra
+  // ou no link: o "Iniciar cronômetro" (fora do formulário) leva o que
+  // estiver aqui; null = nada (o rascunho foi descartado)
   onDraftChange?: (draft: StartDraft | null) => void
 }
 
@@ -80,6 +94,17 @@ type RegistrarDraft = {
   phase: Phase | null
   measureTexts: MeasureTexts
   choices?: SelectionChoiceMap // ausente em rascunho de antes do S5a
+  workId?: string | null // ausentes em rascunho de antes do O4a
+  link?: string
+}
+
+// Os campos que o Iniciar leva, com o que acabou de mudar
+type Reported = {
+  path: string[]
+  phase: Phase | null
+  description: string
+  workId: string | null
+  link: string
 }
 
 function readRegistrarDraft(key: string, byId: TagIndex) {
@@ -94,7 +119,9 @@ function readRegistrarDraft(key: string, byId: TagIndex) {
     !isChoosablePath(d.path, byId) ||
     !isPhase(d.phase) ||
     !isTexts(d.measureTexts) ||
-    !(d.choices === undefined || isChoices(d.choices))
+    !(d.choices === undefined || isChoices(d.choices)) ||
+    !(d.workId === undefined || d.workId === null || isText(d.workId)) ||
+    !(d.link === undefined || isText(d.link))
   ) {
     return null
   }
@@ -143,6 +170,11 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   // Registro novo: nada gravado, nada pré-preenchido (ou o rascunho)
   const measure = useMeasure(path, props.measures, null, restored?.measureTexts)
   const choices = useSelectionChoices(path, props.selections, restored?.choices)
+  // A obra do rascunho volta como estava, sem preencher o caminho de novo (o
+  // caminho do rascunho é o que estava na tela). Obra que sumiu: nenhuma
+  const [workId, setWorkId] = useState(restored?.workId ?? null)
+  const work = props.works.find((w) => w.id === workId) ?? null
+  const [link, setLink] = useState(restored?.link ?? '')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const showPhase = phaseApplies(path, byId)
@@ -156,6 +188,8 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
     phase: props.suggestPhase(props.initialPath),
     measureTexts: {},
     choices: {},
+    workId: null,
+    link: '',
   }))
   useDraftSync(
     props.draftKey,
@@ -167,6 +201,8 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       phase,
       measureTexts: filledTexts(measure.texts),
       choices: choices.touched,
+      workId: work?.id ?? null,
+      link,
     } satisfies RegistrarDraft,
     pristine,
   )
@@ -174,49 +210,82 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   // "Iniciar cronômetro" leva o que está na tela. Vale também pro rascunho
   // recuperado (B1), que já começa mexido: avisa ao montar
   const reported = useRef(restored !== null)
-  const optionIds = choices.optionIds.join()
-  useEffect(() => {
-    if (reported.current) report(path, phase, description)
-    // os outros campos avisam pelos próprios eventos
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optionIds])
 
   // Avisa com os valores NOVOS (o estado só muda na próxima renderização);
   // pelos eventos dos campos. Sem mexer, nada é avisado: o Iniciar continua
   // como antes
-  function report(nextPath: string[], nextPhase: Phase | null, text: string) {
+  function report(next: Partial<Reported> = {}) {
     reported.current = true
-    const applies = phaseApplies(nextPath, byId)
+    const value: Reported = {
+      path,
+      phase,
+      description,
+      workId: work?.id ?? null,
+      link,
+      ...next,
+    }
+    const applies = phaseApplies(value.path, byId)
     props.onDraftChange?.({
-      description: text,
-      tags: pathToChoice(nextPath, applies ? nextPhase : null),
+      description: value.description,
+      tags: pathToChoice(value.path, applies ? value.phase : null),
       selectionOptionIds: choices.optionIds,
       touchedChoices: choices.touched,
+      workId: value.workId,
+      linkUrl: value.link.trim() || null,
     })
   }
+  const optionIds = choices.optionIds.join()
+  useEffect(() => {
+    if (reported.current) report()
+    // os outros campos avisam pelos próprios eventos
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionIds])
 
   // Caminho novo, pré-seleção nova (e os campos da medida do caminho)
-  function changePath(next: string[]) {
+  function changePath(next: string[], also: Partial<Reported> = {}) {
     const nextPhase = props.suggestPhase(next)
     setPath(next)
     setPhase(nextPhase)
     measure.changePath(next)
-    report(next, nextPhase, description)
+    report({ path: next, phase: nextPhase, ...also })
+  }
+
+  // A obra sobrescreve o caminho, mesmo mexido (o toque mais novo ganha). O
+  // mesmo caminho não mexe em nada (a quantidade digitada fica); caminho
+  // padrão arquivado não preenche
+  function chooseWork(id: string | null) {
+    setWorkId(id)
+    const chosen = props.works.find((w) => w.id === id)
+    const next = chosen ? defaultPath(chosen, props.tags) : []
+    if (
+      next.length > 0 &&
+      next.join('/') !== path.join('/') &&
+      isChoosablePath(next, byId)
+    ) {
+      changePath(next, { workId: id })
+    } else {
+      report({ workId: id })
+    }
+  }
+
+  function changeLink(text: string) {
+    setLink(text)
+    report({ link: text })
   }
 
   function changePhase(next: Phase | null) {
     setPhase(next)
-    report(path, next, description)
+    report({ phase: next })
   }
 
   function changeDescription(text: string) {
     setDescription(text)
-    report(path, phase, text)
+    report({ description: text })
   }
 
   function changeChoice(selectionId: string, optionIds: string[]) {
     choices.change(selectionId, optionIds)
-    report(path, phase, description)
+    report()
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -231,6 +300,11 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       setError(sent.error)
       return
     }
+    const url = link.trim()
+    if (url !== '' && !LINK_PATTERN.test(url)) {
+      setError(LINK_ERROR)
+      return
+    }
     setSubmitting(true)
     try {
       await props.onSubmit(
@@ -242,13 +316,14 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
         estimate === '' ? null : estimate,
         sent.values ?? [],
         choices.optionIds,
+        { workId: work?.id ?? null, linkUrl: url || null },
       )
       clearDraft(props.draftKey)
     } catch (err) {
       // 400: o servidor recusou com motivo (ex.: tag arquivada em outra aba)
       setError(
         err instanceof ApiError && err.status === 400
-          ? err.message
+          ? recordError(err.message)
           : 'Não foi possível registrar. Tente de novo.',
       )
       return
@@ -258,8 +333,28 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
     setError('')
   }
 
+  const measureNote = work
+    ? workMeasureNote(work, measure.measure, props.measures)
+    : null
   const blocks: Record<FormField, ReactNode> = {
-    tags: <TagFields tags={props.tags} value={path} onChange={changePath} />,
+    obra: (
+      <WorkField
+        works={props.works}
+        value={work?.id ?? null}
+        onChange={chooseWork}
+        tags={props.tags}
+        measures={props.measures}
+        taskId={props.taskId}
+        tasks={props.tasks}
+      />
+    ),
+    tags: (
+      <TagFields
+        tags={props.tags}
+        value={path}
+        onChange={(next) => changePath(next)}
+      />
+    ),
     fase: showPhase && <PhaseField value={phase} onChange={changePhase} />,
     'selecoes-caminho': (
       <SelectionChoices
@@ -276,11 +371,37 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       />
     ),
     medida: (
-      <MeasureFields
-        measure={measure.measure}
-        texts={measure.texts}
-        onChange={measure.change}
-      />
+      <>
+        <MeasureFields
+          measure={measure.measure}
+          texts={measure.texts}
+          onChange={measure.change}
+        />
+        {measureNote && (
+          <p
+            data-work-field=""
+            className="font-texto text-meta [overflow-wrap:anywhere] text-tinta-suave"
+          >
+            {measureNote}
+          </p>
+        )}
+      </>
+    ),
+    link: (
+      <label data-link-field="" className="flex flex-col gap-1.5">
+        <span className="text-sm text-tinta-suave">Link (opcional)</span>
+        <input
+          type="text"
+          inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={2000}
+          value={link}
+          onChange={(event) => changeLink(event.target.value)}
+          className={fieldClass}
+        />
+      </label>
     ),
   }
 

@@ -302,7 +302,11 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     setError('')
   }
 
+  // Obra e link no lápis: O4b (sem o campo, o pedido não manda workId nem
+  // linkUrl, e o servidor mantém)
   const blocks: Record<FormField, ReactNode> = {
+    obra: null,
+    link: null,
     tags: (
       <TagFields
         tags={props.tags}

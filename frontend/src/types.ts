@@ -33,7 +33,14 @@ export type TaskExecution = {
   workout: WorkoutExercise[] | null
   // Escolhas de seleção, agrupadas por seleção; [] = nenhuma
   selections: ExecutionSelection[]
+  // Obra (O2b) e link da sessão; null = nenhum
+  workId: string | null
+  linkUrl: string | null
 }
+
+// Obra e link de um registro novo. O servidor não preenche nada a partir da
+// obra: o caminho quem preenche é a tela
+export type WorkLink = { workId: string | null; linkUrl: string | null }
 
 export type ExecutionSelection = { selectionId: string; optionIds: string[] }
 
@@ -235,8 +242,8 @@ export type TagChoice = {
 }
 
 // O que o "Iniciar cronômetro" leva do formulário de baixo, se ele foi
-// mexido: caminho (com fase), descrição e seleções. "Quando", estimativa e
-// medida ficam: são do registro manual
+// mexido: caminho (com fase), descrição, seleções, obra e link. "Quando",
+// estimativa e medida ficam: são do registro manual
 export type StartDraft = {
   description: string
   tags: TagChoice
@@ -244,7 +251,7 @@ export type StartDraft = {
   // O que foi tocado: "Nenhuma" não vira escolha gravada, e o painel precisa
   // saber dela pra não sugerir de novo
   touchedChoices: Record<string, string[]>
-}
+} & WorkLink
 
 // Editar um registro: tags ausentes = o servidor não mexe nelas (registro
 // antigo com mais de uma folha, salvo sem tocar nas tags)

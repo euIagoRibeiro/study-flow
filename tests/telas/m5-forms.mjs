@@ -64,7 +64,7 @@ async function markForm(page) {
 async function measureFields(page) {
   return page.evaluate((s) => {
     const form = document.querySelector(s)
-    const known = ['O que foi feito (opcional)', 'Duração estimada (min, opcional)']
+    const known = ['O que foi feito (opcional)', 'Duração estimada (min, opcional)', 'Link (opcional)']
     const legend = form.querySelector('fieldset:not([data-selection-block] *) legend')
     if (legend) {
       const inputs = [...form.querySelectorAll('fieldset:not([data-selection-block] *) input')]

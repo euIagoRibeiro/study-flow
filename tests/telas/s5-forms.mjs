@@ -187,10 +187,10 @@ try {
   await check('neto: a herança soma as três', ['S raiz', 'S multipla', 'S neto'].every((n) => v.some(([x]) => x === n)), JSON.stringify(v))
   await check('caminho novo cai pra raiz', (await value('S multipla')) === 'm1,m3', await value('S multipla'))
 
-  // Ordem: tags → fase → caminho (raiz → folha) → gerais → medida
+  // Ordem: obra → tags → fase → caminho (raiz → folha) → gerais → medida → link (O4a)
   await setField('Fase', 'Protótipo')
   const names = (await ui()).map(([n]) => n)
-  const order = ['Contexto', `Em ${R.name}`, `Em ${R.name} › ${A.name}`, 'Fase', 'S raiz', 'S multipla', 'S neto', 'Natureza', 'Testes (opcional)']
+  const order = ['Obra', 'Contexto', `Em ${R.name}`, `Em ${R.name} › ${A.name}`, 'Fase', 'S raiz', 'S multipla', 'S neto', 'Natureza', 'Testes (opcional)', 'Link (opcional)']
   await check('ordem da constante', order.every((n, i) => names.indexOf(n) > (i ? names.indexOf(order[i - 1]) : -1)), names.join(' | '))
 
   // Acessibilidade

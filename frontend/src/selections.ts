@@ -14,11 +14,13 @@ export const LAST_ACTIVE_OPTION =
 
 // A ordem dos campos nos formulários de registro: mudar é mexer só aqui
 export const FORM_FIELD_ORDER = [
+  'obra',
   'tags',
   'fase',
   'selecoes-caminho',
   'selecoes-gerais',
   'medida',
+  'link',
 ] as const
 
 export type FormField = (typeof FORM_FIELD_ORDER)[number]
