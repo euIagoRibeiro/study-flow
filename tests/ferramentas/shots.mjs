@@ -3,7 +3,8 @@
 // Relógio congelado (out/clock.txt): o cronômetro rodando do seed não muda
 // entre as rodadas. Apagar o clock.txt pra começar uma comparação nova.
 // Com --sem-selecoes, esconde os blocos de seleção e os chips delas: o resto
-// tem que dar 0 pixels contra o "antes" (só o campo novo mudou)
+// tem que dar 0 pixels contra o "antes" (só o campo novo mudou); --sem-obras,
+// o mesmo pra seção Obras
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
@@ -43,6 +44,14 @@ if (process.argv.includes('--sem-selecoes')) {
   await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style')
     style.textContent = '[data-selection-block], [data-selection-chips] { display: none !important; }'
+    document.head.append(style)
+  }))
+}
+// Com --sem-obras, esconde a seção Obras da tela de tags (O3b)
+if (process.argv.includes('--sem-obras')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = '[data-works-block] { display: none !important; }'
     document.head.append(style)
   }))
 }

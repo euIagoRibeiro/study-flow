@@ -22,6 +22,20 @@ export async function deleteExecutions(pool, ids) {
   await pool.query('DELETE FROM task_executions WHERE id = ANY($1::uuid[])', [ids])
 }
 
+// Obras: a bateria guarda os ids de antes e, no fim (depois de apagar os
+// registros que apontam pra elas), apaga as que nasceram nela. A conferência é
+// pela diferença de contagem; obra solta de uma rodada anterior o run.mjs barra
+export async function worksSnapshot(pool) {
+  const { rows } = await pool.query('SELECT id FROM works')
+  return rows.map((row) => row.id)
+}
+
+export async function deleteNewWorks(pool, before) {
+  await pool.query('DELETE FROM works WHERE NOT (id = ANY($1::uuid[]))', [before])
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM works')
+  return rows[0].n - before.length // 0 = nada sobrou, nada do seed sumiu
+}
+
 // A sessão rodando do seed, pausada pra bateria abrir a dela ("uma rodando no app")
 export async function pauseRunning(pool) {
   const { rows } = await pool.query(

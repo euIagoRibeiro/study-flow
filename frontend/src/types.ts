@@ -103,6 +103,50 @@ export type ExerciseActions = {
   remove: (id: string) => void
 }
 
+// Obra (O1–O3): catálogo do que se acompanha em vários registros. O tipo é o
+// caminho padrão (a tag mais funda); status manual, sem arquivar
+export type WorkStatus = 'em_andamento' | 'pausado' | 'concluido' | 'abandonado'
+
+export type Work = {
+  id: string
+  title: string
+  status: WorkStatus
+  defaultTagId: string
+  defaultTaskId: string
+  measureId: string | null // qual medida soma; null = sem progresso numérico
+  total: number | null
+  url: string | null
+  // Derivados pelo servidor (GET /works): as marcas e o progresso vêm daqui
+  defaultTagActive: boolean
+  defaultTaskActive: boolean
+  measureCurrent: boolean // falso = a medida mais próxima do caminho mudou
+  records: number
+  seconds: number
+  progress: number | null // soma da medida; null sem medida
+}
+
+// O que o formulário manda: null limpa (link, medida, total)
+export type WorkFields = Pick<
+  Work,
+  | 'title'
+  | 'status'
+  | 'defaultTagId'
+  | 'defaultTaskId'
+  | 'measureId'
+  | 'total'
+  | 'url'
+>
+
+// O que a tela de tags faz com obras. Criar e editar: o erro sobe pro
+// formulário; mudar status e apagar avisam no Layout
+export type WorkActions = {
+  create: (fields: WorkFields) => Promise<Work>
+  update: (id: string, changes: Partial<WorkFields>) => Promise<Work>
+  setStatus: (id: string, status: WorkStatus) => Promise<Work | null>
+  remove: (id: string) => void
+  refresh: () => void
+}
+
 // Um valor de medida: "3 refatoração" (kindId) ou "12 exercícios" (null)
 export type MeasureValue = { kindId: string | null; quantity: number }
 

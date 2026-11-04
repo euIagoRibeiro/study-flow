@@ -18,6 +18,10 @@ function TagFields(props: {
   // Registro antigo com mais de uma folha: o campo logo abaixo de value
   // mostra "N temas (registro antigo)" até a pessoa mexer nas tags
   legacyCount?: number
+  // Na tela de tags (obra): outro título, e sem o link pra própria tela
+  title?: string
+  manageLink?: boolean
+  rootNone?: string // a 1ª opção do contexto (caminho obrigatório na obra)
 }) {
   const titleId = useId()
   const byId = indexTags(props.tags)
@@ -34,7 +38,7 @@ function TagFields(props: {
   const chosen = props.value.map((id) => byId.get(id))
   const [root, middle] = chosen
   const levels = [
-    { label: 'Contexto', none: 'Sem tag', options: roots },
+    { label: 'Contexto', none: props.rootNone ?? 'Sem tag', options: roots },
     root && {
       label: `Em ${root.name}`,
       none: 'Nenhuma',
@@ -64,14 +68,16 @@ function TagFields(props: {
           id={titleId}
           className="text-sm whitespace-nowrap text-tinta-suave"
         >
-          Tags (opcional)
+          {props.title ?? 'Tags (opcional)'}
         </span>
-        <Link
-          to="/tags"
-          className={`text-meta whitespace-nowrap text-tinta-suave underline decoration-dotted underline-offset-2 hover:text-tinta ${focusRing}`}
-        >
-          gerenciar tags
-        </Link>
+        {props.manageLink !== false && (
+          <Link
+            to="/tags"
+            className={`text-meta whitespace-nowrap text-tinta-suave underline decoration-dotted underline-offset-2 hover:text-tinta ${focusRing}`}
+          >
+            gerenciar tags
+          </Link>
+        )}
       </div>
       {levels.map(
         (level, index) =>

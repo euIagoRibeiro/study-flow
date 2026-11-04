@@ -34,6 +34,7 @@ function MeasureForm(props: {
   measure: Measure | undefined
   note: string // a herança, em uma linha
   used: boolean // a medida já foi usada em algum registro
+  works: number // obras que somam esta medida
   usedKinds: Set<string>
   actions: MeasureActions
   onClose: () => void
@@ -346,6 +347,12 @@ function MeasureForm(props: {
           {props.used ? (
             <p className="font-texto text-meta text-tinta-suave">
               Em uso em registros: arquive em vez de apagar.
+            </p>
+          ) : props.works > 0 ? (
+            <p className="font-texto text-meta text-tinta-suave">
+              É a medida de{' '}
+              {props.works === 1 ? '1 obra' : `${props.works} obras`}: tire a
+              medida da obra antes de apagar.
             </p>
           ) : (
             <button

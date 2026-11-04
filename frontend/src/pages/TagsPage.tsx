@@ -17,6 +17,7 @@ import GeneralSelections from '../components/GeneralSelections'
 import MeasureForm from '../components/MeasureForm'
 import SelectionForm from '../components/SelectionForm'
 import TagForm from '../components/TagForm'
+import WorkCatalog from '../components/WorkCatalog'
 import { describeSelection, selectionError, selectionNote } from '../selections'
 import { cardClass, chipClass, focusRing } from '../styles'
 import { compareNames, indexTags, tagPath } from '../tags'
@@ -28,7 +29,10 @@ import type {
   Selection,
   SelectionActions,
   Tag,
+  Task,
   TaskExecution,
+  Work,
+  WorkActions,
 } from '../types'
 
 // Quais tags estão abertas: conveniência de quem olha a tela (só neste
@@ -64,6 +68,10 @@ function registros(count: number) {
   return count === 1 ? '1 registro' : `${count} registros`
 }
 
+function obras(count: number) {
+  return count === 1 ? '1 obra' : `${count} obras`
+}
+
 type FormState =
   | { kind: 'root' }
   | { kind: 'child'; parentId: string }
@@ -81,6 +89,9 @@ function TagsPage(props: {
   selectionActions: SelectionActions
   exercises: Exercise[]
   exerciseActions: ExerciseActions
+  works: Work[]
+  workActions: WorkActions
+  tasks: Task[]
   executions: TaskExecution[]
   onCreate: (name: string, parentId: string | null) => Promise<void>
   onRename: (id: string, name: string) => Promise<void>
@@ -190,6 +201,21 @@ function TagsPage(props: {
   const measureByTag = new Map(
     props.measures.map((measure) => [measure.tagId, measure]),
   )
+  // Caminho padrão e medida de obra não se apagam (o 409 da API é a rede)
+  const worksByTag = new Map<string, number>()
+  const worksByMeasure = new Map<string, number>()
+  for (const work of props.works) {
+    worksByTag.set(
+      work.defaultTagId,
+      (worksByTag.get(work.defaultTagId) ?? 0) + 1,
+    )
+    if (work.measureId) {
+      worksByMeasure.set(
+        work.measureId,
+        (worksByMeasure.get(work.measureId) ?? 0) + 1,
+      )
+    }
+  }
 
   // Arquivadas só com "Mostrar arquivadas", como as tags
   const visibleSelections = props.selections
@@ -441,11 +467,13 @@ function TagsPage(props: {
           ? 'Tem subtags: apague ou arquive as subtags antes.'
           : uses > 0
             ? `Em uso em ${registros(uses)}. Arquive em vez de apagar.`
-            : measureByTag.has(tag.id)
-              ? 'Declara uma medida: apague a medida antes.'
-              : props.selections.some((s) => s.tagId === tag.id)
-                ? 'Declara uma seleção: apague a seleção antes.'
-                : undefined
+            : worksByTag.has(tag.id)
+              ? `É o caminho padrão de ${obras(worksByTag.get(tag.id) ?? 0)}.`
+              : measureByTag.has(tag.id)
+                ? 'Declara uma medida: apague a medida antes.'
+                : props.selections.some((s) => s.tagId === tag.id)
+                  ? 'Declara uma seleção: apague a seleção antes.'
+                  : undefined
     actions.push({
       label: 'Apagar',
       icon: <TrashIcon />,
@@ -483,6 +511,7 @@ function TagsPage(props: {
             measure={measure}
             note={measureNote(tag)}
             used={measure !== undefined && usedMeasures.has(measure.id)}
+            works={measure ? (worksByMeasure.get(measure.id) ?? 0) : 0}
             usedKinds={usedKinds}
             actions={props.measureActions}
             onClose={closeForm}
@@ -678,6 +707,13 @@ function TagsPage(props: {
             : null
         }
         onNew={() => setForm({ kind: 'selection-new', tagId: null })}
+      />
+      <WorkCatalog
+        works={props.works}
+        tags={props.tags}
+        tasks={props.tasks}
+        measures={props.measures}
+        actions={props.workActions}
       />
       <ExerciseCatalog
         exercises={props.exercises}

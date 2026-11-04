@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { ApiError } from './api/client'
 import * as executionsApi from './api/executions'
@@ -8,6 +8,7 @@ import * as selectionsApi from './api/selections'
 import * as tagsApi from './api/tags'
 import * as tasksApi from './api/tasks'
 import * as timeEntriesApi from './api/timeEntries'
+import * as worksApi from './api/works'
 import ExecutePage from './pages/ExecutePage'
 import HistoricoPage from './pages/HistoricoPage'
 import Layout from './pages/Layout'
@@ -32,6 +33,8 @@ import type {
   Task,
   TaskExecution,
   TimeEntry,
+  Work,
+  WorkActions,
   WorkoutCatalog,
   WorkoutExercise,
 } from './types'
@@ -57,6 +60,7 @@ function App() {
   const [measures, setMeasures] = useState<Measure[]>([])
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [selections, setSelections] = useState<Selection[]>([])
+  const [works, setWorks] = useState<Work[]>([])
 
   useEffect(() => {
     let ignore = false
@@ -69,6 +73,7 @@ function App() {
       measuresApi.listMeasures(),
       exercisesApi.listExercises(),
       selectionsApi.listSelections(),
+      worksApi.listWorks(),
     ])
       .then(
         ([
@@ -79,6 +84,7 @@ function App() {
           measureList,
           exerciseList,
           selectionList,
+          workList,
         ]) => {
           if (ignore) return
           setTasks(taskList)
@@ -88,6 +94,7 @@ function App() {
           setMeasures(measureList)
           setExercises(exerciseList)
           setSelections(selectionList)
+          setWorks(workList)
           setStatus('ready')
         },
       )
@@ -425,6 +432,7 @@ function App() {
           archived.has(tag.id) ? { ...tag, active: false } : tag,
         ),
       )
+      refreshWorks()
     } catch (error) {
       tagError(error, 'Não foi possível arquivar a tag. Tente de novo.')
     }
@@ -433,6 +441,7 @@ function App() {
   async function reactivateTag(id: string) {
     try {
       replaceTag(await tagsApi.reactivateTag(id))
+      refreshWorks()
     } catch (error) {
       tagError(error, 'Não foi possível reativar a tag. Tente de novo.')
     }
@@ -512,6 +521,56 @@ function App() {
     },
   }
 
+  // Obras: o progresso e as marcas são derivados pelo servidor e envelhecem
+  // quando se registra (Executar) ou quando a tag, a tarefa ou a medida mudam.
+  // A lista é recarregada ao entrar na tela de tags e depois dessas mudanças;
+  // a resposta mais nova ganha (uma recarga lenta não desfaz uma mais nova)
+  const worksRequest = useRef(0)
+  function refreshWorks() {
+    const request = ++worksRequest.current
+    worksApi.listWorks().then(
+      (list) => {
+        if (request === worksRequest.current) setWorks(list)
+      },
+      (error: unknown) => console.error(error),
+    )
+  }
+  function replaceWork(updated: Work) {
+    worksRequest.current++
+    setWorks((current) =>
+      current.some((w) => w.id === updated.id)
+        ? current.map((w) => (w.id === updated.id ? updated : w))
+        : [...current, updated],
+    )
+    return updated
+  }
+  const workActions: WorkActions = {
+    async create(fields) {
+      return replaceWork(await worksApi.createWork(fields))
+    },
+    async update(id, changes) {
+      return replaceWork(await worksApi.updateWork(id, changes))
+    },
+    async setStatus(id, status) {
+      try {
+        return replaceWork(await worksApi.updateWork(id, { status }))
+      } catch (error) {
+        tagError(error, 'Não foi possível mudar o status. Tente de novo.')
+        return null
+      }
+    },
+    async remove(id) {
+      try {
+        await worksApi.deleteWork(id)
+        worksRequest.current++
+        setWorks((current) => current.filter((w) => w.id !== id))
+      } catch (error) {
+        tagError(error, 'Não foi possível apagar a obra. Tente de novo.')
+      }
+    },
+    refresh: refreshWorks,
+  }
+
   // Medidas: os erros sobem pro formulário de medida (mostra o motivo)
   function replaceMeasure(updated: Measure) {
     setMeasures((current) =>
@@ -522,6 +581,7 @@ function App() {
     async create(tagId, fields, kinds) {
       const created = await measuresApi.createMeasure(tagId, fields, kinds)
       setMeasures((current) => [...current, created])
+      refreshWorks()
     },
     async update(id, changes) {
       replaceMeasure(await measuresApi.updateMeasure(id, changes))
@@ -529,6 +589,7 @@ function App() {
     async remove(id) {
       await measuresApi.deleteMeasure(id)
       setMeasures((current) => current.filter((m) => m.id !== id))
+      refreshWorks()
     },
     async createKind(measureId, name) {
       const kind = await measuresApi.createKind(measureId, name)
@@ -697,6 +758,9 @@ function App() {
               selectionActions={selectionActions}
               exercises={exercises}
               exerciseActions={exerciseActions}
+              works={works}
+              workActions={workActions}
+              tasks={tasks}
               executions={executions}
               onCreate={addTag}
               onRename={renameTag}

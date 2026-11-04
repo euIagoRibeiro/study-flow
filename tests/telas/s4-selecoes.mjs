@@ -86,7 +86,7 @@ try {
     const section = document.querySelector('section[aria-label="Seleções gerais"]')
     return { heads, afterTree: Boolean(tree.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING) }
   })
-  check('seção entre a árvore e Exercícios', order.afterTree && order.heads.join() === 'Seleções gerais,Exercícios', order.heads.join())
+  check('seção entre a árvore e Exercícios (Obras no meio, O3b)', order.afterTree && order.heads.join() === 'Seleções gerais,Obras,Exercícios', order.heads.join())
   check('controle negativo: um ⋯ por contexto, nenhum a mais', (await menuCount(page)) === activeRoots.length + 1,
     `${await menuCount(page)} de ${activeRoots.length + 1}`)
 
