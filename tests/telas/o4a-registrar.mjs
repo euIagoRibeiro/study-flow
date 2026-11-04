@@ -2,7 +2,10 @@
 // andamento primeiro, as outras num grupo com o status), a obra preenche o
 // caminho (mesmo mexido; o mesmo caminho não apaga a quantidade; caminho
 // padrão arquivado não preenche), "Nenhuma obra" mantém o caminho, marcas,
-// linha da tarefa padrão (a tarefa da página não muda), nota da medida, link (vazio não vai, inválido barra, frases do servidor),
+// linha da tarefa padrão (a tarefa da página não muda), nota da medida, link
+// recolhido ("+ Link" abre e foca; aberto fica aberto; volta fechado depois de
+// registrar; rascunho com link volta aberto, sem foco; aberto e vazio volta
+// fechado), link (vazio não vai, inválido barra, frases do servidor),
 // corpo do POST do Registrar e do Iniciar, rascunho (a obra não refaz o
 // caminho; obra que sumiu é ignorada), status mudado na tela de tags reagrupa
 // sem recarregar, e os toques. Dados próprios (prefixo teste-o4), apagados no
@@ -135,6 +138,27 @@ try {
     if (text) await handle.type(text)
     await pause(150)
   }
+  // Link recolhido: o botão "+ Link" ou o campo, e quem tem o foco
+  const linkState = () => page.evaluate(() => {
+    const block = document.querySelector('main form [data-link-field]')
+    const input = block?.querySelector('input') ?? null
+    return { button: block?.querySelector('button')?.textContent.trim() ?? null, input: input !== null, focused: input !== null && document.activeElement === input, value: input?.value ?? null }
+  })
+  const openLink = async () => {
+    const done = await page.evaluate(() => {
+      const b = document.querySelector('main form [data-link-field] button')
+      if (!b) return false
+      b.scrollIntoView({ block: 'center' })
+      b.click()
+      return true
+    })
+    if (!done) throw new Error('botão "+ Link" não existe')
+    await pause(150)
+  }
+  const typeLink = async (text) => {
+    if (!(await linkState()).input) await openLink()
+    await typeIn('Link (opcional)', text)
+  }
   const notes = () => page.evaluate(() => [...document.querySelectorAll('main form [data-work-field] p, main form p[data-work-field]')].map((p) => p.textContent))
   const formError = () => page.evaluate(() => document.querySelector('main form [role="alert"]')?.textContent.trim() ?? '')
   const submit = () => page.evaluate(() => [...document.querySelectorAll('main form button')].find((b) => b.textContent.trim() === 'Registrar').click())
@@ -157,14 +181,23 @@ try {
   // ---------- 1. o campo, a ordem e as opções
   await fresh()
   const names = (await ui()).map(([n]) => n)
-  check('ordem: Obra logo antes de Contexto, Link depois da medida (no fim)', names[names.indexOf('Contexto') - 1] === 'Obra' && names.at(-1) === 'Link (opcional)', names.join(' | '))
+  check('ordem: Obra logo antes de Contexto, Link no fim (logo antes do Registrar)', names[names.indexOf('Contexto') - 1] === 'Obra' &&
+    (await page.evaluate(() => document.querySelector('main form [data-link-field]')?.nextElementSibling?.textContent.trim() === 'Registrar')), names.join(' | '))
   const g = await groups()
   check('opções: "Nenhuma obra" primeiro, escolhida', g?.first === 'Nenhuma obra' && (await value('Obra')) === 'Nenhuma obra', JSON.stringify(g))
   check('grupos: "Em andamento" por título, "Outras" na ordem do filtro com o status', JSON.stringify(g?.groups) === JSON.stringify(expectGroups(allWorks)), `${JSON.stringify(g?.groups)} x ${JSON.stringify(expectGroups(allWorks))}`)
+  const closed = await linkState()
+  check('Link começa fechado: só o botão "+ Link"', closed.button === '+ Link' && !closed.input, JSON.stringify(closed))
+  await openLink()
+  const opened = await linkState()
+  check('"+ Link" abre o campo e leva o foco pra ele', opened.input && opened.focused && opened.button === null, JSON.stringify(opened))
   check('link vazio e com teclado de URL', await page.evaluate(() => {
     const i = document.querySelector('main form [data-link-field] input')
     return i?.value === '' && i.inputMode === 'url' && i.type === 'text' && i.getAttribute('autocapitalize') === 'none' && i.spellcheck === false && i.maxLength === 2000
   }))
+  await typeIn('Link (opcional)', '')
+  await page.evaluate(() => document.activeElement?.blur())
+  check('aberto, fica aberto (mesmo vazio)', (await linkState()).input)
 
   // ---------- 2. escolher a obra preenche o caminho
   await setField('Obra', wA.title)
@@ -204,13 +237,13 @@ try {
   // ---------- 4. link e corpo do Registrar
   await fresh()
   await setField('Obra', wB.title)
-  await typeIn('Link (opcional)', 'ftp://exemplo.com/x')
+  await typeLink('ftp://exemplo.com/x')
   posts.length = 0
   await submit()
   await pause(400)
   check('link inválido: mensagem e nenhum pedido', (await formError()) === LINK_ERROR && posts.length === 0, `${await formError()} / ${posts.length}`)
   inject = { status: 400, error: 'linkUrl pode ter no máximo 2000 caracteres' }
-  await typeIn('Link (opcional)', 'https://exemplo.com/a')
+  await typeLink('https://exemplo.com/a')
   await submit()
   await pause(500)
   check('400 do servidor sobre o link: frase da tela', (await formError()) === 'Link: no máximo 2000 caracteres.', await formError())
@@ -227,6 +260,11 @@ try {
   const row = (await pool.query('SELECT work_id, link_url FROM task_executions WHERE task_id = $1 ORDER BY created_at DESC LIMIT 1', [T.id])).rows[0]
   check('gravado: obra e link', row?.work_id === wB.id && row?.link_url === 'https://exemplo.com/a', JSON.stringify(row))
   check('Registrar apaga o rascunho', (await draft()) === null, await draft())
+  // Voltar à tarefa sem recarregar a página: o formulário novo começa fechado
+  await page.evaluate(() => history.back())
+  await page.waitForSelector('main form [data-link-field]')
+  await pause(200)
+  check('depois de registrar, o Link volta fechado', (await linkState()).button === '+ Link', JSON.stringify(await linkState()))
   // Sem obra e sem link: nada no corpo
   await fresh()
   posts.length = 0
@@ -234,6 +272,14 @@ try {
   await page.waitForFunction(() => location.pathname === '/')
   await pause(300)
   check('sem obra e sem link: nenhum dos dois no corpo', posts.length === 1 && !('workId' in posts[0]) && !('linkUrl' in posts[0]), JSON.stringify(posts))
+  // Aberto e vazio: também nada
+  await fresh()
+  await openLink()
+  posts.length = 0
+  await submit()
+  await page.waitForFunction(() => location.pathname === '/')
+  await pause(300)
+  check('Link aberto e vazio: nenhum link no corpo', posts.length === 1 && !('linkUrl' in posts[0]), JSON.stringify(posts))
 
   // ---------- 5. Iniciar
   const clickStart = () => page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Iniciar cronômetro').click())
@@ -243,7 +289,7 @@ try {
   }
   await fresh()
   await setField('Obra', wA.title)
-  await typeIn('Link (opcional)', 'https://exemplo.com/b')
+  await typeLink('https://exemplo.com/b')
   posts.length = 0
   await clickStart()
   await page.waitForFunction(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Finalizar'))
@@ -251,7 +297,13 @@ try {
   check('Iniciar leva obra, link e o caminho dela', posts.at(-1)?.workId === wA.id && posts.at(-1)?.linkUrl === 'https://exemplo.com/b' && posts.at(-1)?.rootTagId === R.id && posts.at(-1)?.tagIds?.join() === A.id, JSON.stringify(posts.at(-1)))
   const open = (await pool.query('SELECT work_id, link_url FROM task_executions WHERE task_id = $1 AND completed_at IS NULL', [T.id])).rows[0]
   check('registro aberto com obra e link', open?.work_id === wA.id && open?.link_url === 'https://exemplo.com/b', JSON.stringify(open))
-  await stopOpen()
+  // Finalizar pela tela; o aviso de desfazer expira e volta à Lista. De volta à tarefa: fechado
+  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Finalizar').click())
+  await page.waitForFunction(() => location.pathname === '/', { timeout: 15000 })
+  await page.evaluate(() => history.back())
+  await page.waitForSelector('main form [data-link-field]')
+  await pause(200)
+  check('depois de Iniciar e Finalizar, o Link volta fechado', (await linkState()).button === '+ Link', JSON.stringify(await linkState()))
   await fresh()
   posts.length = 0
   await clickStart()
@@ -264,9 +316,11 @@ try {
   await fresh()
   await setField('Obra', wA.title)
   await setField(`Em ${R.name}`, B.name) // caminho mexido depois da obra
-  await typeIn('Link (opcional)', 'https://exemplo.com/c')
+  await typeLink('https://exemplo.com/c')
   await go()
   check('rascunho volta com a obra e o link', (await value('Obra')) === wA.title && (await value('Link (opcional)')) === 'https://exemplo.com/c', `${await value('Obra')} ${await value('Link (opcional)')}`)
+  const back = await linkState()
+  check('rascunho com link: o campo volta aberto, sem pegar o foco', back.input && !back.focused, JSON.stringify(back))
   check('rascunho NÃO reaplica a obra sobre o caminho mexido', (await pathNow()) === `${R.name} › ${B.name}`, await pathNow())
   await page.evaluate((k, d) => sessionStorage.setItem(k, d), KEY(T.id), JSON.stringify({ ...JSON.parse(await draft()), workId: '00000000-0000-4000-8000-000000000000' }))
   await go()
@@ -278,6 +332,13 @@ try {
   await pause(300)
   check('obra que sumiu não vai no pedido (corpo sem workId)', posts.length === 1 && !('workId' in posts[0]), JSON.stringify(posts))
   check('obra que sumiu: o registro grava', (await page.evaluate(() => location.pathname)) === '/', await page.evaluate(() => location.pathname))
+  // Aberto e vazio não é rascunho: volta fechado (a obra escolhida faz existir o rascunho)
+  await fresh()
+  await setField('Obra', wA.title)
+  await openLink()
+  await go()
+  const empty = await linkState()
+  check('rascunho com o Link aberto e vazio: volta fechado', (await value('Obra')) === wA.title && empty.button === '+ Link' && !empty.input, JSON.stringify(empty))
 
   // ---------- 7. status mudado na tela de tags reagrupa sem recarregar
   await fresh()

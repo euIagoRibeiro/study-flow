@@ -52,6 +52,7 @@ import {
 import DraftNotice from './DraftNotice'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
+import LinkField from './LinkField'
 import MeasureFields from './MeasureFields'
 import PhaseField from './PhaseField'
 import SelectionChoices from './SelectionChoices'
@@ -388,20 +389,11 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       </>
     ),
     link: (
-      <label data-link-field="" className="flex flex-col gap-1.5">
-        <span className="text-sm text-tinta-suave">Link (opcional)</span>
-        <input
-          type="text"
-          inputMode="url"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          maxLength={2000}
-          value={link}
-          onChange={(event) => changeLink(event.target.value)}
-          className={fieldClass}
-        />
-      </label>
+      <LinkField
+        value={link}
+        onChange={changeLink}
+        startOpen={(restored?.link ?? '').trim() !== ''}
+      />
     ),
   }
 

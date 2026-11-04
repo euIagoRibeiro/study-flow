@@ -1,5 +1,6 @@
 // O4a: campos Obra e Link no Registrar, janela real com a barra de rolagem, 320
-// a 1280. Estados: seed (nenhuma obra escolhida) e "longa": lista de obras
+// a 1280. Estados: seed (nenhuma obra escolhida, Link fechado: o "+ Link" com
+// alvo de toque de 44px e folga do foco) e "longa" (Link aberto): lista de obras
 // injetada (títulos de 100 letras, sem espaço, em todos os status) e a obra
 // escolhida com as 3 marcas, a linha da tarefa padrão (tarefa de 100 letras) e a
 // nota da medida, com uma medida de 30 letras injetada no caminho dela; link de
@@ -70,6 +71,8 @@ try {
         s.dispatchEvent(new Event('change', { bubbles: true }))
       }, stale.id)
       await new Promise((r) => setTimeout(r, 300))
+      await page.evaluate(() => document.querySelector('main form [data-link-field] button').click())
+      await new Promise((r) => setTimeout(r, 150))
       const input = await page.$('main form [data-link-field] input')
       await input.evaluate((el, v) => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v)
@@ -98,12 +101,15 @@ try {
           out.push({ ok: !leak, what: `texto vaza: "${node.textContent.slice(0, 25)}"${leak ? ` ${leak.left.toFixed(1)}..${leak.right.toFixed(1)} em ${box.left.toFixed(1)}..${box.right.toFixed(1)}` : ''}` })
         }
         const notes = form.querySelectorAll('[data-work-field] p, p[data-work-field]').length
-        const controls = [...form.querySelectorAll('[data-work-field] select, [data-link-field] input')]
+        const controls = [...form.querySelectorAll('[data-work-field] select, [data-link-field] input, [data-link-field] button')]
+        const linkButton = form.querySelector('[data-link-field] button')
         return {
           out,
           texts,
           notes,
-          fields: form.querySelectorAll('[data-work-field] select').length + form.querySelectorAll('[data-link-field] input').length,
+          fields: form.querySelectorAll('[data-work-field] select').length + form.querySelectorAll('[data-link-field] input, [data-link-field] button').length,
+          linkOpen: form.querySelector('[data-link-field] input') !== null,
+          buttonHeight: linkButton ? linkButton.getBoundingClientRect().height : null,
           scroll: document.documentElement.scrollWidth - useful,
           controlOut: Math.max(0, ...controls.map((c) => { const r = c.getBoundingClientRect(); return Math.max(r.right - box.right, box.left - r.left) })),
           margin: Math.min(...controls.map((c) => { const r = c.getBoundingClientRect(); return Math.min(r.left, useful - r.right) })),
@@ -113,6 +119,9 @@ try {
       for (const r of m.out) check(`${tag}: ${r.what}`, r.ok, r.what)
       // Fixas: os dois campos, as notas esperadas e o mínimo de textos (rótulos Obra e Link + notas)
       check(`${tag}: campos Obra e Link presentes`, m.fields === 2, String(m.fields))
+      // Fechado no seed ("+ Link", alvo de toque de 44px como os outros botões); aberto no longo
+      if (state === 'seed') check(`${tag}: Link fechado, "+ Link" com ≥ 44px de altura`, !m.linkOpen && m.buttonHeight >= 44, `${m.linkOpen} ${m.buttonHeight}px`)
+      else check(`${tag}: Link aberto`, m.linkOpen)
       check(`${tag}: notas esperadas (${state === 'longa' ? 5 : 0})`, m.notes === (state === 'longa' ? 5 : 0), String(m.notes))
       check(`${tag}: textos medidos: ${m.texts}, esperado ao menos ${m.notes + 2}`, m.texts > 0 && m.texts >= m.notes + 2, String(m.texts))
       check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)
