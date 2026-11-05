@@ -9,6 +9,7 @@ import type {
   Measure,
   Selection,
   WorkoutCatalog,
+  WorkPicker,
   CompletedExecution,
   ExecutionChanges,
   Tag,
@@ -38,6 +39,7 @@ function HistoricoPage(props: {
   measures: Measure[]
   selections: Selection[]
   workoutCatalog: WorkoutCatalog
+  workPicker: WorkPicker
   onEditExecution: (
     executionId: string,
     changes: ExecutionChanges,
@@ -81,6 +83,7 @@ function HistoricoPage(props: {
           measures={props.measures}
           selections={props.selections}
           workoutCatalog={props.workoutCatalog}
+          workPicker={props.workPicker}
           onEdit={props.onEditExecution}
           onEditTimeEntry={props.onEditTimeEntry}
         />

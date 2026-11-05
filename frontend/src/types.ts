@@ -104,6 +104,15 @@ export type WorkoutCatalog = {
   create: (name: string) => Promise<Exercise>
 }
 
+// O que a edição de um registro precisa pra Obra (O4c), montado no App: as
+// obras, as tarefas (linha da tarefa padrão) e a recarga, pra obra gravada
+// que não está na lista carregada
+export type WorkPicker = {
+  works: Work[]
+  tasks: Task[]
+  refresh: () => Promise<void>
+}
+
 export type ExerciseActions = {
   rename: (id: string, name: string) => Promise<void>
   setActive: (id: string, active: boolean) => void
@@ -266,7 +275,8 @@ export type ExecutionChanges = {
   workout?: WorkoutExercise[]
   // Ausente: mantém (o que sair do caminho, o servidor tira). [] remove
   selectionOptionIds?: string[]
-} & Partial<TagChoice>
+} & Partial<TagChoice> &
+  Partial<WorkLink> // ausente: mantém; null limpa
 
 export type LoadStatus = 'loading' | 'error' | 'ready'
 

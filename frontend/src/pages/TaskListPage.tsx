@@ -15,6 +15,7 @@ import type {
   Measure,
   Selection,
   WorkoutCatalog,
+  WorkPicker,
   ExecutionChanges,
   NewTask,
   Tag,
@@ -35,6 +36,7 @@ function TaskListPage(props: {
   measures: Measure[]
   selections: Selection[]
   workoutCatalog: WorkoutCatalog
+  workPicker: WorkPicker
   onCreate: (task: NewTask) => Promise<string>
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
@@ -214,6 +216,7 @@ function TaskListPage(props: {
             measures={props.measures}
             selections={props.selections}
             workoutCatalog={props.workoutCatalog}
+            workPicker={props.workPicker}
             onEdit={props.onEdit}
             onArchive={props.onArchive}
             onReactivate={props.onReactivate}

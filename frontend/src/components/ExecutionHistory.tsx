@@ -18,6 +18,7 @@ import type {
   Tag,
   TimeEntry,
   WorkoutCatalog,
+  WorkPicker,
 } from '../types'
 import { formatSets } from '../workouts'
 import CompactIconButton from './CompactIconButton'
@@ -46,6 +47,7 @@ function ExecutionHistory(props: {
   measures: Measure[]
   selections: Selection[]
   workoutCatalog: WorkoutCatalog
+  workPicker: WorkPicker
   onEdit: (executionId: string, changes: ExecutionChanges) => Promise<void>
   onEditTimeEntry: (
     entryId: string,
@@ -258,6 +260,7 @@ function ExecutionHistory(props: {
             measures={props.measures}
             selections={props.selections}
             workoutCatalog={props.workoutCatalog}
+            workPicker={props.workPicker}
             onSubmit={async (changes) => {
               await props.onEdit(execution.id, changes)
               setEditingId(null)

@@ -25,13 +25,13 @@ const groups = {
     'painel-graficos.mjs', 'painel-periodos.mjs', 'painel-comparacao.mjs', 'painel-tags.mjs',
     'cronometro-inicio.mjs', 'cronometro-escolha.mjs', 'navegacao.mjs', 'cartoes.mjs', 'rascunhos.mjs',
     's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs', 's5-lapis.mjs', 's6-chips.mjs', 'o3-obras.mjs',
-    'o4a-registrar.mjs', 'o4b-painel.mjs',
+    'o4a-registrar.mjs', 'o4b-painel.mjs', 'o4c-lapis.mjs',
   ],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
     'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs', 's5-layout.mjs', 's6-layout.mjs',
-    'o3-layout.mjs', 'o4a-layout.mjs', 'o4b-layout.mjs',
+    'o3-layout.mjs', 'o4a-layout.mjs', 'o4b-layout.mjs', 'o4c-layout.mjs',
   ],
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'

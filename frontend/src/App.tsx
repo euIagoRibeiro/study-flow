@@ -38,6 +38,7 @@ import type {
   WorkLink,
   WorkoutCatalog,
   WorkoutExercise,
+  WorkPicker,
 } from './types'
 import { indexTags } from './tags'
 import { writeTimerChoices } from './timerMemory'
@@ -515,6 +516,7 @@ function App() {
       recentExerciseIds(executions, markerId, indexTags(tags)),
     create: createExercise,
   }
+  const workPicker: WorkPicker = { works, tasks, refresh: refreshWorks }
 
   const exerciseActions: ExerciseActions = {
     async rename(id, name) {
@@ -544,7 +546,7 @@ function App() {
   const worksRequest = useRef(0)
   function refreshWorks() {
     const request = ++worksRequest.current
-    worksApi.listWorks().then(
+    return worksApi.listWorks().then(
       (list) => {
         if (request === worksRequest.current) setWorks(list)
       },
@@ -715,6 +717,7 @@ function App() {
               measures={measures}
               selections={selections}
               workoutCatalog={workoutCatalog}
+              workPicker={workPicker}
               onCreate={addTask}
               onEdit={editTask}
               onArchive={archiveTask}
@@ -759,6 +762,7 @@ function App() {
               measures={measures}
               selections={selections}
               workoutCatalog={workoutCatalog}
+              workPicker={workPicker}
               onEditExecution={editExecution}
               onEditTimeEntry={editTimeEntry}
             />

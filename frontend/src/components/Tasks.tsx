@@ -3,6 +3,7 @@ import type {
   Measure,
   Selection,
   WorkoutCatalog,
+  WorkPicker,
   ExecutionChanges,
   NewTask,
   Tag,
@@ -20,6 +21,7 @@ function Tasks(props: {
   measures: Measure[]
   selections: Selection[]
   workoutCatalog: WorkoutCatalog
+  workPicker: WorkPicker
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
   onArchive: (taskId: string) => void
   onReactivate: (taskId: string) => void
@@ -62,6 +64,7 @@ function Tasks(props: {
           measures={props.measures}
           selections={props.selections}
           workoutCatalog={props.workoutCatalog}
+          workPicker={props.workPicker}
           onEdit={props.onEdit}
           onArchive={props.onArchive}
           onReactivate={props.onReactivate}

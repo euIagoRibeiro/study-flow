@@ -7,7 +7,8 @@
 // antes". O deadlock dela não dá pra forçar aqui: mora dentro do UPDATE da raiz,
 // entre travar o registro e conferir as FKs (provado com um trigger de sonda, em
 // banco temporário; ver docs/progresso.md, O2b).
-// Casos 8–10: o Finalizar do painel trocando a obra (O4b).
+// Casos 8–10: o Finalizar do painel trocando a obra (O4b). Casos 11–14: o lápis
+// trocando a obra de um registro fechado (O4c).
 // Prefixo teste-corrida-o; apaga tudo no finally (pg).
 import pg from 'pg'
 import { API } from '../config.mjs'
@@ -272,6 +273,78 @@ try {
     check('finalizar A→B, apagar a B: Finalizar grava a B', p.status === 200 && (await workOf(id)) === b.id && (await doneOf(id)), detail(p))
     check('finalizar A→B, apagar a B: DELETE responde 409', d.status === 409, detail(d))
     check('finalizar A→B, apagar a B: a B fica', await exists(b.id))
+  }
+
+  // 11–14. O lápis (O4c) trocando a obra de um registro FECHADO, sem trocar a raiz
+  // (o pedido do lápis leva o caminho do registro)
+  const lapis = (rid, workId) => put(rid, { workId, rootTagId: R1.id, tagIds: [] })
+  const race = (p) => Promise.race([p, new Promise((s) => setTimeout(() => s({ status: 'preso' }), 2000))])
+  // 11. Lápis A → B parado nas tags; DELETE da A: 409 na hora (o gravado ainda
+  // aponta pra A), como no Finalizar (caso 8)
+  {
+    const a = await work()
+    const b = await work()
+    const id = await record({ workId: a.id })
+    await parkOnTags()
+    const gravar = lapis(id, b.id)
+    check('lápis A→B, apagar a A: PUT parado depois de gravar a B', await blocked(1, mine))
+    const d = await race(api('DELETE', `/works/${a.id}`))
+    check('lápis A→B, apagar a A: DELETE responde 409 sem esperar', d.status === 409, detail(d))
+    await hold.query('ROLLBACK')
+    const p = await gravar
+    check('lápis A→B, apagar a A: PUT grava a B', p.status === 200 && (await workOf(id)) === b.id, detail(p))
+    check('lápis A→B, apagar a A: a A fica', await exists(a.id))
+  }
+
+  // 12. DELETE da B chega antes do lápis A → B: 400, e o pedido inteiro volta
+  // (nem a descrição nova fica)
+  {
+    const a = await work()
+    const b = await work()
+    const id = await record({ workId: a.id })
+    await hold.query('BEGIN')
+    await hold.query('DELETE FROM works WHERE id = $1', [b.id])
+    const gravar = put(id, { description: 'lápis novo', workId: b.id, rootTagId: R1.id, tagIds: [] })
+    check('lápis A→B, B apagada antes: PUT parado na B', await blocked(1, mine))
+    await hold.query('COMMIT')
+    const p = await gravar
+    const row = (await pool.query('SELECT work_id, description FROM task_executions WHERE id = $1', [id])).rows[0]
+    check('lápis A→B, B apagada antes: 400 "Obra não encontrada"', p.status === 400 && p.body?.error === 'Obra não encontrada', detail(p))
+    check('lápis A→B, B apagada antes: registro intacto (a A e a descrição de antes)', row.work_id === a.id && row.description === 'corrida', JSON.stringify(row))
+  }
+
+  // 13. Lápis A → B chega antes (parado nas tags, com a B travada); DELETE da B espera
+  {
+    const a = await work()
+    const b = await work()
+    const id = await record({ workId: a.id })
+    await parkOnTags()
+    const gravar = lapis(id, b.id)
+    check('lápis A→B, apagar a B: PUT parado', await blocked(1, mine))
+    const apagar = api('DELETE', `/works/${b.id}`)
+    check('lápis A→B, apagar a B: DELETE espera o PUT', await blocked(2, mine))
+    await hold.query('ROLLBACK')
+    const [p, d] = await Promise.all([gravar, apagar])
+    check('lápis A→B, apagar a B: PUT grava a B', p.status === 200 && (await workOf(id)) === b.id, detail(p))
+    check('lápis A→B, apagar a B: DELETE responde 409', d.status === 409, detail(d))
+    check('lápis A→B, apagar a B: a B fica', await exists(b.id))
+  }
+
+  // 14. Lápis A → "Nenhuma obra" parado nas tags; DELETE da A. Medido: 409 na hora
+  // (o gravado ainda aponta pra A); o PUT grava sem obra e a A fica, agora sem
+  // registros (apagar de novo funciona)
+  {
+    const a = await work()
+    const id = await record({ workId: a.id })
+    await parkOnTags()
+    const gravar = lapis(id, null)
+    check('lápis A→nenhuma, apagar a A: PUT parado', await blocked(1, mine))
+    const d = await race(api('DELETE', `/works/${a.id}`))
+    check('lápis A→nenhuma, apagar a A: DELETE responde 409 sem esperar', d.status === 409, detail(d))
+    await hold.query('ROLLBACK')
+    const p = await gravar
+    check('lápis A→nenhuma, apagar a A: PUT grava sem obra', p.status === 200 && (await workOf(id)) === null, detail(p))
+    check('lápis A→nenhuma, apagar a A: a A fica', await exists(a.id))
   }
 } catch (err) {
   check(`bateria sem erro inesperado: ${err.message}`, false)

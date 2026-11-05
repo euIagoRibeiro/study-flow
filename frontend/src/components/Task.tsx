@@ -12,6 +12,7 @@ import type {
   Measure,
   Selection,
   WorkoutCatalog,
+  WorkPicker,
   CompletedExecution,
   ExecutionChanges,
   NewTask,
@@ -60,6 +61,7 @@ function Task(props: {
   measures: Measure[]
   selections: Selection[]
   workoutCatalog: WorkoutCatalog
+  workPicker: WorkPicker
   openForm: OpenForm
   onToggle: (form: NonNullable<OpenForm>) => void
   onEdit: (taskId: string, changes: NewTask) => Promise<void>
@@ -243,6 +245,7 @@ function Task(props: {
               measures={props.measures}
               selections={props.selections}
               workoutCatalog={props.workoutCatalog}
+              workPicker={props.workPicker}
               onEdit={props.onEditExecution}
               onEditTimeEntry={props.onEditTimeEntry}
             />

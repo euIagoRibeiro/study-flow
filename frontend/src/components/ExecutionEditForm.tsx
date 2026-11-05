@@ -1,4 +1,10 @@
-import { Fragment, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import {
@@ -36,18 +42,27 @@ import type {
   Tag,
   WorkoutCatalog,
   WorkoutExercise,
+  WorkPicker,
 } from '../types'
 import { MINUTES_ERROR, parseMinutes } from '../numbers'
 import { useMeasure } from '../useMeasure'
 import { useSelectionChoices } from '../useSelectionChoices'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
+import {
+  LINK_ERROR,
+  LINK_PATTERN,
+  recordError,
+  workMeasureNote,
+} from '../works'
 import DraftNotice from './DraftNotice'
 import EstimateField from './EstimateField'
 import FormError from './FormError'
+import LinkField from './LinkField'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
 import PhaseField from './PhaseField'
 import SelectionChoices from './SelectionChoices'
 import TagFields from './TagFields'
+import WorkField from './WorkField'
 import WorkoutSection from './WorkoutSection'
 
 type EditProps = {
@@ -57,6 +72,7 @@ type EditProps = {
   selections: Selection[]
   estimateMinutes: number | null // a estimativa que o registro já tem
   workoutCatalog: WorkoutCatalog
+  workPicker: WorkPicker
   onSubmit: (changes: ExecutionChanges) => Promise<unknown>
   // Fecha sem gravar (o formulário com treino é longo: o lápis que abriu
   // fica lá em cima)
@@ -75,6 +91,8 @@ type EditDraft = {
   measureTexts: MeasureTexts
   workout: WorkoutExercise[]
   choices?: SelectionChoiceMap // só o tocado; ausente em rascunho de antes do S5c
+  workId?: string | null // ausentes em rascunho de antes do O4c
+  link?: string
 }
 
 const filledTexts = (texts: MeasureTexts) =>
@@ -131,6 +149,8 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
           : {},
       workout: execution.workout ?? [],
       choices: {},
+      workId: execution.workId ?? null,
+      link: execution.linkUrl ?? '',
     }
   })
   // O que ficou digitado antes (ir às tags e voltar, por exemplo); cada parte
@@ -152,6 +172,8 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
       !isTexts(d.measureTexts) ||
       !isWorkout(d.workout) ||
       !(d.choices === undefined || isChoices(d.choices)) ||
+      !(d.workId === undefined || d.workId === null || isText(d.workId)) ||
+      !(d.link === undefined || isText(d.link)) ||
       !d.workout.every((item) =>
         props.workoutCatalog.exercises.some((x) => x.id === item.exerciseId),
       )
@@ -167,6 +189,37 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     restored?.completedAt ?? pristine.completedAt,
   )
   const [minutes, setMinutes] = useState(restored?.minutes ?? initialMinutes)
+  // Obra do rascunho que sumiu: a do registro
+  const [workId, setWorkId] = useState(() =>
+    typeof restored?.workId === 'string' &&
+    props.workPicker.works.some((w) => w.id === restored.workId)
+      ? restored.workId
+      : restored?.workId === null
+        ? null
+        : (pristine.workId ?? null),
+  )
+  const work = props.workPicker.works.find((w) => w.id === workId) ?? null
+  const [link, setLink] = useState(restored?.link ?? pristine.link ?? '')
+  // A obra gravada fora da lista carregada (criada em outro aparelho depois
+  // de a página abrir): busca as obras uma vez, só nesse caso
+  const [workLoad, setWorkLoad] = useState<'nada' | 'buscando' | 'feito'>(() =>
+    execution.workId &&
+    !props.workPicker.works.some((w) => w.id === execution.workId)
+      ? 'buscando'
+      : 'nada',
+  )
+  useEffect(() => {
+    if (workLoad !== 'buscando') return
+    let live = true
+    void props.workPicker.refresh().then(() => {
+      if (live) setWorkLoad('feito')
+    })
+    return () => {
+      live = false
+    }
+    // só na abertura do lápis
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [selection, setSelection] = useState(() =>
     restored?.path
       ? { path: restored.path, legacyCount: 0 }
@@ -205,6 +258,8 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
       measureTexts: filledTexts(measure.texts),
       workout: draft,
       choices: choices.touched,
+      workId,
+      link,
     } satisfies EditDraft,
     pristine,
   )
@@ -242,6 +297,11 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     const sent = measure.toSend()
     if ('error' in sent) {
       setError(sent.error)
+      return
+    }
+    const url = link.trim()
+    if (url !== '' && !LINK_PATTERN.test(url)) {
+      setError(LINK_ERROR)
       return
     }
     const empty =
@@ -287,12 +347,18 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
         ...(sent.values ? { measureValues: sent.values } : {}),
         ...(sendWorkout ? { workout: draft } : {}),
         ...(selectionOptionIds ? { selectionOptionIds } : {}),
+        // Só se mudaram em relação ao registro (null limpa): a obra escolhida
+        // aqui não mexe no caminho, é correção do passado
+        ...(workId !== (execution.workId ?? null) ? { workId } : {}),
+        ...((url || null) !== (execution.linkUrl ?? null)
+          ? { linkUrl: url || null }
+          : {}),
       })
       clearDraft(draftKey)
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 400
-          ? err.message
+          ? recordError(err.message)
           : 'Não foi possível salvar. Tente de novo.',
       )
       return
@@ -302,11 +368,34 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     setError('')
   }
 
-  // Obra e link no lápis: O4b (sem o campo, o pedido não manda workId nem
-  // linkUrl, e o servidor mantém)
+  const measureNote = work
+    ? workMeasureNote(work, measure.measure, props.measures)
+    : null
   const blocks: Record<FormField, ReactNode> = {
-    obra: null,
-    link: null,
+    obra: (
+      <WorkField
+        works={props.workPicker.works}
+        value={workId}
+        onChange={setWorkId}
+        tags={props.tags}
+        measures={props.measures}
+        taskId={execution.taskId}
+        tasks={props.workPicker.tasks}
+        missing={
+          workLoad === 'buscando'
+            ? 'Carregando a obra…'
+            : 'Obra deste registro (não carregou)'
+        }
+      />
+    ),
+    link: (
+      <LinkField
+        value={link}
+        onChange={setLink}
+        // Lido só na montagem: o registro (ou o rascunho) já tem link
+        startOpen={link.trim() !== ''}
+      />
+    ),
     tags: (
       <TagFields
         tags={props.tags}
@@ -335,13 +424,23 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
       />
     ),
     medida: (
-      <MeasureFields
-        measure={measure.measure}
-        texts={measure.texts}
-        onChange={measure.change}
-        keptKindIds={measure.keptKindIds}
-        oldValues={measure.oldValues}
-      />
+      <>
+        <MeasureFields
+          measure={measure.measure}
+          texts={measure.texts}
+          onChange={measure.change}
+          keptKindIds={measure.keptKindIds}
+          oldValues={measure.oldValues}
+        />
+        {measureNote && (
+          <p
+            data-work-field=""
+            className="font-texto text-meta [overflow-wrap:anywhere] text-tinta-suave"
+          >
+            {measureNote}
+          </p>
+        )}
+      </>
     ),
   }
 
