@@ -6,7 +6,8 @@
 // (títulos de 100 letras, sem espaço, em todos os status) e a obra escolhida com
 // as 3 marcas, a linha da tarefa padrão (tarefa de 100 letras) e a nota da
 // medida, com uma medida de 30 letras injetada no caminho; link de 2000
-// caracteres. Nada é gravado (o Salvar não é tocado): a bateria confere que
+// caracteres. "longa-tipos": o mesmo, com a medida de 30 letras COM tipos (o
+// rótulo vira a legenda do fieldset). Nada é gravado (o Salvar não é tocado): a bateria confere que
 // nenhum pedido de escrita saiu. Uma checagem por texto medido (o total não
 // cresce quando falha) e a contagem mínima de textos, fixa.
 import puppeteer from 'puppeteer-core'
@@ -42,6 +43,9 @@ const longTask = { id: crypto.randomUUID(), title: 't'.repeat(100), frequency: '
 const stale = fake(99, { status: 'em_andamento', measureId: capitulos.id, measureCurrent: false, defaultTagActive: false, defaultTaskActive: false, defaultTaskId: longTask.id })
 const injectedWorks = JSON.stringify([...works, ...Array.from({ length: 20 }, (_, i) => fake(i)), stale])
 const injectedMeasures = JSON.stringify([...measures, longMeasure])
+// A mesma medida com tipos: o rótulo vira a legenda do fieldset
+const injectedKinds = JSON.stringify([...measures, { ...longMeasure, kinds: [{ id: crypto.randomUUID(), name: 'leitura', active: true }, { id: crypto.randomUUID(), name: 'questões', active: true }] }])
+let measuresBody = injectedMeasures
 const injectedTasks = JSON.stringify([...tasks, longTask])
 const LINK = `https://exemplo.com/${'a'.repeat(1980)}`
 
@@ -58,7 +62,7 @@ try {
     if (req.method() !== 'GET' && req.method() !== 'OPTIONS') writes.push(`${req.method()} ${req.url()}`)
     const body = !injected || req.method() !== 'GET' ? null
       : req.url() === `${API}/works` ? injectedWorks
-        : req.url() === `${API}/measures` ? injectedMeasures
+        : req.url() === `${API}/measures` ? measuresBody
           : req.url() === `${API}/tasks` ? injectedTasks : null
     if (body) req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body })
     else req.continue()
@@ -92,8 +96,9 @@ try {
   }
   const states = {
     seed: async (enter) => { injected = false; await enter() },
-    longa: async (enter) => {
+    longa: async (enter, body = injectedMeasures) => {
       injected = true
+      measuresBody = body
       await enter()
       await page.evaluate((FORM, id) => {
         const s = [...document.querySelectorAll(`${FORM} label`)].find((l) => l.querySelector('span')?.textContent === 'Obra').querySelector('select')
@@ -109,6 +114,9 @@ try {
         el.dispatchEvent(new Event('input', { bubbles: true }))
       }, LINK)
       await page.waitForNetworkIdle()
+    },
+    'longa-tipos': async (enter) => {
+      await states.longa(enter, injectedKinds)
     },
   }
   for (const [place, enter] of Object.entries(places)) for (const [state, into] of Object.entries(states)) {
@@ -134,12 +142,14 @@ try {
         const notes = form.querySelectorAll('[data-work-field] p, p[data-work-field]').length
         const controls = [...form.querySelectorAll('[data-work-field] select, [data-link-field] input, [data-link-field] button')]
         const linkButton = form.querySelector('[data-link-field] button')
+        const legend = [...form.querySelectorAll('fieldset > legend')].some((l) => l.textContent.startsWith('M'.concat('m'.repeat(29))))
         return {
           out,
           texts,
           notes,
           fields: form.querySelectorAll('[data-work-field] select').length + form.querySelectorAll('[data-link-field] input, [data-link-field] button').length,
           linkOpen: form.querySelector('[data-link-field] input') !== null,
+          legend,
           buttonHeight: linkButton ? linkButton.getBoundingClientRect().height : null,
           scroll: document.documentElement.scrollWidth - useful,
           formOut: Math.max(0, box.right - card.right, card.left - box.left),
@@ -153,7 +163,8 @@ try {
       check(`${tag}: campos Obra e Link presentes`, m.fields === 2, String(m.fields))
       if (state === 'seed') check(`${tag}: Link fechado, "+ Link" com ≥ 44px de altura`, !m.linkOpen && m.buttonHeight >= 44, `${m.linkOpen} ${m.buttonHeight}px`)
       else check(`${tag}: Link aberto`, m.linkOpen)
-      check(`${tag}: notas esperadas (${state === 'longa' ? 5 : 0})`, m.notes === (state === 'longa' ? 5 : 0), String(m.notes))
+      check(`${tag}: notas esperadas (${state === 'seed' ? 0 : 5})`, m.notes === (state === 'seed' ? 0 : 5), String(m.notes))
+      if (state === 'longa-tipos') check(`${tag}: medida com tipos, legenda de 30 letras presente`, m.legend, String(m.legend))
       check(`${tag}: textos medidos: ${m.texts}, esperado ao menos ${m.notes + 2}`, m.texts > 0 && m.texts >= m.notes + 2, String(m.texts))
       check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)
       check(`${tag}: formulário dentro do cartão`, m.formOut <= 0.5, `${m.formOut}px`)

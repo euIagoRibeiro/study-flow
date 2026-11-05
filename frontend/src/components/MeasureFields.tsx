@@ -36,7 +36,7 @@ function MeasureFields(props: {
         (kinds.length > 0 ? (
           // min-w-0: fieldset não encolhe sozinho (lição da M4)
           <fieldset className="flex min-w-0 flex-col gap-1.5">
-            <legend className="mb-1.5 text-sm text-tinta-suave">
+            <legend className="mb-1.5 text-sm [overflow-wrap:anywhere] text-tinta-suave">
               {title} (opcional)
             </legend>
             {/* Um embaixo do outro no celular (pedido do uso real: a grade
