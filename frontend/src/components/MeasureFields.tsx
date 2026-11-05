@@ -65,7 +65,9 @@ function MeasureFields(props: {
           </fieldset>
         ) : (
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm text-tinta-suave">{title} (opcional)</span>
+            <span className="text-sm [overflow-wrap:anywhere] text-tinta-suave">
+              {title} (opcional)
+            </span>
             <input
               type="text"
               inputMode={inputMode}
