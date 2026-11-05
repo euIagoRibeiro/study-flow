@@ -21,6 +21,7 @@ import type {
   WorkPicker,
 } from '../types'
 import { formatSets } from '../workouts'
+import { linkHost } from '../works'
 import CompactIconButton from './CompactIconButton'
 import ExecutionEditForm from './ExecutionEditForm'
 import { ChevronDownIcon, PencilIcon } from './icons'
@@ -133,6 +134,12 @@ function ExecutionHistory(props: {
     // quem diz é a sessão estimada, na lista
     const allEstimated =
       entries.length > 0 && entries.every((entry) => entry.estimated)
+    // Obra pelo título de hoje (renomear é dinâmico), sem o status: o status é
+    // o estado de hoje, e o cartão é do passado. Fora da lista carregada: sem chip
+    const work = execution.workId
+      ? props.workPicker.works.find((w) => w.id === execution.workId)
+      : undefined
+    const host = execution.linkUrl ? linkHost(execution.linkUrl) : null
 
     return (
       <article className={`${cardClass} flex flex-col gap-1`}>
@@ -155,6 +162,21 @@ function ExecutionHistory(props: {
           <p className="font-texto text-conteudo break-words">
             {execution.description}
           </p>
+        )}
+        {/* Lista própria, antes das tags (a ordem do formulário); só mostra */}
+        {work && (
+          <ul
+            data-work-chips=""
+            aria-label="Obra"
+            className="flex flex-wrap gap-1.5 py-0.5"
+          >
+            <li className={tagChipClass}>
+              <span className="wrap-anywhere">Obra: </span>
+              <span className="font-semibold wrap-anywhere text-tinta">
+                {work.title}
+              </span>
+            </li>
+          </ul>
         )}
         {leaves.length > 0 && (
           <ul aria-label="Tags" className="flex flex-wrap gap-1.5 py-0.5">
@@ -235,6 +257,21 @@ function ExecutionHistory(props: {
                   className={`h-4 w-4 transition-transform ${sessionsOpen ? 'rotate-180' : ''}`}
                 />
               </button>
+            )}
+            {/* Só o domínio; nova aba sem referência nem origem. Nada é
+                buscado do site (sem ícone, sem prévia) */}
+            {host && execution.linkUrl && (
+              <a
+                data-record-link=""
+                href={execution.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Abrir link do registro em ${host} (nova aba)`}
+                className={`${textButtonClass} min-w-0 wrap-anywhere`}
+              >
+                {host}
+                <span aria-hidden="true">↗</span>
+              </a>
             )}
           </div>
           <CompactIconButton

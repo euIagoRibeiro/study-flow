@@ -181,6 +181,21 @@ export function recordError(message: string): string {
   return message
 }
 
+// O link do registro no Histórico mostra só o domínio, sem "www.". Endereço
+// que não é http/https não vira link (o banco já garante; a tela confere de
+// novo). O domínio vem do navegador (com acento, na forma xn--)
+export function linkHost(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null
+    }
+    return parsed.hostname.replace(/^www\./, '') || null
+  } catch {
+    return null
+  }
+}
+
 export const TITLE_ERROR = 'Escreva um título.'
 export const LINK_ERROR =
   'Link: um endereço que começa com http:// ou https://.'
