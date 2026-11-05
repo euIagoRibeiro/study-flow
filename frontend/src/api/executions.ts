@@ -43,7 +43,8 @@ function putExecution(
     measureValues?: MeasureValue[]
     workout?: WorkoutExercise[]
     selectionOptionIds?: string[]
-  } & Partial<TagChoice>,
+  } & Partial<TagChoice> &
+    Partial<WorkLink>,
 ): Promise<SavedExecution> {
   return request<SavedExecution>(`/executions/${id}`, {
     method: 'PUT',
@@ -100,13 +101,15 @@ export function startExecution(
   })
 }
 
-// measureValues e selectionOptionIds undefined = não mexer (o servidor mantém)
+// measureValues e selectionOptionIds undefined = não mexer (o servidor mantém);
+// obra e link só os que vierem (null limpa)
 export function finishExecution(
   id: string,
   description: string,
   tags: Partial<TagChoice>,
   measureValues: MeasureValue[] | undefined,
   selectionOptionIds: string[] | undefined,
+  link: Partial<WorkLink>,
 ): Promise<SavedExecution> {
   return putExecution(id, {
     description,
@@ -114,11 +117,13 @@ export function finishExecution(
     ...tags,
     ...(measureValues ? { measureValues } : {}),
     ...(selectionOptionIds ? { selectionOptionIds } : {}),
+    ...link,
   })
 }
 
 // Desfazer volta tudo ao que era: descrição, tags, medida, treino e seleções de
-// antes (ausentes, o servidor manteria os do Finalizar)
+// antes (ausentes, o servidor manteria os do Finalizar); obra e link, os que o
+// Finalizar mudou
 export function reopenExecution(
   id: string,
   previousDescription: string | null,
@@ -126,6 +131,7 @@ export function reopenExecution(
   previousMeasureValues: MeasureValue[],
   previousWorkout: WorkoutExercise[],
   previousSelectionOptionIds: string[],
+  previousLink: Partial<WorkLink>,
 ): Promise<SavedExecution> {
   return putExecution(id, {
     description: previousDescription,
@@ -134,6 +140,7 @@ export function reopenExecution(
     measureValues: previousMeasureValues,
     workout: previousWorkout,
     selectionOptionIds: previousSelectionOptionIds,
+    ...previousLink,
   })
 }
 

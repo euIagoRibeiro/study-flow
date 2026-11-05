@@ -310,6 +310,7 @@ function App() {
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
     selectionOptionIds: string[] | undefined,
+    link: Partial<WorkLink>,
   ) {
     keepSaved(
       await executionsApi.finishExecution(
@@ -318,6 +319,7 @@ function App() {
         tags,
         measureValues,
         selectionOptionIds,
+        link,
       ),
     )
   }
@@ -330,6 +332,7 @@ function App() {
     previousMeasureValues: MeasureValue[],
     previousWorkout: WorkoutExercise[],
     previousSelectionOptionIds: string[],
+    previousLink: Partial<WorkLink>,
     resumeEntryId: string | null,
   ) {
     try {
@@ -341,11 +344,20 @@ function App() {
           previousMeasureValues,
           previousWorkout,
           previousSelectionOptionIds,
+          previousLink,
         ),
       )
     } catch (error) {
       console.error(error)
-      setSaveError('Não foi possível desfazer. A execução continua finalizada.')
+      // A frase do link é a mesma do Registrar; a da obra, própria (não há o
+      // que escolher no Desfazer)
+      setSaveError(
+        !(error instanceof ApiError && error.status === 400)
+          ? 'Não foi possível desfazer. A execução continua finalizada.'
+          : error.message === 'Obra não encontrada'
+            ? 'Não foi possível desfazer: a obra de antes não existe mais. A execução continua finalizada.'
+            : `Não foi possível desfazer: ${recordError(error.message)} A execução continua finalizada.`,
+      )
       return
     }
     // Depois da execução, nunca antes: o servidor só reabre sessão de

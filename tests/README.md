@@ -32,6 +32,8 @@ npm run api
 npm run telas
 npm run layout
 npm run telas -- a3e1   # só as baterias cujo nome contém "a3e1"
+npm run telas -- painel.mjs   # nome exato: só ela (não a s5-painel nem a o4b-painel)
+# FILTRO_EXATO=1 recusa um filtro que não seja o nome exato de uma bateria
 ```
 
 Uma bateria só passa com **saída 0 e "N de N" com N > 0**: a que não achou o

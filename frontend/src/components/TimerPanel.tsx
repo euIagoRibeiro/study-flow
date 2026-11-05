@@ -22,8 +22,11 @@ import type {
   Selection,
   Tag,
   TagChoice,
+  Task,
   TaskExecution,
   TimeEntry,
+  Work,
+  WorkLink,
   WorkoutExercise,
 } from '../types'
 import {
@@ -41,13 +44,32 @@ import { useMeasure } from '../useMeasure'
 import { useSelectionChoices } from '../useSelectionChoices'
 import { useWorkoutSync, type WorkoutTarget } from '../useWorkoutSync'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
+import {
+  defaultPath,
+  LINK_ERROR,
+  LINK_PATTERN,
+  recordError,
+  workMeasureNote,
+} from '../works'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
+import LinkField from './LinkField'
 import MeasureFields, { MeasureWarning } from './MeasureFields'
 import PhaseField from './PhaseField'
 import SelectionChoices from './SelectionChoices'
 import TagFields from './TagFields'
+import WorkField from './WorkField'
 import WorkoutSection from './WorkoutSection'
+
+// O que a memória do painel guarda, com o que acabou de mudar
+type Remembered = {
+  path: string[]
+  phase: Phase | null
+  description: string
+  measureTexts: MeasureTexts
+  workId: string | null
+  link: string
+}
 
 function TimerPanel(props: {
   execution: TaskExecution
@@ -57,6 +79,8 @@ function TimerPanel(props: {
   measures: Measure[]
   selections: Selection[]
   exercises: Exercise[]
+  works: Work[]
+  tasks: Task[]
   // Recentes no contexto (pela tag marcadora)
   recentExerciseIds: (markerId: string) => string[]
   // tags null = caminho já gravado, só o treino
@@ -78,6 +102,8 @@ function TimerPanel(props: {
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
     selectionOptionIds: string[] | undefined,
+    // Só o que mudou em relação ao registro (ausente, o servidor mantém)
+    link: Partial<WorkLink>,
   ) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
@@ -105,6 +131,19 @@ function TimerPanel(props: {
       // Valores da medida (N3): de qual caminho eram, pra só valerem nele
       measureTexts: isTexts(memory.measureTexts) ? memory.measureTexts : null,
       measurePath: memory.path.join('/'),
+      // Obra e link: se o servidor não mudou desde então; obra que sumiu, a dele
+      work:
+        memory.workBase === (execution.workId ?? null) &&
+        (memory.workId === null ||
+          (typeof memory.workId === 'string' &&
+            props.works.some((w) => w.id === memory.workId)))
+          ? { id: memory.workId }
+          : null,
+      link:
+        memory.linkBase === (execution.linkUrl ?? null) &&
+        typeof memory.link === 'string'
+          ? memory.link
+          : null,
     }
   })
   const [description, setDescription] = useState(
@@ -122,22 +161,36 @@ function TimerPanel(props: {
       : (execution.phase ?? props.suggestPhase(props.initial.path)),
   )
   const showPhase = phaseApplies(selection.path, tagsById)
+  // A obra e o link gravados pelo Iniciar (ou os escolhidos antes de sair)
+  const [workId, setWorkId] = useState(
+    remembered?.work ? remembered.work.id : (execution.workId ?? null),
+  )
+  const work = props.works.find((w) => w.id === workId) ?? null
+  const [link, setLink] = useState(remembered?.link ?? execution.linkUrl ?? '')
 
   // Guarda o que está na tela agora (com o que o servidor tinha), a cada
   // mudança feita aqui: sair e voltar não perde a escolha
-  function remember(
-    path: string[],
-    phaseValue: Phase | null,
-    text: string,
-    texts: MeasureTexts,
-  ) {
+  function remember(next: Partial<Remembered> = {}) {
+    const value: Remembered = {
+      path: selection.path,
+      phase,
+      description,
+      measureTexts: measure.texts,
+      workId: work?.id ?? null,
+      link,
+      ...next,
+    }
     writeTimerMemory(execution.id, {
       base: serverPathKey,
-      path,
-      phase: phaseValue,
+      path: value.path,
+      phase: value.phase,
       descriptionBase: execution.description ?? null,
-      description: text,
-      measureTexts: texts,
+      description: value.description,
+      measureTexts: value.measureTexts,
+      workBase: execution.workId ?? null,
+      workId: value.workId,
+      linkBase: execution.linkUrl ?? null,
+      link: value.link,
     })
   }
   // Voltou pelo Desfazer com medida: os campos começam nos valores dela
@@ -195,6 +248,34 @@ function TimerPanel(props: {
     marker === null && execution.workout
       ? `Finalizar com esse caminho vai remover o treino (${describeWorkout(execution.workout)}).`
       : undefined
+  // Caminho novo: fase pela sugestão, campos da medida nova (vazios), o treino
+  // segue o caminho
+  function changePath(path: string[], also: Partial<Remembered> = {}) {
+    const nextPhase = props.suggestPhase(path)
+    setSelection({ path, legacyCount: 0 })
+    setPhase(nextPhase)
+    measure.changePath(path)
+    workout.retarget(targetFor(path, nextPhase))
+    remember({ path, phase: nextPhase, measureTexts: {}, ...also })
+  }
+
+  // Como no Registrar: a obra sobrescreve o caminho; o mesmo caminho não mexe
+  // em nada; caminho padrão arquivado não preenche; "Nenhuma obra" mantém
+  function chooseWork(id: string | null) {
+    setWorkId(id)
+    const chosen = props.works.find((w) => w.id === id)
+    const next = chosen ? defaultPath(chosen, props.tags) : []
+    if (
+      next.length > 0 &&
+      next.join('/') !== selection.path.join('/') &&
+      isChoosablePath(next, tagsById)
+    ) {
+      changePath(next, { workId: id })
+    } else {
+      remember({ workId: id })
+    }
+  }
+
   const workoutBlocks =
     workout.status === 'saving' ||
     (workout.status === 'error' && marker !== null)
@@ -242,6 +323,22 @@ function TimerPanel(props: {
       setError(sent.error)
       return
     }
+    const url = link.trim()
+    if (url !== '' && !LINK_PATTERN.test(url)) {
+      setError(LINK_ERROR)
+      return
+    }
+    // Obra e link só se mudaram em relação ao registro: uma tela velha não
+    // sobrescreve o que mudou em outro aparelho
+    const chosenWork = work?.id ?? null
+    const changed: Partial<WorkLink> = {
+      ...(chosenWork !== (execution.workId ?? null)
+        ? { workId: chosenWork }
+        : {}),
+      ...((url || null) !== (execution.linkUrl ?? null)
+        ? { linkUrl: url || null }
+        : {}),
+    }
     setSubmitting(true)
     try {
       await onFinish(
@@ -255,13 +352,14 @@ function TimerPanel(props: {
         // A lista vai sempre: é o que está na tela, inclusive depois de a
         // gravação do caminho (treino ao vivo) ter tirado escolhas do servidor
         selection.legacyCount > 0 ? undefined : choices.optionIds,
+        changed,
       )
       // Gravado: a escolha da tela não tem mais o que guardar
       clearTimerMemory(execution.id)
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 400
-          ? err.message
+          ? recordError(err.message)
           : 'Não foi possível finalizar. Tente de novo.',
       )
       return
@@ -271,24 +369,37 @@ function TimerPanel(props: {
     setError('')
   }
 
-  // Obra e link no painel: O4b (a obra gravada pelo Iniciar fica: o Finalizar
-  // não manda workId, e ausente mantém)
+  const measureNote = work
+    ? workMeasureNote(work, measure.measure, props.measures)
+    : null
   const blocks: Record<FormField, ReactNode> = {
-    obra: null,
-    link: null,
+    obra: (
+      <WorkField
+        works={props.works}
+        value={work?.id ?? null}
+        onChange={chooseWork}
+        tags={props.tags}
+        measures={props.measures}
+        taskId={execution.taskId}
+        tasks={props.tasks}
+      />
+    ),
+    link: (
+      <LinkField
+        value={link}
+        onChange={(text) => {
+          setLink(text)
+          remember({ link: text })
+        }}
+        // Lido só na montagem: o registro (ou a memória) já tem link
+        startOpen={link.trim() !== ''}
+      />
+    ),
     tags: (
       <TagFields
         tags={props.tags}
         value={selection.path}
-        onChange={(path) => {
-          const nextPhase = props.suggestPhase(path)
-          setSelection({ path, legacyCount: 0 })
-          setPhase(nextPhase)
-          measure.changePath(path)
-          workout.retarget(targetFor(path, nextPhase))
-          // caminho novo, campos da medida nova (vazios)
-          remember(path, nextPhase, description, {})
-        }}
+        onChange={(path) => changePath(path)}
         keep={[
           ...(execution.rootTagId ? [execution.rootTagId] : []),
           ...execution.tagIds,
@@ -301,7 +412,7 @@ function TimerPanel(props: {
         value={phase}
         onChange={(next) => {
           setPhase(next)
-          remember(selection.path, next, description, measure.texts)
+          remember({ phase: next })
         }}
       />
     ),
@@ -322,19 +433,26 @@ function TimerPanel(props: {
       />
     ),
     medida: (
-      <MeasureFields
-        measure={measure.measure}
-        texts={measure.texts}
-        onChange={(key, text) => {
-          measure.change(key, text)
-          remember(selection.path, phase, description, {
-            ...measure.texts,
-            [key]: text,
-          })
-        }}
-        keptKindIds={measure.keptKindIds}
-        oldValues={measure.oldValues}
-      />
+      <>
+        <MeasureFields
+          measure={measure.measure}
+          texts={measure.texts}
+          onChange={(key, text) => {
+            measure.change(key, text)
+            remember({ measureTexts: { ...measure.texts, [key]: text } })
+          }}
+          keptKindIds={measure.keptKindIds}
+          oldValues={measure.oldValues}
+        />
+        {measureNote && (
+          <p
+            data-work-field=""
+            className="font-texto text-meta [overflow-wrap:anywhere] text-tinta-suave"
+          >
+            {measureNote}
+          </p>
+        )}
+      </>
     ),
   }
 
@@ -399,12 +517,7 @@ function TimerPanel(props: {
               value={description}
               onChange={(event) => {
                 setDescription(event.target.value)
-                remember(
-                  selection.path,
-                  phase,
-                  event.target.value,
-                  measure.texts,
-                )
+                remember({ description: event.target.value })
               }}
               className={fieldClass}
             />

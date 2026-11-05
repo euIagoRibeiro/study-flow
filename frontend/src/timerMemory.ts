@@ -6,7 +6,8 @@ import type { Phase } from './types'
 
 // O que foi escolhido no painel do cronômetro, só na TELA (sessão do
 // navegador): sair e voltar (ou recarregar) não perde. O caminho vale até o
-// 1º exercício, que grava ele no servidor; a descrição, até o Finalizar.
+// 1º exercício, que grava ele no servidor; a descrição, a obra e o link, até
+// o Finalizar.
 // Nada vai pro servidor antes disso (toque acidental não grava lixo, o motivo
 // da A3e). Cada parte guarda o que o servidor tinha quando foi escolhida
 // (`base`, `descriptionBase`): se o servidor mudou depois, vale o servidor.
@@ -18,6 +19,11 @@ export type TimerMemory = {
   descriptionBase: string | null
   description: string
   measureTexts?: MeasureTexts // N3; conferido por quem lê (isTexts)
+  // O4b; ausentes em memória de antes. A obra e o link do servidor na hora
+  workBase?: string | null
+  workId?: string | null
+  linkBase?: string | null
+  link?: string
 }
 
 const key = (executionId: string) => `studyflow:cronometro:${executionId}`

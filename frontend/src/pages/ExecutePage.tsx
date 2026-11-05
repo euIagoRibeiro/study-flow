@@ -78,6 +78,7 @@ function ExecutePage(props: {
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
     selectionOptionIds: string[] | undefined,
+    link: Partial<WorkLink>,
   ) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,
@@ -86,6 +87,7 @@ function ExecutePage(props: {
     previousMeasureValues: MeasureValue[],
     previousWorkout: WorkoutExercise[],
     previousSelectionOptionIds: string[],
+    previousLink: Partial<WorkLink>,
     resumeEntryId: string | null,
   ) => Promise<void>
 }) {
@@ -105,6 +107,7 @@ function ExecutePage(props: {
     previousMeasureValues: MeasureValue[]
     previousWorkout: WorkoutExercise[]
     previousSelectionOptionIds: string[]
+    previousLink: Partial<WorkLink>
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
@@ -201,6 +204,7 @@ function ExecutePage(props: {
     tags: Partial<TagChoice>,
     measureValues: MeasureValue[] | undefined,
     selectionOptionIds: string[] | undefined,
+    link: Partial<WorkLink>,
   ) {
     const execution = props.executions.find((e) => e.id === executionId)
     const resumeEntry = props.timeEntries.find(
@@ -213,6 +217,7 @@ function ExecutePage(props: {
       tags,
       measureValues,
       selectionOptionIds,
+      link,
     )
     setPendingUndo({
       taskId: selectedTask?.id ?? '',
@@ -230,6 +235,12 @@ function ExecutePage(props: {
       // [] = nenhuma: idem
       previousSelectionOptionIds:
         execution?.selections.flatMap((item) => item.optionIds) ?? [],
+      // Simétrico ao Finalizar: só o que ele mudou, com o valor de antes
+      // (null limpa)
+      previousLink: {
+        ...('workId' in link ? { workId: execution?.workId ?? null } : {}),
+        ...('linkUrl' in link ? { linkUrl: execution?.linkUrl ?? null } : {}),
+      },
       resumeEntryId: resumeEntry?.id ?? null,
     })
   }
@@ -244,6 +255,7 @@ function ExecutePage(props: {
       undo.previousMeasureValues,
       undo.previousWorkout,
       undo.previousSelectionOptionIds,
+      undo.previousLink,
       undo.resumeEntryId,
     )
     setUndoing(false)
@@ -441,6 +453,8 @@ function ExecutePage(props: {
           measures={props.measures}
           selections={props.selections}
           exercises={props.exercises}
+          works={props.works}
+          tasks={props.tasks}
           recentExerciseIds={(markerId) =>
             recentExerciseIds(props.executions, markerId, tagsById)
           }

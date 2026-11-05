@@ -7,6 +7,7 @@
 // antes". O deadlock dela não dá pra forçar aqui: mora dentro do UPDATE da raiz,
 // entre travar o registro e conferir as FKs (provado com um trigger de sonda, em
 // banco temporário; ver docs/progresso.md, O2b).
+// Casos 8–10: o Finalizar do painel trocando a obra (O4b).
 // Prefixo teste-corrida-o; apaga tudo no finally (pg).
 import pg from 'pg'
 import { API } from '../config.mjs'
@@ -204,6 +205,73 @@ try {
     await hold.query('ROLLBACK')
     const p = await gravar
     check('status: PUT grava', p.status === 200, detail(p))
+  }
+
+  // 8–10. O Finalizar do painel trocando a obra A pela B (O4b). Registro aberto sem
+  // sessão (fechado e reaberto): não mexe na sessão rodando do seed
+  const openRecord = async (body) => {
+    const rid = await record(body)
+    const r = await put(rid, { completedAt: null })
+    if (r.status !== 200) throw new Error(`reabrir: ${detail(r)}`)
+    return rid
+  }
+  const finalizar = (rid, body) => put(rid, { completedAt: new Date().toISOString(), ...body })
+  const doneOf = async (rid) => (await pool.query('SELECT completed_at FROM task_executions WHERE id = $1', [rid])).rows[0].completed_at !== null
+  // Prende o PUT nas tags, DEPOIS de gravar a obra nova (a raiz é conferida com FOR KEY SHARE)
+  const parkOnTags = async () => {
+    await hold.query('BEGIN')
+    await hold.query('SELECT 1 FROM tags WHERE id = $1 FOR UPDATE', [R1.id])
+  }
+
+  // 8. Finalizar A → B parado nas tags; chega o DELETE da A. Medido: o DELETE não
+  // espera. O que está gravado ainda aponta pra A, e a conferência da FK (FOR KEY
+  // SHARE) não briga com o UPDATE do Finalizar (não muda chave): 409 na hora
+  {
+    const a = await work()
+    const b = await work()
+    const id = await openRecord({ workId: a.id })
+    await parkOnTags()
+    const gravar = finalizar(id, { workId: b.id, rootTagId: R1.id, tagIds: [] })
+    check('finalizar A→B, apagar a A: Finalizar parado depois de gravar a B', await blocked(1, mine))
+    const d = await Promise.race([api('DELETE', `/works/${a.id}`), new Promise((s) => setTimeout(() => s({ status: 'preso' }), 2000))])
+    check('finalizar A→B, apagar a A: DELETE responde 409 sem esperar', d.status === 409, detail(d))
+    await hold.query('ROLLBACK')
+    const p = await gravar
+    check('finalizar A→B, apagar a A: Finalizar grava a B', p.status === 200 && (await workOf(id)) === b.id && (await doneOf(id)), detail(p))
+    check('finalizar A→B, apagar a A: a A fica', await exists(a.id))
+  }
+
+  // 9. DELETE da B chega antes do Finalizar A → B
+  {
+    const a = await work()
+    const b = await work()
+    const id = await openRecord({ workId: a.id })
+    await hold.query('BEGIN')
+    await hold.query('DELETE FROM works WHERE id = $1', [b.id])
+    const gravar = finalizar(id, { workId: b.id })
+    check('finalizar A→B, B apagada antes: Finalizar parado na B', await blocked(1, mine))
+    await hold.query('COMMIT')
+    const p = await gravar
+    check('finalizar A→B, B apagada antes: 400 "Obra não encontrada"', p.status === 400 && p.body?.error === 'Obra não encontrada', detail(p))
+    check('finalizar A→B, B apagada antes: registro aberto, ainda com a A', !(await doneOf(id)) && (await workOf(id)) === a.id)
+    await finalizar(id, {}) // uma aberta por tarefa: libera o caso seguinte
+  }
+
+  // 10. Finalizar A → B chega antes (parado nas tags, com a B travada); DELETE da B
+  {
+    const a = await work()
+    const b = await work()
+    const id = await openRecord({ workId: a.id })
+    await parkOnTags()
+    const gravar = finalizar(id, { workId: b.id, rootTagId: R1.id, tagIds: [] })
+    check('finalizar A→B, apagar a B: Finalizar parado', await blocked(1, mine))
+    const apagar = api('DELETE', `/works/${b.id}`)
+    check('finalizar A→B, apagar a B: DELETE espera o Finalizar', await blocked(2, mine))
+    await hold.query('ROLLBACK')
+    const [p, d] = await Promise.all([gravar, apagar])
+    check('finalizar A→B, apagar a B: Finalizar grava a B', p.status === 200 && (await workOf(id)) === b.id && (await doneOf(id)), detail(p))
+    check('finalizar A→B, apagar a B: DELETE responde 409', d.status === 409, detail(d))
+    check('finalizar A→B, apagar a B: a B fica', await exists(b.id))
   }
 } catch (err) {
   check(`bateria sem erro inesperado: ${err.message}`, false)

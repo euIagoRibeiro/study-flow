@@ -25,29 +25,40 @@ const groups = {
     'painel-graficos.mjs', 'painel-periodos.mjs', 'painel-comparacao.mjs', 'painel-tags.mjs',
     'cronometro-inicio.mjs', 'cronometro-escolha.mjs', 'navegacao.mjs', 'cartoes.mjs', 'rascunhos.mjs',
     's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs', 's5-lapis.mjs', 's6-chips.mjs', 'o3-obras.mjs',
-    'o4a-registrar.mjs',
+    'o4a-registrar.mjs', 'o4b-painel.mjs',
   ],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
     'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs', 's5-layout.mjs', 's6-layout.mjs',
-    'o3-layout.mjs', 'o4a-layout.mjs',
+    'o3-layout.mjs', 'o4a-layout.mjs', 'o4b-layout.mjs',
   ],
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'
 
 const which = process.argv[2] ?? 'tudo'
-// Filtro opcional: só as baterias cujo nome contém o texto (npm run telas -- a3e1)
+// Filtro opcional: só as baterias cujo nome contém o texto (npm run telas -- a3e1).
+// O nome exato de uma bateria roda só ela ("painel.mjs" não leva a s5-painel;
+// "a3e1.mjs en-US" é a rodada em inglês): quem confere algo antes de cada
+// bateria chama uma por vez
 const only = process.argv[3]
+const nameOf = (entry) => [].concat(entry).join(' ')
 const chosen = which === 'tudo' ? Object.keys(groups) : [which]
 if (!chosen.every((g) => groups[g])) {
   throw new Error(`grupo desconhecido: ${which} (tudo, ${Object.keys(groups).join(', ')})`)
 }
+const exact = only !== undefined && chosen.some((g) => groups[g].some((e) => nameOf(e) === only))
 
 // ---- pré-condições: para no primeiro problema, com o que fazer
 function stop(message) {
   console.error(`\nPRÉ-CONDIÇÃO: ${message}`)
   process.exit(2)
+}
+// FILTRO_EXATO=1: o filtro tem que ser o nome de uma bateria (roteiro que
+// confere a memória antes de cada uma; um texto que casasse várias as rodaria
+// sem a conferência entre elas)
+if (process.env.FILTRO_EXATO === '1' && !exact) {
+  stop(`FILTRO_EXATO: "${only ?? ''}" não é o nome de uma bateria de ${which}`)
 }
 if (!process.env.DATABASE_URL) {
   stop('DATABASE_URL ausente. Rode pelo npm (npm run tudo), que lê ../backend/.env')
@@ -121,8 +132,8 @@ for (const group of chosen) {
   console.log(`\n== ${group}`)
   for (const entry of groups[group]) {
     const [file, ...args] = [].concat(entry)
-    if (only && !file.includes(only)) continue
-    const name = [file, ...args].join(' ')
+    const name = nameOf(entry)
+    if (only && (exact ? name !== only : !file.includes(only))) continue
     const started = Date.now()
     const freeGb = (freemem() / 1024 ** 3).toFixed(2)
     const r = group === 'banco'
