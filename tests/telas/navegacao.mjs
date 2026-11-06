@@ -36,7 +36,8 @@ try {
   const go = async (url) => { await page.goto(`${APP}${url}`, { waitUntil: 'networkidle0' }); await pause(150) }
   const tap = async (fn, ...args) => { await page.evaluate(fn, ...args); await pause(300) }
   const back = async () => { await page.goBack(); await pause(300) }
-  const pickTask = () => tap(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Exercício físico')).click())
+  // Só na lista de tarefas: os atalhos (O5) também podem ter "Exercício físico"
+  const pickTask = () => tap(() => [...[...document.querySelectorAll('main section')].find((s) => s.querySelector('h2')?.textContent.trim() === 'Escolha uma tarefa').querySelectorAll('button')].find((b) => b.textContent.includes('Exercício físico')).click())
   const tapBack = () => tap(() => [...document.querySelectorAll('main button, main a')].find((b) => /^←/.test(b.textContent.trim())).click())
   const tab = (label) => tap((l) => [...document.querySelectorAll('nav[aria-label="Principal"] a')].find((a) => a.textContent.trim() === l).click(), label)
 

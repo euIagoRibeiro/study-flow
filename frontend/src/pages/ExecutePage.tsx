@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import ExecutionForm from '../components/ExecutionForm'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
@@ -18,7 +18,14 @@ import {
   secondaryButtonClass,
 } from '../styles'
 import { clearDraft, draftKeys } from '../formDrafts'
-import { executionSelection, indexTags, lastRootPath } from '../tags'
+import {
+  NO_PATH,
+  readShortcut,
+  recentPaths,
+  worksInProgress,
+} from '../shortcuts'
+import { executionSelection, indexTags, lastRootPath, tagPath } from '../tags'
+import { progressLine } from '../works'
 import type {
   Exercise,
   Frequency,
@@ -130,6 +137,20 @@ function ExecutePage(props: {
   const activeTasks = props.tasks.filter((task) => task.active)
   const selectedTask = activeTasks.find((task) => task.id === selectedTaskId)
   const undo = pendingUndo?.taskId === selectedTaskId ? pendingUndo : null
+  const tagsById = indexTags(props.tags)
+  // Atalho (O5) na URL: lido ao abrir a tarefa e tirado em seguida (recarregar
+  // não aplica de novo; quem guarda o que está na tela é o rascunho).
+  // Inválido: a tarefa abre normal, sem erro
+  const shortcut = readShortcut(searchParams, props.works, tagsById)
+  const hasShortcutParams =
+    searchParams.has('obra') || searchParams.has('caminho')
+  useEffect(() => {
+    if (!hasShortcutParams || selectedTask === undefined) return
+    setSearchParams(
+      { tarefa: selectedTask.id },
+      { replace: true, state: location.state },
+    )
+  }, [hasShortcutParams, selectedTask, setSearchParams, location.state])
 
   // Abrir uma tarefa empilha (o voltar volta pra lista), marcado no estado
   // da navegação: o "← Tarefas" sabe que pode só voltar. Trocar de tarefa
@@ -137,6 +158,18 @@ function ExecutePage(props: {
   // mostrar o aviso de uma finalização antiga)
   function selectTask(taskId: string) {
     setSearchParams({ tarefa: taskId }, { state: { fromPicker: true } })
+    setPendingUndo(null)
+    setDraft(null)
+  }
+
+  // Atalho: abre a tarefa com a obra ou o caminho, empilhado como a lista.
+  // Tarefa já aberta (rodando ou pausada): abre o painel como está
+  function openShortcut(taskId: string, param: Record<string, string>) {
+    if (openStateOf(taskId)) return selectTask(taskId)
+    setSearchParams(
+      { tarefa: taskId, ...param },
+      { state: { fromPicker: true } },
+    )
     setPendingUndo(null)
     setDraft(null)
   }
@@ -305,7 +338,106 @@ function ExecutePage(props: {
     )
   }
 
+  const pathLabel = (leafId: string | undefined) => {
+    const leaf = leafId ? tagsById.get(leafId) : undefined
+    return leaf ? tagPath(leaf, tagsById) : 'sem contexto'
+  }
+
+  // A tarefa do atalho já aberta: o item diz, e o toque abre o painel sem aplicar
+  function openNote(taskId: string) {
+    const state = openStateOf(taskId)
+    if (!state) return null
+    return (
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-tinta-suave">
+        <span className={chipAndamentoClass}>
+          <span
+            className={`h-2 w-2 rounded-full ${state === 'rodando' ? 'animate-pulsa bg-current' : 'border-[1.5px] border-current'}`}
+          />
+          {state === 'rodando' ? 'Rodando' : 'Pausado'}
+        </span>
+        A tarefa já está aberta.
+      </span>
+    )
+  }
+
+  function renderWorkItem(work: Work) {
+    const task = props.tasks.find((t) => t.id === work.defaultTaskId)
+    const lines = (
+      <>
+        <span className="font-titulo [overflow-wrap:anywhere]">
+          {work.title}
+        </span>
+        <span className="font-texto text-meta [overflow-wrap:anywhere] text-tinta-suave">
+          {task?.title ?? 'Tarefa não encontrada'} ·{' '}
+          {pathLabel(work.defaultTagId)}
+        </span>
+        <span className="font-dados text-meta text-tinta-suave">
+          {progressLine(
+            work,
+            props.measures.find((m) => m.id === work.measureId),
+          )}
+        </span>
+      </>
+    )
+    // Tarefa padrão arquivada: não abre (a tarefa não aparece no Executar)
+    if (!task?.active) {
+      return (
+        <li key={work.id}>
+          <div className="flex min-h-11 flex-col items-start gap-0.5 rounded-xl border border-linha bg-superficie px-3 py-2 text-base">
+            {lines}
+            <span className="font-texto text-meta text-tinta-suave">
+              A tarefa padrão desta obra está arquivada.
+            </span>
+          </div>
+        </li>
+      )
+    }
+    return (
+      <li key={work.id}>
+        <button
+          type="button"
+          onClick={() => openShortcut(task.id, { obra: work.id })}
+          className={`${pickerButtonClass} flex flex-col items-start gap-0.5`}
+        >
+          {lines}
+          {openNote(task.id)}
+        </button>
+      </li>
+    )
+  }
+
+  function renderRecentItem(recent: { taskId: string; path: string[] }) {
+    const task = activeTasks.find((t) => t.id === recent.taskId)
+    const leaf = recent.path.at(-1)
+    return (
+      <li key={`${recent.taskId}|${leaf ?? ''}`}>
+        <button
+          type="button"
+          onClick={() =>
+            openShortcut(recent.taskId, { caminho: leaf ?? NO_PATH })
+          }
+          className={`${pickerButtonClass} flex flex-col items-start gap-0.5`}
+        >
+          <span className="font-titulo [overflow-wrap:anywhere]">
+            {task?.title}
+          </span>
+          <span className="font-texto text-meta [overflow-wrap:anywhere] text-tinta-suave">
+            {pathLabel(leaf)}
+          </span>
+          {openNote(recent.taskId)}
+        </button>
+      </li>
+    )
+  }
+
   if (selectedTask === undefined) {
+    const works = worksInProgress(props.works, props.executions)
+    const recents = recentPaths(
+      props.executions,
+      props.tasks,
+      props.works,
+      tagsById,
+    )
     // Em andamento fica fora do filtro: o que está aberto nunca some da tela
     const inProgress = activeTasks.filter((task) => openStateOf(task.id))
     const others = activeTasks.filter((task) => !openStateOf(task.id))
@@ -342,6 +474,24 @@ function ExecutePage(props: {
             </h2>
             <ul className="flex flex-col gap-2">
               {inProgress.map(renderPickerItem)}
+            </ul>
+          </section>
+        )}
+        {works.length > 0 && (
+          <section data-shortcuts="">
+            <h2 className="mb-3 font-titulo text-base font-semibold">
+              Obras em andamento
+            </h2>
+            <ul className="flex flex-col gap-2">{works.map(renderWorkItem)}</ul>
+          </section>
+        )}
+        {recents.length > 0 && (
+          <section data-shortcuts="">
+            <h2 className="mb-3 font-titulo text-base font-semibold">
+              Recentes
+            </h2>
+            <ul className="flex flex-col gap-2">
+              {recents.map(renderRecentItem)}
             </ul>
           </section>
         )}
@@ -384,7 +534,6 @@ function ExecutePage(props: {
         .sort((a, b) => (a.startedAt > b.startedAt ? 1 : -1))
     : []
   const runningEntry = openEntries.find((entry) => entry.endedAt === null)
-  const tagsById = indexTags(props.tags)
   const preselected = lastRootPath(props.executions, selectedTask.id, tagsById)
   // Fase: pelo caminho (de qualquer tarefa), não pela tarefa como o contexto
   const suggestPhase = (path: string[]) =>
@@ -522,6 +671,7 @@ function ExecutePage(props: {
             works={props.works}
             taskId={selectedTask.id}
             tasks={props.tasks}
+            shortcut={shortcut}
             onSubmit={handleExecute}
             draftKey={draftKeys.registrar(selectedTask.id)}
             onDraftChange={(value) =>

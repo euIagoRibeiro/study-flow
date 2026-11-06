@@ -23,6 +23,7 @@ import {
   type FormField,
   type SelectionChoiceMap,
 } from '../selections'
+import { applyShortcut, type Shortcut } from '../shortcuts'
 import { fieldClass, secondaryButtonClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice, type TagIndex } from '../tags'
@@ -68,6 +69,8 @@ type FormProps = {
   taskId: string // a tarefa da página (a obra não a troca)
   tasks: Task[]
   initialPath: string[] // pré-seleção: o contexto do último registro
+  // Atalho da lista do Executar (O5): aplicado ao abrir, com a regra do toque
+  shortcut?: Shortcut | null
   suggestPhase: (path: string[]) => Phase | null
   onSubmit: (
     description: string,
@@ -156,6 +159,23 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   const byId = indexTags(props.tags)
   // O que ficou digitado antes (ir às tags e voltar, por exemplo)
   const [restored] = useState(() => readRegistrarDraft(props.draftKey, byId))
+  // O atalho por cima do começo (rascunho ou pré-seleção), como se a pessoa
+  // tivesse tocado: caminho novo, fase pela sugestão e medida vazia
+  const [start] = useState(() => {
+    const base = {
+      path: restored?.path ?? props.initialPath,
+      workId: restored?.workId ?? null,
+    }
+    if (!props.shortcut) return { ...base, moved: false }
+    const next = applyShortcut(
+      base,
+      props.shortcut,
+      props.works,
+      props.tags,
+      byId,
+    )
+    return { ...next, moved: next.path.join('/') !== base.path.join('/') }
+  })
   const [description, setDescription] = useState(restored?.description ?? '')
   // "Quando" começa na hora em que o formulário abriu; sem mexer, grava a
   // hora do clique (preencher não deixa o registro no passado)
@@ -164,34 +184,51 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   )
   const [when, setWhen] = useState(restored?.when ?? openedAt)
   const [minutes, setMinutes] = useState(restored?.minutes ?? '')
-  const [path, setPath] = useState(restored?.path ?? props.initialPath)
+  const [path, setPath] = useState(start.path)
   const [phase, setPhase] = useState(() =>
-    restored ? restored.phase : props.suggestPhase(props.initialPath),
+    start.moved || !restored ? props.suggestPhase(start.path) : restored.phase,
   )
   // Registro novo: nada gravado, nada pré-preenchido (ou o rascunho)
-  const measure = useMeasure(path, props.measures, null, restored?.measureTexts)
+  const measure = useMeasure(
+    path,
+    props.measures,
+    null,
+    start.moved ? undefined : restored?.measureTexts,
+  )
   const choices = useSelectionChoices(path, props.selections, restored?.choices)
   // A obra do rascunho volta como estava, sem preencher o caminho de novo (o
   // caminho do rascunho é o que estava na tela). Obra que sumiu: nenhuma
-  const [workId, setWorkId] = useState(restored?.workId ?? null)
+  const [workId, setWorkId] = useState(start.workId)
   const work = props.works.find((w) => w.id === workId) ?? null
   const [link, setLink] = useState(restored?.link ?? '')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const showPhase = phaseApplies(path, byId)
 
-  // Rascunho: a "foto" do formulário, guardada enquanto difere do intocado
-  const [pristine] = useState<RegistrarDraft>(() => ({
-    description: '',
-    when: null,
-    minutes: '',
-    path: props.initialPath,
-    phase: props.suggestPhase(props.initialPath),
-    measureTexts: {},
-    choices: {},
-    workId: null,
-    link: '',
-  }))
+  // Rascunho: a "foto" do formulário, guardada enquanto difere do intocado. O
+  // atalho não é rascunho: o intocado já vem com ele
+  const [pristine] = useState<RegistrarDraft>(() => {
+    const opened = props.shortcut
+      ? applyShortcut(
+          { path: props.initialPath, workId: null },
+          props.shortcut,
+          props.works,
+          props.tags,
+          byId,
+        )
+      : { path: props.initialPath, workId: null }
+    return {
+      description: '',
+      when: null,
+      minutes: '',
+      path: opened.path,
+      phase: props.suggestPhase(opened.path),
+      measureTexts: {},
+      choices: {},
+      workId: opened.workId,
+      link: '',
+    }
+  })
   useDraftSync(
     props.draftKey,
     {
@@ -209,8 +246,8 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   )
   // As escolhas mudam sem evento quando a sugestão chega; depois de mexido, o
   // "Iniciar cronômetro" leva o que está na tela. Vale também pro rascunho
-  // recuperado (B1), que já começa mexido: avisa ao montar
-  const reported = useRef(restored !== null)
+  // recuperado (B1) e pro atalho (O5), que já começam mexidos: avisa ao montar
+  const reported = useRef(restored !== null || Boolean(props.shortcut))
 
   // Avisa com os valores NOVOS (o estado só muda na próxima renderização);
   // pelos eventos dos campos. Sem mexer, nada é avisado: o Iniciar continua

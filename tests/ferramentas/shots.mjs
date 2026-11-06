@@ -6,7 +6,8 @@
 // tem que dar 0 pixels contra o "antes" (só o campo novo mudou); --sem-obras,
 // o mesmo pra seção Obras; --sem-obra-campo, pros campos Obra e Link e o chip e
 // o link do Histórico
-// --sem-duracao, pro "Durou" do Finalizar e o aviso de sessão longa
+// --sem-duracao, pro "Durou" do Finalizar e o aviso de sessão longa;
+// --sem-atalhos, pras seções "Obras em andamento" e "Recentes" do Executar (O5)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
@@ -23,6 +24,7 @@ const pages = [
   ['lista', '/'],
   ['historico', '/historico'],
   ['tags', '/tags'],
+  ['executar-lista', '/executar'],
   ['executar-vestibular', '/executar?tarefa=5eed0000-0000-4000-8000-000000000009'],
   ['executar-aib', '/executar?tarefa=5eed0000-0000-4000-8000-000000000011'],
   ['timer-rodando', '/executar?tarefa=5eed0000-0000-4000-8000-000000000002'],
@@ -71,6 +73,14 @@ if (process.argv.includes('--sem-duracao')) {
   await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style')
     style.textContent = '[data-duration-field], [data-long-warning] { display: none !important; }'
+    document.head.append(style)
+  }))
+}
+// Com --sem-atalhos, esconde "Obras em andamento" e "Recentes" (O5)
+if (process.argv.includes('--sem-atalhos')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = '[data-shortcuts] { display: none !important; }'
     document.head.append(style)
   }))
 }
