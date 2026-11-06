@@ -2,7 +2,7 @@
 // andamento, pela data do último registro concluído (todos os registros
 // carregados: um de 2 anos atrás conta), sem registro no fim por título; tarefa
 // padrão arquivada sem toque, com o motivo; tarefa já aberta: o item diz e o
-// toque abre o painel sem aplicar. Recentes: 5 pares tarefa + caminho, sem
+// toque abre o painel sem aplicar. Recentes: 8 pares tarefa + caminho, sem
 // repetir, sem registro de obra em andamento, sem tarefa ou tag arquivada. O
 // toque abre a tarefa com a obra (o caminho dela) ou o caminho; a URL volta a
 // ?tarefa=; nada é gravado antes do Iniciar/Registrar; rascunho fica por baixo;
@@ -146,7 +146,7 @@ try {
 
   // ---------- 2. Recentes
   const recents = (await section('Recentes'))?.items ?? []
-  check('Recentes: 5 itens', recents.length === 5, String(recents.length))
+  check('Recentes: 8 itens', recents.length === 8, String(recents.length))
   check('Recentes: os 3 primeiros = tarefa + caminho, sem repetir, sem obra em andamento, sem arquivados',
     JSON.stringify(recents.slice(0, 3).map((i) => i.text)) === JSON.stringify([`${P} tarefa | ${P} raiz › ${P} sub`, `${P} tarefa | ${P} raiz`, `${P} tarefa | sem contexto`]),
     JSON.stringify(recents.slice(0, 4).map((i) => i.text)))

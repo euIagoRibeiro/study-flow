@@ -11,7 +11,7 @@ import { defaultPath } from './works'
 // Atalhos da lista do Executar (O5): "Obras em andamento" e "Recentes". O toque
 // abre a tarefa com a obra ou o caminho preenchidos; nada é gravado antes do
 // Iniciar ou do Registrar
-export const RECENT_LIMIT = 5
+export const RECENT_LIMIT = 8
 
 const completed = (executions: TaskExecution[]) =>
   executions.filter(

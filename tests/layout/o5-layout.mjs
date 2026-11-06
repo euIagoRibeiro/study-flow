@@ -29,8 +29,8 @@ const fake = (i) => ({
 const longWorks = [...works, ...Array.from({ length: 10 }, (_, i) => fake(i))]
 const inProgress = (list) => list.filter((w) => w.status === 'em_andamento').length
 const STATES = {
-  seed: { bodies: {}, works: inProgress(works), recents: 5 },
-  longo: { bodies: { tags: longTags, tasks: longTasks, works: longWorks }, works: inProgress(longWorks), recents: 5 },
+  seed: { bodies: {}, works: inProgress(works), recents: 8 },
+  longo: { bodies: { tags: longTags, tasks: longTasks, works: longWorks }, works: inProgress(longWorks), recents: 8 },
   vazio: { bodies: { works: [], executions: [], 'time-entries': [] }, works: 0, recents: 0 },
 }
 
