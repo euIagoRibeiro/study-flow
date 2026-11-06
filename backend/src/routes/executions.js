@@ -682,8 +682,10 @@ class TagError extends Error {}
 class WorkError extends Error {}
 
 const WORK_NOT_FOUND = 'Obra não encontrada'
-// Registrar, Finalizar e o lápis (o "Quando"): nenhum registro termina no futuro
+// Registrar, Finalizar e o lápis (o "Quando"): nenhum registro termina no futuro.
+// No Finalizar (fechar registro aberto) o fim é o "agora" do aparelho
 const FUTURE_END = 'O registro não pode terminar no futuro.'
+const CHECK_CLOCK = ' Confira o horário do aparelho.'
 
 // A obra fica travada (FOR KEY SHARE) antes de ligar: apagá-la no meio espera
 // aqui ou chega antes e dá 400. Ordem no PUT: registro, obra, tags. Tem que vir
@@ -912,7 +914,12 @@ executionsRouter.put('/:id', async (req, res) => {
   const { error, data: changes } = validate(executionChangesSchema, req.body)
   if (error) return res.status(400).json({ error })
   if (changes.completedAt && inFuture(changes.completedAt)) {
-    return res.status(400).json({ error: FUTURE_END })
+    const open = await pool.query(
+      'SELECT 1 FROM task_executions WHERE id = $1 AND completed_at IS NULL',
+      [req.params.id],
+    )
+    const error = FUTURE_END + (open.rowCount > 0 ? CHECK_CLOCK : '')
+    return res.status(400).json({ error })
   }
 
   // Finalizar também fecha a sessão rodando dessa execução, e as tags (se

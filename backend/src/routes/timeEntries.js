@@ -39,6 +39,8 @@ function isRunningConflict(err) {
 const CONFLICT_ERROR = 'Já existe um cronômetro rodando'
 const FUTURE_START = 'A sessão não pode começar no futuro.'
 const FUTURE_END = 'A sessão não pode terminar no futuro.'
+// No Pausar (fechar a sessão rodando) o fim é o "agora" do aparelho
+const CHECK_CLOCK = ' Confira o horário do aparelho.'
 
 timeEntriesRouter.get('/', async (req, res) => {
   const result = await pool.query(
@@ -88,7 +90,12 @@ timeEntriesRouter.put('/:id', async (req, res) => {
     return res.status(400).json({ error: FUTURE_START })
   }
   if (changes.endedAt && inFuture(changes.endedAt)) {
-    return res.status(400).json({ error: FUTURE_END })
+    const running = await pool.query(
+      'SELECT 1 FROM time_entries WHERE id = $1 AND ended_at IS NULL',
+      [req.params.id],
+    )
+    const error = FUTURE_END + (running.rowCount > 0 ? CHECK_CLOCK : '')
+    return res.status(400).json({ error })
   }
 
   try {
