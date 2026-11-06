@@ -82,6 +82,39 @@ node --env-file=../backend/.env ferramentas/api-snapshot.mjs depois --ignorar=ca
 Rodar o "depois" **logo depois** da mudança: bateria que restaura dado pelo
 fluxo real devolve id novo e a comparação acusaria diferença sem regressão.
 
+## Instância isolada
+
+Um backend e um Vite a mais, numa cópia do banco, sem tocar no par de
+desenvolvimento (3333 e 5173). Nada muda no código: a variável de ambiente
+ganha do `.env` no backend (`node --env-file`) e no Vite. Sem as variáveis, vale
+o `.env`, como sempre. Comandos no Git Bash, a partir da raiz (testado em
+2026-11-06):
+
+```
+D="docker exec -i study-flow-postgres-1"
+$D createdb -U studyflow studyflow_isolada
+$D pg_dump -U studyflow -d studyflow | $D psql -U studyflow -d studyflow_isolada -q -v ON_ERROR_STOP=1
+
+# backend na 3334, na cópia, aceitando só a 5174 (o DATABASE_URL do .env com o banco trocado)
+cd backend
+URL=$(grep '^DATABASE_URL=' .env | cut -d= -f2- | sed 's#/studyflow\([?]\|$\)#/studyflow_isolada\1#')
+PORT=3334 DATABASE_URL="$URL" CORS_ORIGIN=http://localhost:5174 node --env-file=.env src/index.js
+
+# Vite na 5174 apontando pra 3334 (outro terminal, em frontend/)
+VITE_API_URL=http://localhost:3334 npx vite --port 5174 --strictPort
+
+# bateria só de API contra a instância (em tests/)
+API_URL=http://localhost:3334 node api/seed-obras.mjs
+```
+
+- `--strictPort`: com a 5174 ocupada, o Vite para com erro em vez de pegar
+  outra porta em silêncio.
+- O CORS aceita só a origem da variável: uma página da 5173 pedindo à 3334 é
+  recusada pelo navegador.
+- Encerrar **pela porta**, conferindo a linha de comando do processo (o backend
+  de desenvolvimento roda o mesmo `node --env-file=.env src/index.js`, na 3333), e
+  apagar a cópia: `$D dropdb -U studyflow studyflow_isolada`.
+
 ## Bateria nova
 
 Nasce aqui, na pasta do tipo dela, com `config.mjs` (nunca caminho absoluto),
