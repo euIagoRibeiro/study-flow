@@ -321,7 +321,10 @@ function ExecutePage(props: {
           onClick={() => selectTask(task.id)}
           className={`${pickerButtonClass} flex flex-wrap items-center gap-x-2 gap-y-1`}
         >
-          <span className="font-titulo">{task.title}</span>
+          {/* Título sem espaço quebra dentro da palavra, sem empurrar a tela */}
+          <span className="min-w-0 font-titulo [overflow-wrap:anywhere]">
+            {task.title}
+          </span>
           {task.frequency !== 'none' && (
             <span className={chipClass}>{frequencyLabels[task.frequency]}</span>
           )}

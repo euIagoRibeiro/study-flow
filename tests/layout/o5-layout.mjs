@@ -2,7 +2,8 @@
 // barra de rolagem, 320 a 1280. Estados: seed; longo (respostas injetadas: nomes
 // de tag com 30 letras e títulos de tarefa com 100, sem espaço; 10 obras em
 // andamento com títulos de 100 letras, uma na tarefa que está rodando, com a
-// nota "A tarefa já está aberta"); vazio (sem obras nem registros: as duas
+// nota "A tarefa já está aberta"; os títulos de tarefa longos passam também
+// pelas listas de tarefas, "Em andamento" e "Escolha uma tarefa"); vazio (sem obras nem registros: as duas
 // seções não aparecem). Nada é gravado. Checagens fixas por estado e largura
 // (o total não depende do que acontece).
 import puppeteer from 'puppeteer-core'
@@ -77,12 +78,7 @@ try {
           }
         }
         const rects = boxes.map((b) => b.getBoundingClientRect())
-        // O que passa da tela, fora das seções novas (só informação)
-        const outside = [...document.querySelectorAll('main *')]
-          .filter((el) => el.getBoundingClientRect().right > useful + 0.5 && !el.closest('section[data-shortcuts]') && el.children.length === 0)
-          .map((el) => `${el.tagName.toLowerCase()} "${el.textContent.trim().slice(0, 12)}" dentro de "${el.closest('section')?.querySelector('h2')?.textContent.trim() ?? '?'}"`)
         return {
-          outside: [...new Set(outside)].slice(0, 4),
           shortcutsOut: Math.max(0, ...sections.flatMap((s) => [...s.querySelectorAll('*')]).map((el) => el.getBoundingClientRect().right - useful)),
           works: named('Obras em andamento')?.querySelectorAll(':scope > ul > li').length ?? 0,
           recents: named('Recentes')?.querySelectorAll(':scope > ul > li').length ?? 0,
@@ -105,12 +101,7 @@ try {
       check(`${tag}: textos medidos ${m.texts} ≥ ${minTexts}`, m.texts >= minTexts, String(m.texts))
       check(`${tag}: texto dentro do item`, m.leak === null, m.leak)
       check(`${tag}: nada das seções novas passa da tela`, m.shortcutsOut <= 0.5, `${m.shortcutsOut.toFixed(1)}px`)
-      // longo: os títulos de tarefa de 100 letras sem espaço vazam nas listas de
-      // tarefas que já existiam (defeito de antes do O5, registrado à parte)
-      if (state === 'longo') {
-        if (m.scroll > 0) console.log(`INFO   ${tag}: rolagem lateral ${m.scroll}px fora das seções novas: ${m.outside.join(' | ')}`)
-        check(`${tag}: a rolagem lateral não vem das seções novas`, m.shortcutsOut <= 0.5 && m.outside.length > 0 === m.scroll > 0, `${m.scroll}px ${m.outside.join(' | ')}`)
-      } else check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)
+      check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)
       check(`${tag}: itens com ≥ 44px de altura`, m.lowest >= 44, `${m.lowest}px`)
       check(`${tag}: folga do foco ≥ 4px`, m.margin >= 4, `${m.margin}px`)
       check(`${tag}: itens sem sobrepor`, !m.overlap)
