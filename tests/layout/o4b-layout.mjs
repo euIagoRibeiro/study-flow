@@ -8,6 +8,8 @@
 // gravado (o Finalizar não é tocado, e o caminho escolhido não tem treino): a
 // bateria confere que nenhum pedido de escrita saiu. Uma checagem por texto
 // medido (o total não cresce quando falha) e a contagem mínima de textos, fixa.
+// A sessão rodando do seed vai com o início 25 min atrás na resposta da API (o
+// seed a ancora no reseed; com 2h, o "Durou" abriria e o total mudaria).
 import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
 
@@ -40,26 +42,33 @@ const injectedWorks = JSON.stringify([...works, ...Array.from({ length: 20 }, (_
 const injectedMeasures = JSON.stringify([...measures, longMeasure])
 const injectedTasks = JSON.stringify([...tasks, longTask])
 const LINK = `https://exemplo.com/${'a'.repeat(1980)}`
+const entries = await (await fetch(`${API}/time-entries`)).json()
+const running = entries.find((e) => e.endedAt === null && e.taskExecutionId.startsWith('5eed'))
 
 let browser
 try {
+  if (!running) throw new Error('sessão rodando do seed não achada')
   browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let injected = false
+  let runningStart = null
   const writes = []
   await page.setRequestInterception(true)
   page.on('request', (req) => {
     if (req.method() !== 'GET' && req.method() !== 'OPTIONS') writes.push(`${req.method()} ${req.url()}`)
-    const body = !injected || req.method() !== 'GET' ? null
+    const entriesBody = req.method() === 'GET' && req.url() === `${API}/time-entries`
+      ? JSON.stringify(entries.map((e) => (e.id === running.id ? { ...e, startedAt: runningStart } : e))) : null
+    const body = entriesBody ?? (!injected || req.method() !== 'GET' ? null
       : req.url() === `${API}/works` ? injectedWorks
         : req.url() === `${API}/measures` ? injectedMeasures
-          : req.url() === `${API}/tasks` ? injectedTasks : null
+          : req.url() === `${API}/tasks` ? injectedTasks : null)
     if (body) req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body })
     else req.continue()
   })
   let panelTask = null
   const open = async () => {
+    runningStart = new Date(Date.now() - 25 * 60e3).toISOString()
     await page.goto(`${APP}/executar?tarefa=${panelTask}`, { waitUntil: 'networkidle0' })
     await page.evaluate(() => sessionStorage.clear())
     await page.goto(`${APP}/executar?tarefa=${panelTask}`, { waitUntil: 'networkidle0' })
@@ -113,6 +122,7 @@ try {
           out,
           texts,
           notes,
+          longWarning: document.querySelector('main [data-long-warning]') !== null,
           fields: form.querySelectorAll('[data-work-field] select').length + form.querySelectorAll('[data-link-field] input, [data-link-field] button').length,
           linkOpen: form.querySelector('[data-link-field] input') !== null,
           buttonHeight: linkButton ? linkButton.getBoundingClientRect().height : null,
@@ -125,6 +135,7 @@ try {
       for (const r of m.out) check(`${tag}: ${r.what}`, r.ok, r.what)
       // Fixas: os dois campos, as notas esperadas e o mínimo de textos (rótulos Obra e Link + notas)
       check(`${tag}: campos Obra e Link presentes`, m.fields === 2, String(m.fields))
+      check(`${tag}: sem aviso de sessão longa (o mesmo estado a qualquer hora)`, !m.longWarning)
       // Fechado no seed ("+ Link", alvo de toque de 44px como os outros botões); aberto no longo
       if (state === 'seed') check(`${tag}: Link fechado, "+ Link" com ≥ 44px de altura`, !m.linkOpen && m.buttonHeight >= 44, `${m.linkOpen} ${m.buttonHeight}px`)
       else check(`${tag}: Link aberto`, m.linkOpen)

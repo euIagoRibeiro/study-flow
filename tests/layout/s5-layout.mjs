@@ -2,7 +2,9 @@
 // lápis (Histórico e cartão da Lista, o lugar mais estreito), janela real com a
 // barra de rolagem, 320 a 1280: seed (Desenho › Inktober) e pior caso
 // injetado (múltipla de 30 opções de 30 letras sem espaço, seleção única e nome
-// no limite). No painel, o caminho é só escolhido na tela: nada é gravado.
+// no limite). No painel, o caminho é só escolhido na tela: nada é gravado. A
+// sessão rodando do seed vai com o início 25 min atrás na resposta da API (o
+// seed a ancora no reseed; com 2h, o painel ganharia o aviso e o "Durou" aberto).
 import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
 
@@ -25,20 +27,27 @@ const worst = [...selections, long(true), long(false)]
 // Um registro do seed em Desenho, da tarefa Desenhar
 const executions = await (await fetch(`${API}/executions`)).json()
 const record = executions.find((e) => e.taskId === task.id && e.rootTagId === desenho.id && e.completedAt && e.description)
+const entries = await (await fetch(`${API}/time-entries`)).json()
+const running = entries.find((e) => e.endedAt === null && e.taskExecutionId.startsWith('5eed'))
 
 let browser
 try {
+  if (!running) throw new Error('sessão rodando do seed não achada')
   browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let body = null
+  let runningStart = null
   await page.setRequestInterception(true)
   page.on('request', (req) => {
-    if (body && req.method() === 'GET' && req.url() === `${API}/selections`) {
-      req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body })
+    const reply = (data) => req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: data })
+    if (body && req.method() === 'GET' && req.url() === `${API}/selections`) reply(body)
+    else if (runningStart && req.method() === 'GET' && req.url() === `${API}/time-entries`) {
+      reply(JSON.stringify(entries.map((e) => (e.id === running.id ? { ...e, startedAt: runningStart } : e))))
     } else req.continue()
   })
   const open = async (taskId) => {
+    runningStart = new Date(Date.now() - 25 * 60e3).toISOString()
     await page.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
     await page.evaluate(() => sessionStorage.clear())
     await page.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
@@ -96,6 +105,7 @@ try {
         const fields = blocks.flatMap((b) => [...b.querySelectorAll('select, fieldset')])
         const controls = blocks.flatMap((b) => [...b.querySelectorAll('select, input')])
         return {
+          longWarning: document.querySelector('main [data-long-warning]') !== null,
           blocks: blocks.length,
           scroll: document.documentElement.scrollWidth - useful,
           textOut: Math.max(0, ...texts.flatMap(rects).map((r) => Math.max(r.right - box.right, box.left - r.left))),
@@ -111,6 +121,7 @@ try {
       }, EDIT)
       const tag = `${where}, ${state} ${width}px`
       check(`${tag}: dois blocos`, m.blocks === 2, `${m.blocks}`)
+      if (where === 'rodando') check(`${tag}: sem aviso de sessão longa (o mesmo estado a qualquer hora)`, !m.longWarning)
       check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)
       check(`${tag}: texto dentro do formulário`, m.textOut <= 0.5, `${m.textOut}px`)
       check(`${tag}: campos dentro do formulário`, m.fieldOut <= 0.5, `${m.fieldOut}px`)
