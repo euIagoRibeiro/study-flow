@@ -5,7 +5,8 @@
 // o formulário mantido. Sessão de 2h ou mais: aviso "Rodando há X…" e o campo já
 // aberto, sem foco. Passando da meia-noite, o registro cai em "Ontem". Pausado:
 // sem campo. Memória ao sair e voltar; outra sessão (Pausar e Retomar), campo
-// novo. Desfazer volta a "Rodando". Lápis da sessão mostra o motivo de um 400.
+// novo. Desfazer volta a "Rodando". Lápis da sessão e Pausar mostram o motivo de
+// um 400 (o Pausar, com a frase genérica em qualquer outro erro).
 // Toques. Dados próprios (prefixo teste-tempo-p), apagados no fim; pausa a
 // sessão do seed e devolve a linha exata. Uso (raiz do repo):
 //   node --env-file=backend/.env tests/telas/tempo-painel.mjs
@@ -262,6 +263,48 @@ try {
   check('lápis da sessão: mostra o motivo do servidor', shown && message === 'A sessão não pode terminar no futuro.', message)
   check('lápis da sessão recusado: sessão intacta', (await sessionsOf(r.id))[0].ended_at?.toISOString() === end60)
   await page.close()
+
+  // ---------- 8b. Pausar recusado: 400 com o motivo (relógio da página 10 min
+  // adiantado, o servidor recusa de verdade); 500 com a frase genérica
+  const banner = (p) => p.evaluate(() => document.querySelector('[role="alert"] p')?.textContent.trim() ?? '')
+  const tapPause = async (p) => {
+    await p.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
+    await p.waitForFunction(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Pausar'))
+    await p.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Pausar').click())
+    await p.waitForFunction(() => document.querySelector('[role="alert"] p') !== null).catch(() => {})
+    await pause(200)
+  }
+  r = await openRecord(ago(30))
+  const ahead = await browser.newPage()
+  await ahead.setViewport({ width: 390, height: 900 })
+  await ahead.evaluateOnNewDocument(() => {
+    const Real = Date
+    const shift = 10 * 60_000
+    class Ahead extends Real {
+      constructor(...a) { super(...(a.length ? a : [Real.now() + shift])) }
+      static now() { return Real.now() + shift }
+    }
+    globalThis.Date = Ahead
+  })
+  await tapPause(ahead)
+  let shownBanner = await banner(ahead)
+  check('Pausar com 400: mostra o motivo do servidor', shownBanner === 'Não foi possível pausar: A sessão não pode terminar no futuro. Confira o horário do aparelho. O cronômetro continua rodando.', shownBanner)
+  check('Pausar recusado: a sessão continua rodando', (await sessionsOf(r.id))[0].ended_at === null)
+  await ahead.close()
+  const failing = await browser.newPage()
+  await failing.setViewport({ width: 390, height: 900 })
+  await failing.setRequestInterception(true)
+  failing.on('request', (req) => {
+    if (req.method() === 'PUT' && req.url().includes('/time-entries/')) {
+      return req.respond({ status: 500, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'falha simulada' }) })
+    }
+    req.continue()
+  })
+  await tapPause(failing)
+  shownBanner = await banner(failing)
+  check('Pausar com 500: a frase genérica, sem o corpo da resposta', shownBanner === 'Não foi possível pausar. O cronômetro continua rodando.', shownBanner)
+  await failing.close()
+  await closeOpen()
 
   // ---------- 9. toques: Finalizar normal 1; com "Durou" na sessão curta e na longa, +1
   const touch = await browser.newPage()

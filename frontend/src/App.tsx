@@ -270,7 +270,12 @@ function App() {
       replaceTimeEntry(await timeEntriesApi.stopTimeEntry(entry))
     } catch (error) {
       console.error(error)
-      setSaveError('Não foi possível pausar. O cronômetro continua rodando.')
+      // 400: o servidor diz o motivo (ex.: fim no futuro, relógio do aparelho)
+      setSaveError(
+        error instanceof ApiError && error.status === 400
+          ? `Não foi possível pausar: ${error.message} O cronômetro continua rodando.`
+          : 'Não foi possível pausar. O cronômetro continua rodando.',
+      )
     }
   }
 
