@@ -1,7 +1,13 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { pool } from '../db.js'
-import { isoDateTime, isUuid, urlField, validate } from '../validation.js'
+import {
+  inFuture,
+  isoDateTime,
+  isUuid,
+  urlField,
+  validate,
+} from '../validation.js'
 import { TIME_ENTRY_COLUMNS } from './timeEntries.js'
 
 export const executionsRouter = Router()
@@ -676,6 +682,8 @@ class TagError extends Error {}
 class WorkError extends Error {}
 
 const WORK_NOT_FOUND = 'Obra não encontrada'
+// Registrar, Finalizar e o lápis (o "Quando"): nenhum registro termina no futuro
+const FUTURE_END = 'O registro não pode terminar no futuro.'
 
 // A obra fica travada (FOR KEY SHARE) antes de ligar: apagá-la no meio espera
 // aqui ou chega antes e dá 400. Ordem no PUT: registro, obra, tags. Tem que vir
@@ -808,6 +816,9 @@ executionsRouter.get('/', async (req, res) => {
 executionsRouter.post('/', async (req, res) => {
   const { error, data: execution } = validate(newExecutionSchema, req.body)
   if (error) return res.status(400).json({ error })
+  if (execution.completedAt && inFuture(execution.completedAt)) {
+    return res.status(400).json({ error: FUTURE_END })
+  }
 
   // Execução + tags juntas, ou nada
   const client = await pool.connect()
@@ -900,6 +911,9 @@ executionsRouter.put('/:id', async (req, res) => {
   }
   const { error, data: changes } = validate(executionChangesSchema, req.body)
   if (error) return res.status(400).json({ error })
+  if (changes.completedAt && inFuture(changes.completedAt)) {
+    return res.status(400).json({ error: FUTURE_END })
+  }
 
   // Finalizar também fecha a sessão rodando dessa execução, e as tags (se
   // vieram) trocam junto: tudo acontece ou nada acontece. Uma transação só
@@ -1047,7 +1061,7 @@ executionsRouter.put('/:id', async (req, res) => {
     if (err.code === '23514' && err.constraint === 'time_entries_check') {
       return res.status(400).json({
         error:
-          'completedAt não pode ser antes do início da sessão em andamento',
+          'O registro não pode terminar antes do início da sessão em andamento.',
       })
     }
     throw err

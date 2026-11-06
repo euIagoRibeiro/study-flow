@@ -6,6 +6,7 @@
 // tem que dar 0 pixels contra o "antes" (só o campo novo mudou); --sem-obras,
 // o mesmo pra seção Obras; --sem-obra-campo, pros campos Obra e Link e o chip e
 // o link do Histórico
+// --sem-duracao, pro "Durou" do Finalizar e o aviso de sessão longa
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
@@ -62,6 +63,14 @@ if (process.argv.includes('--sem-obra-campo')) {
   await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style')
     style.textContent = '[data-work-field], [data-link-field], [data-work-chips], [data-record-link] { display: none !important; }'
+    document.head.append(style)
+  }))
+}
+// Com --sem-duracao, esconde o "Durou" do Finalizar e o aviso de sessão longa
+if (process.argv.includes('--sem-duracao')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = '[data-duration-field], [data-long-warning] { display: none !important; }'
     document.head.append(style)
   }))
 }

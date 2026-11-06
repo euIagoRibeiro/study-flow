@@ -79,6 +79,7 @@ function ExecutePage(props: {
     measureValues: MeasureValue[] | undefined,
     selectionOptionIds: string[] | undefined,
     link: Partial<WorkLink>,
+    endedAt: string | null,
   ) => Promise<void>
   onUndoFinishExecution: (
     executionId: string,
@@ -205,6 +206,7 @@ function ExecutePage(props: {
     measureValues: MeasureValue[] | undefined,
     selectionOptionIds: string[] | undefined,
     link: Partial<WorkLink>,
+    endedAt: string | null,
   ) {
     const execution = props.executions.find((e) => e.id === executionId)
     const resumeEntry = props.timeEntries.find(
@@ -218,6 +220,7 @@ function ExecutePage(props: {
       measureValues,
       selectionOptionIds,
       link,
+      endedAt,
     )
     setPendingUndo({
       taskId: selectedTask?.id ?? '',

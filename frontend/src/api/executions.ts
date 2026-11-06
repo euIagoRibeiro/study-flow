@@ -110,10 +110,12 @@ export function finishExecution(
   measureValues: MeasureValue[] | undefined,
   selectionOptionIds: string[] | undefined,
   link: Partial<WorkLink>,
+  // "Durou" (esqueci o cronômetro): o fim corrigido; null = agora
+  endedAt: string | null,
 ): Promise<SavedExecution> {
   return putExecution(id, {
     description,
-    completedAt: new Date().toISOString(),
+    completedAt: endedAt ?? new Date().toISOString(),
     ...tags,
     ...(measureValues ? { measureValues } : {}),
     ...(selectionOptionIds ? { selectionOptionIds } : {}),

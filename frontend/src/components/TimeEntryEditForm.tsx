@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { ApiError } from '../api/client'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../dates'
 import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
 import type { TimeEntry } from '../types'
@@ -34,8 +35,13 @@ function TimeEntryEditForm(props: {
     setSubmitting(true)
     try {
       await props.onSubmit({ startedAt: startedIso, endedAt: endedIso })
-    } catch {
-      setError('Não foi possível salvar. Tente de novo.')
+    } catch (err) {
+      // 400: o motivo do servidor (fim no futuro, sessão estimada…)
+      setError(
+        err instanceof ApiError && err.status === 400
+          ? err.message
+          : 'Não foi possível salvar. Tente de novo.',
+      )
       return
     } finally {
       setSubmitting(false)

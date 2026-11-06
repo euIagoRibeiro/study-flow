@@ -24,6 +24,9 @@ export type TimerMemory = {
   workId?: string | null
   linkBase?: string | null
   link?: string
+  // "Durou": só vale pra sessão rodando em que foi digitado
+  durationEntry?: string | null
+  duration?: string
 }
 
 const key = (executionId: string) => `studyflow:cronometro:${executionId}`

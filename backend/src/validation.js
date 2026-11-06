@@ -29,6 +29,14 @@ export function urlField(field) {
     .nullable()
 }
 
+// Registro e sessão não terminam (nem começam) no futuro. Tolerância de 5
+// minutos: o "agora" do Finalizar e do Pausar vem do relógio do celular, que
+// pode estar um pouco adiantado em relação ao do servidor
+const CLOCK_TOLERANCE_MS = 5 * 60_000
+export function inFuture(iso) {
+  return new Date(iso).getTime() > Date.now() + CLOCK_TOLERANCE_MS
+}
+
 // Só ISO completo com Z ou fuso; gravado sempre normalizado em UTC
 export function isoDateTime(message) {
   return z.iso

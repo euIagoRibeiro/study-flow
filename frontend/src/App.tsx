@@ -312,6 +312,7 @@ function App() {
     measureValues: MeasureValue[] | undefined,
     selectionOptionIds: string[] | undefined,
     link: Partial<WorkLink>,
+    endedAt: string | null,
   ) {
     keepSaved(
       await executionsApi.finishExecution(
@@ -321,6 +322,7 @@ function App() {
         measureValues,
         selectionOptionIds,
         link,
+        endedAt,
       ),
     )
   }

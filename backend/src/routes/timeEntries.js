@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { pool } from '../db.js'
-import { isoDateTime, isUuid, validate } from '../validation.js'
+import { inFuture, isoDateTime, isUuid, validate } from '../validation.js'
 
 export const timeEntriesRouter = Router()
 
@@ -29,7 +29,7 @@ const timeEntryChangesSchema = z
   })
   .refine(
     ({ startedAt, endedAt }) => endedAt === null || endedAt >= startedAt,
-    'endedAt não pode ser antes de startedAt',
+    'O fim da sessão precisa ser depois do início.',
   )
 
 function isRunningConflict(err) {
@@ -37,6 +37,8 @@ function isRunningConflict(err) {
 }
 
 const CONFLICT_ERROR = 'Já existe um cronômetro rodando'
+const FUTURE_START = 'A sessão não pode começar no futuro.'
+const FUTURE_END = 'A sessão não pode terminar no futuro.'
 
 timeEntriesRouter.get('/', async (req, res) => {
   const result = await pool.query(
@@ -49,6 +51,9 @@ timeEntriesRouter.get('/', async (req, res) => {
 timeEntriesRouter.post('/', async (req, res) => {
   const { error, data: entry } = validate(newTimeEntrySchema, req.body)
   if (error) return res.status(400).json({ error })
+  if (inFuture(entry.startedAt)) {
+    return res.status(400).json({ error: FUTURE_START })
+  }
 
   try {
     const result = await pool.query(
@@ -79,6 +84,12 @@ timeEntriesRouter.put('/:id', async (req, res) => {
   }
   const { error, data: changes } = validate(timeEntryChangesSchema, req.body)
   if (error) return res.status(400).json({ error })
+  if (inFuture(changes.startedAt)) {
+    return res.status(400).json({ error: FUTURE_START })
+  }
+  if (changes.endedAt && inFuture(changes.endedAt)) {
+    return res.status(400).json({ error: FUTURE_END })
+  }
 
   try {
     // Reabrir (endedAt null) só se a execução dela estiver aberta: senão

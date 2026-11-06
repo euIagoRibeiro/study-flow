@@ -1,4 +1,10 @@
-import { Fragment, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { ApiError } from '../api/client'
 import { formatClock, formatDuration } from '../dates'
 import {
@@ -8,6 +14,7 @@ import {
   secondaryButtonClass,
 } from '../styles'
 import { phaseApplies } from '../phases'
+import { LONG_SESSION_MS, sessionEnd } from '../sessionEnd'
 import {
   executionSelection,
   indexTags,
@@ -51,6 +58,7 @@ import {
   recordError,
   workMeasureNote,
 } from '../works'
+import DurationField from './DurationField'
 import ElapsedTime from './ElapsedTime'
 import FormError from './FormError'
 import LinkField from './LinkField'
@@ -69,6 +77,7 @@ type Remembered = {
   measureTexts: MeasureTexts
   workId: string | null
   link: string
+  duration: string
 }
 
 function TimerPanel(props: {
@@ -104,6 +113,8 @@ function TimerPanel(props: {
     selectionOptionIds: string[] | undefined,
     // Só o que mudou em relação ao registro (ausente, o servidor mantém)
     link: Partial<WorkLink>,
+    // "Durou": o fim corrigido da sessão rodando; null = agora
+    endedAt: string | null,
   ) => Promise<unknown>
 }) {
   // Desestruturado: runningEntry como const local permite o TypeScript
@@ -144,6 +155,13 @@ function TimerPanel(props: {
         typeof memory.link === 'string'
           ? memory.link
           : null,
+      // "Durou": só na mesma sessão rodando
+      duration:
+        runningEntry !== undefined &&
+        memory.durationEntry === runningEntry.id &&
+        typeof memory.duration === 'string'
+          ? memory.duration
+          : null,
     }
   })
   const [description, setDescription] = useState(
@@ -167,6 +185,24 @@ function TimerPanel(props: {
   )
   const work = props.works.find((w) => w.id === workId) ?? null
   const [link, setLink] = useState(remembered?.link ?? execution.linkUrl ?? '')
+  // Presa à sessão rodando: depois de Pausar e Retomar, a sessão é outra
+  const [durationOf, setDurationOf] = useState({
+    entryId: runningEntry?.id ?? null,
+    text: remembered?.duration ?? '',
+  })
+  const duration =
+    durationOf.entryId === (runningEntry?.id ?? null) ? durationOf.text : ''
+  // Relógio do aviso de sessão longa e do "Termina às" (o grande, o
+  // ElapsedTime, tem o dele)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 15_000)
+    return () => clearInterval(interval)
+  }, [])
+  const runningMs = runningEntry
+    ? now - new Date(runningEntry.startedAt).getTime()
+    : 0
+  const longSession = runningEntry !== undefined && runningMs >= LONG_SESSION_MS
 
   // Guarda o que está na tela agora (com o que o servidor tinha), a cada
   // mudança feita aqui: sair e voltar não perde a escolha
@@ -178,6 +214,7 @@ function TimerPanel(props: {
       measureTexts: measure.texts,
       workId: work?.id ?? null,
       link,
+      duration,
       ...next,
     }
     writeTimerMemory(execution.id, {
@@ -191,6 +228,8 @@ function TimerPanel(props: {
       workId: value.workId,
       linkBase: execution.linkUrl ?? null,
       link: value.link,
+      durationEntry: runningEntry?.id ?? null,
+      duration: value.duration,
     })
   }
   // Voltou pelo Desfazer com medida: os campos começam nos valores dela
@@ -331,6 +370,20 @@ function TimerPanel(props: {
     // Obra e link só se mudaram em relação ao registro: uma tela velha não
     // sobrescreve o que mudou em outro aparelho
     const chosenWork = work?.id ?? null
+    // "Durou": só com a sessão rodando (pausado, o fim já foi gravado no Pausar)
+    let endedAt: string | null = null
+    if (runningEntry) {
+      const checked = sessionEnd(
+        runningEntry.startedAt,
+        duration,
+        new Date().getTime(),
+      )
+      if ('error' in checked) {
+        setError(checked.error)
+        return
+      }
+      endedAt = checked.end
+    }
     const changed: Partial<WorkLink> = {
       ...(chosenWork !== (execution.workId ?? null)
         ? { workId: chosenWork }
@@ -353,6 +406,7 @@ function TimerPanel(props: {
         // gravação do caminho (treino ao vivo) ter tirado escolhas do servidor
         selection.legacyCount > 0 ? undefined : choices.optionIds,
         changed,
+        endedAt,
       )
       // Gravado: a escolha da tela não tem mais o que guardar
       clearTimerMemory(execution.id)
@@ -487,6 +541,17 @@ function TimerPanel(props: {
               : 'Primeira sessão'
             : `${sessions} ${sessions === 1 ? 'sessão' : 'sessões'} até agora`}
         </p>
+        {/* Esqueceu o cronômetro? Leva pro Finalizar: pausar fecharia a sessão
+            agora, e o "Durou" só vale pra sessão rodando */}
+        {longSession && (
+          <p
+            data-long-warning=""
+            role="status"
+            className="font-texto text-sm font-semibold [overflow-wrap:anywhere] text-tinta"
+          >
+            {`Rodando há ${formatDuration(runningMs)}. Durou quanto? Informe em "Durou" e finalize, sem pausar.`}
+          </p>
+        )}
         <button
           type="button"
           onClick={() =>
@@ -525,6 +590,20 @@ function TimerPanel(props: {
           {FORM_FIELD_ORDER.map((field) => (
             <Fragment key={field}>{blocks[field]}</Fragment>
           ))}
+          {runningEntry && (
+            <DurationField
+              // Outra sessão (Pausar e Retomar): campo novo
+              key={runningEntry.id}
+              value={duration}
+              onChange={(text) => {
+                setDurationOf({ entryId: runningEntry.id, text })
+                remember({ duration: text })
+              }}
+              startedAt={runningEntry.startedAt}
+              now={now}
+              forceOpen={longSession}
+            />
+          )}
           <MeasureWarning text={measure.warning} />
           <MeasureWarning text={workoutWarning} />
         </form>
