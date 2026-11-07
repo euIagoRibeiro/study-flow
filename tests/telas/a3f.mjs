@@ -58,19 +58,29 @@ try {
   page.on('dialog', (d) => d.accept())
   await page.setViewport({ width: 390, height: 900 })
   let puts = []
+  // Controle das esperas: ATRASO_PUT_MS=1500 segura cada PUT de registro
+  const putDelay = Number(process.env.ATRASO_PUT_MS ?? 0)
   await page.setRequestInterception(true)
   page.on('request', (req) => {
-    if (req.method() === 'PUT' && req.url().includes('/executions/')) puts.push({ url: req.url(), body: JSON.parse(req.postData() ?? '{}') })
-    req.continue()
+    const isPut = req.method() === 'PUT' && req.url().includes('/executions/')
+    if (isPut) puts.push({ url: req.url(), body: JSON.parse(req.postData() ?? '{}') })
+    if (isPut && putDelay) setTimeout(() => req.continue(), putDelay)
+    else req.continue()
   })
 
-  // ---- helpers: cartão pelo texto da descrição
-  const cardSel = (desc) => page.evaluate((desc) => {
-    document.querySelectorAll('[data-t]').forEach((x) => x.removeAttribute('data-t'))
-    const a = [...document.querySelectorAll('article')].find((x) => [...x.querySelectorAll('p')].some((p) => p.textContent.trim() === desc))
-    a?.setAttribute('data-t', 'card')
-    return !!a
-  }, desc)
+  // ---- helpers: cartão pelo texto da descrição, já sem o formulário aberto
+  const cardSel = async (desc) => {
+    try {
+      await page.waitForFunction((desc) => [...document.querySelectorAll('article')].some((x) => !x.querySelector('form') && [...x.querySelectorAll('p')].some((p) => p.textContent.trim() === desc)), { timeout: 5000 }, desc)
+    } catch {
+      throw new Error(`cartão "${desc}" não apareceu`)
+    }
+    await page.evaluate((desc) => {
+      document.querySelectorAll('[data-t]').forEach((x) => x.removeAttribute('data-t'))
+      const a = [...document.querySelectorAll('article')].find((x) => !x.querySelector('form') && [...x.querySelectorAll('p')].some((p) => p.textContent.trim() === desc))
+      a.setAttribute('data-t', 'card')
+    }, desc)
+  }
   const C = '[data-t="card"]'
   const S = `${C} section[aria-label="Treino"]`
   const click = (scope, text, starts = false) => page.evaluate((s, t, starts) => {
@@ -83,14 +93,20 @@ try {
   }, scope, text, starts)
   const workoutList = () => page.evaluate((C) => [...(document.querySelector(C)?.querySelectorAll('ul[aria-label="Treino"] > li') ?? [])].map((li) => [...li.children].map((c) => c.textContent.trim())), C)
   const openEdit = async () => { await page.evaluate((C) => document.querySelector(`${C} button[aria-label^="Editar registro"]`).click(), C); await pause(200) }
-  const save = async () => {
+  // closes: false quando o Salvar deve ficar travado (o formulário continua aberto)
+  const save = async ({ closes = true } = {}) => {
     const ok = await page.evaluate((C) => {
       const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Salvar' && x.form && document.querySelector(C).contains(x.form))
       if (!b) return false
       b.click(); return true
     }, C)
     if (!ok) throw new Error('Salvar do registro não achado')
-    await pause(700)
+    if (!closes) return pause(300)
+    try {
+      await page.waitForFunction(() => ![...document.querySelectorAll('article form')].length, { timeout: 5000 })
+    } catch {
+      throw new Error('o formulário do registro não fechou depois do Salvar')
+    }
   }
   const choose = async (label, option) => {
     const v = await page.evaluate((C, label, option) => {
@@ -231,7 +247,7 @@ try {
   // Exercício sem série: trava com motivo
   await pick('supino', SUPINO.name)
   puts = []
-  await save()
+  await save({ closes: false })
   t = await cardText()
   check('exercício sem série: Salvar travado com o motivo, nada enviado', puts.length === 0 && t.includes(`${SUPINO.name} está sem séries: adicione uma ou tire do treino.`), `${puts.length} ${t.slice(-200)}`)
   await page.evaluate((n) => document.querySelector(`button[aria-label="Mais ações do exercício ${n}"]`).click(), SUPINO.name)
