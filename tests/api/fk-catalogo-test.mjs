@@ -10,6 +10,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import pg from 'pg'
 import { API, TESTS } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 const { Pool } = pg
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL ausente: rode com --env-file=backend/.env (a limpeza usa o banco)')
@@ -114,7 +115,7 @@ try {
     return false
   }
   const call = async (method, path, body) => {
-    const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+    const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
     const text = await res.text()
     return { status: res.status, body: text ? JSON.parse(text) : null }
   }

@@ -5,9 +5,9 @@
 // na ordem em que foram feitas, no servidor, no banco (position) e na tela.
 // Registro aberto próprio, sem sessão (prefixo teste-ordem), apagado no fim.
 // Uso (raiz do repo): node --env-file=backend/.env tests/telas/treino-ordem.mjs
-import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 
 if (!process.env.DATABASE_URL) {
@@ -24,14 +24,14 @@ const check = (name, ok, detail = '') => {
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 async function waitForApi() {
   for (let i = 0; i < 40; i++) {
-    try { if ((await fetch(`${API}/tags`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tags`)).ok) return } catch {}
     await pause(250)
   }
   throw new Error('API fora do ar')
 }
 async function api(method, path, body) {
   await waitForApi()
-  const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   if (res.status >= 300) throw new Error(`${method} ${path}: ${res.status} ${text}`)
   return text ? JSON.parse(text) : null
@@ -47,7 +47,7 @@ try {
   if (!A?.active || !B?.active) throw new Error('exercícios do seed não achados')
   const open = await api('POST', '/executions', { taskId, description: `${P} reg`, completedAt: null })
 
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   await page.setViewport({ width: 390, height: 900 })

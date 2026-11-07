@@ -4,8 +4,8 @@
 // da sessão (antes, só o próprio lápis, lá em cima). Fechar devolve o foco a
 // quem abriu (o ⋯, o lápis), que rola a tela até ele. Cancelar não grava
 // nada. Só lê: nada é gravado (o Cancelar é conferido na API).
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -16,14 +16,14 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const TASK = 'Exercício físico'
 const DESC = 'Costas e bíceps' // registro do seed (1401), com treino e sessão
 
-const executionByDesc = async () => (await (await fetch(`${API}/executions`)).json()).find((e) => e.description === DESC)
+const executionByDesc = async () => (await (await apiFetch(`${API}/executions`)).json()).find((e) => e.description === DESC)
 const before = await executionByDesc()
 // Depois de achar, sempre pelo ID: se algo gravar, a descrição muda e a busca
 // pela descrição não acharia nada (a 1ª versão da checagem deixava passar)
-const current = async () => (await (await fetch(`${API}/executions`)).json()).find((e) => e.id === before.id)
+const current = async () => (await (await apiFetch(`${API}/executions`)).json()).find((e) => e.id === before.id)
 if (!before) throw new Error(`o seed não tem o registro "${DESC}" (reseed?)`)
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)

@@ -2,9 +2,9 @@
 // determinístico) e no Histórico (compareNames, a mesma regra do formulário,
 // sem depender da collation do banco). Registro próprio em Programar
 // (contexto Código: refatoração / leitura / questões), apagado no finally.
-import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 const { Pool } = pg
 
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=../backend/.env (npm run telas)')
@@ -20,12 +20,12 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${ok ? '' : ` (${detail})`}`)
 }
 async function api(method, path, body) {
-  const res = await fetch(`${API}${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(`${API}${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   return { status: res.status, body: text ? JSON.parse(text) : null }
 }
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 let ID = null
 try {
   const measure = (await api('GET', '/measures')).body.find((m) => m.tagId === CODIGO)
@@ -63,7 +63,7 @@ try {
   await page.setRequestInterception(true)
   page.on('request', async (req) => {
     if (req.method() === 'GET' && req.url() === `${API}/executions`) {
-      const res = await fetch(req.url())
+      const res = await apiFetch(req.url())
       const list = await res.json()
       // Nem alfabética nem o contrário dela (inverter a ordem antiga daria a
       // alfabética por coincidência)

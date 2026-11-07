@@ -8,8 +8,8 @@
 // obras pela diferença de contagem. Uso (raiz do repo):
 //   node --env-file=backend/.env tests/telas/o4d-chips.mjs
 import pg from 'pg'
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { deleteExecutions, deleteNewWorks, worksSnapshot } from '../limpeza.mjs'
 
 if (!process.env.DATABASE_URL) {
@@ -26,7 +26,7 @@ const check = (name, ok, detail = '') => {
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 async function api(method, path, body) {
-  const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   if (res.status >= 300) throw new Error(`${method} ${path}: ${res.status} ${text}`)
   return text ? JSON.parse(text) : null
@@ -71,7 +71,7 @@ try {
   const renamed = `${P} nome de hoje`
   await api('PATCH', `/works/${wR.id}`, { title: renamed })
 
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   await page.setViewport({ width: 390, height: 1000 })

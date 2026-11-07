@@ -7,9 +7,9 @@
 // os valores da medida também sobrevivem (sem aviso: tela contínua). Nada vai
 // pro servidor antes de registrar/salvar/finalizar. Tarefa de teste própria;
 // o 1401 do seed é restaurado no banco (o "Salvar apaga" grava de verdade).
-import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=../backend/.env (npm run telas)')
@@ -45,7 +45,7 @@ const reg1401 = async () => (await pool.query(
   `SELECT e.description, (SELECT count(*)::int FROM exercise_sets s JOIN execution_exercises x ON x.id = s.execution_exercise_id WHERE x.task_execution_id = e.id) AS series
    FROM task_executions e WHERE e.id = $1`, [REG])).rows[0]
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)

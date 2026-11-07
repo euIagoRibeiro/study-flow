@@ -11,8 +11,8 @@
 // --sem-estimativa, pro campo da duração estimada (Registrar e lápis)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME, OUT as here } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 
 const label = process.argv[2]
 const clockFile = join(here, 'clock.txt')
@@ -32,7 +32,7 @@ const pages = [
   ['timer-pausado', '/executar?tarefa=5eed0000-0000-4000-8000-000000000004'],
   ['executar-exfis', '/executar?tarefa=5eed0000-0000-4000-8000-000000000006'],
 ]
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

@@ -10,8 +10,8 @@
 // devolve. Uso (raiz do repo):
 //   node --env-file=backend/.env tests/telas/lapis-segundos.mjs
 import pg from 'pg'
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { deleteExecutions, pauseRunning, resumeRunning } from '../limpeza.mjs'
 
 if (!process.env.DATABASE_URL) {
@@ -27,7 +27,7 @@ const check = (name, ok, detail = '') => {
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 async function api(method, path, body) {
-  const res = await fetch(API + path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const res = await apiFetch(API + path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const text = await res.text()
   if (res.status >= 300) throw new Error(`${method} ${path}: ${res.status} ${text}`)
   return text ? JSON.parse(text) : null
@@ -60,7 +60,7 @@ try {
   // R4: a 2ª 01:30 de 02/11/2025 em Nova York (EST, UTC-5) = 06:30Z
   const r4 = await rec(`${P} r4`, { completedAt: '2025-11-02T06:30:12.345Z', estimatedMinutes: 10 })
 
-  browser = await puppeteer.launch({ executablePath: CHROME })
+  browser = await launch({ executablePath: CHROME })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   await page.setViewport({ width: 390, height: 900 })

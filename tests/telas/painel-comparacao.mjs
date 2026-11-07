@@ -8,8 +8,8 @@
 //    (semanas passadas, "novo" / "sem tempo agora", linha só do anterior sem
 //    bolinha), detalhe (subtags e fases) e a semana atual até o mesmo ponto.
 // Só lê: nada é gravado.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const FUSO = 'America/Sao_Paulo'
 const results = []
@@ -40,11 +40,11 @@ const local = (ymd) => new Date(`${ymd}T00:00:00-03:00`)
 const addDays = (ymd, n) => ymdOf(new Date(local(ymd).getTime() + n * 86400e3 + 12 * 3600e3))
 const mondayOf = (ymd) => addDays(ymd, -((new Date(local(ymd).getTime() + 12 * 3600e3).getUTCDay() + 6) % 7))
 const api = async (route, de, ate, extra = {}) =>
-  (await fetch(`${API}/dashboard/${route}?${new URLSearchParams({ de: de.toISOString(), ate: ate.toISOString(), fuso: FUSO, ...extra })}`)).json()
+  (await apiFetch(`${API}/dashboard/${route}?${new URLSearchParams({ de: de.toISOString(), ate: ate.toISOString(), fuso: FUSO, ...extra })}`)).json()
 
-const tags = await (await fetch(`${API}/tags`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const nameOf = (id) => (id === null ? '(sem tag)' : tags.find((t) => t.id === id)?.name)
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   // ======== 1. relógio congelado
   {

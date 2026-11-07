@@ -2,8 +2,8 @@
 // aviso no formulário "Nova tag" e a trava de apagar. O seed é lido da API; o
 // que ele não tem (arquivada, subtag) entra injetado na resposta de /selections.
 // S4b: criar e editar, com tudo o que cria prefixado "s4b" e apagado no fim
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -11,9 +11,9 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${detail ? ` (${detail})` : ''}`)
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
-const get = async (p) => (await fetch(API + p)).json()
+const get = async (p) => (await apiFetch(API + p)).json()
 const send = async (method, p, body) => {
-  const r = await fetch(API + p, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const r = await apiFetch(API + p, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!r.ok) throw new Error(`${method} ${p}: ${r.status} ${await r.text()}`)
   return r.status === 204 ? null : r.json()
 }
@@ -45,7 +45,7 @@ try {
   testTag = await send('POST', '/tags', { name: 's4 teste' })
   const ingles = tags.find((t) => t.name === 'Inglês')
 
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   await page.setViewport({ width: 375, height: 900 })

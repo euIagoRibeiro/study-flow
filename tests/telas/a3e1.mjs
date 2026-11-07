@@ -2,11 +2,11 @@
 // abertos (Exercício físico, sem sessão rodando: não esbarra no "Rodando" do
 // seed) e apaga tudo no finally, direto no banco (não há DELETE de registro).
 // Rodar: node --env-file=backend/.env a3e1.mjs (da raiz do repo)
-import puppeteer from 'puppeteer-core'
 
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=backend/.env')
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
@@ -21,14 +21,14 @@ const check = (name, ok, detail = '') => {
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 async function waitForApi() {
   for (let i = 0; i < 40; i++) {
-    try { if ((await fetch(`${API}/tags`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tags`)).ok) return } catch {}
     await pause(250)
   }
   throw new Error('API fora do ar')
 }
 async function api(method, path, body) {
   await waitForApi()
-  const res = await fetch(`${API}${path}`, {
+  const res = await apiFetch(`${API}${path}`, {
     method, headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   })
@@ -40,7 +40,7 @@ const sets = (w) => (w ?? []).map((x) => `${x.exerciseId.slice(-2)}:` + x.sets.m
 
 const created = []
 let testTag
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
   args: [`--lang=${LANG}`],

@@ -6,8 +6,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path'
 import pixelmatch from 'pixelmatch'
 import pngjs from 'pngjs'
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME, OUT } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 const { PNG } = pngjs
 
 const label = process.argv[2]
@@ -49,7 +49,7 @@ const frozen = Number(readFileSync(clockFile, 'utf8'))
 const dir = join(OUT, `nav-${label}`)
 mkdirSync(dir, { recursive: true })
 const meta = {}
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   await page.evaluateOnNewDocument((t) => {

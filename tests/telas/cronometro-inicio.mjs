@@ -5,9 +5,9 @@
 // mexer no formulário, igual a antes. "Quando", estimativa e medida não vão
 // (decidido: são do registro manual). Tarefa de teste própria, apagada no
 // finally com tudo o que criou.
-import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=../backend/.env (npm run telas)')
@@ -38,7 +38,7 @@ const saved = async () => (await pool.query(
    FROM task_executions e LEFT JOIN tags r ON r.id = e.root_tag_id
    WHERE e.task_id = $1 AND e.completed_at IS NULL`, [taskId])).rows
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)

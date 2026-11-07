@@ -10,9 +10,9 @@
 // cores): barras contra o fundo, bolinha do chip contra o fundo DO CHIP,
 // texto do chip, bolinhas da tabela. Barras e chips são HTML: print da
 // janela + coordenadas da tela (o print por elemento da seção saiu cortado).
-import puppeteer from 'puppeteer-core'
 import pngjs from 'pngjs'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 const { PNG } = pngjs
 
 let ok = 0, bad = 0
@@ -23,7 +23,7 @@ const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - 
 const rgbOf = (css) => css.match(/\d+/g).slice(0, 3).map(Number)
 const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 3)
 
-const tags = await (await fetch(`${API}/tags`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const codigo = tags.find((t) => t.name === 'Código' && t.level === 1).id
 const byId = new Map(tags.map((t) => [t.id, t]))
 const pathOf = (t) => (t.parentId ? `${pathOf(byId.get(t.parentId))} › ${t.name}` : t.name)
@@ -35,8 +35,8 @@ const ymd = ymdOf(monday)
 const nextMonday = new Date(monday); nextMonday.setDate(nextMonday.getDate() + 7)
 const weekStart = `${ymd}T00:00:00-03:00`
 const query = new URLSearchParams({ de: weekStart, ate: `${ymdOf(nextMonday)}T00:00:00-03:00`, fuso: 'America/Sao_Paulo' })
-const week = await (await fetch(`${API}/dashboard/tempo-por-contexto?${query}`)).json()
-const subtags = (await (await fetch(`${API}/dashboard/tempo-por-subtag?contexto=${codigo}&${query}`)).json()).items
+const week = await (await apiFetch(`${API}/dashboard/tempo-por-contexto?${query}`)).json()
+const subtags = (await (await apiFetch(`${API}/dashboard/tempo-por-subtag?contexto=${codigo}&${query}`)).json()).items
 // Contextos sem tempo na semana, no fim da lista: os 5 primeiros têm cor, o
 // resto vira "outros". Pelo menos 2, cada um com 10% do total: a fatia cinza
 // nunca fica fina demais pra ler
@@ -58,7 +58,7 @@ const expected = {
   dots: injected.items.length + subtags.length,
 }
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   await page.setRequestInterception(true)

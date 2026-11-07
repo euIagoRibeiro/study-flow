@@ -1,11 +1,11 @@
 // A3e: layout da seção Treino aberta, 5 estados × 7 larguras, janela real
 // (barra de rolagem visível, largura útil). Registro aberto próprio, apagado
 // no finally. Rodar da raiz: node --env-file=backend/.env a3e-layout.mjs
-import puppeteer from 'puppeteer-core'
 
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=backend/.env')
 import pg from 'pg'
 import { API, APP, CHROME, OUT } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const TASK = '5eed0000-0000-4000-8000-000000000006'
@@ -14,12 +14,12 @@ let ok = 0, bad = 0
 const check = (cond, msg) => { cond ? ok++ : bad++; if (!cond) console.log('FALHA', msg) }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 async function api(method, path, body) {
-  const res = await fetch(`${API}${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(`${API}${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   return { status: res.status, body: text ? JSON.parse(text) : null }
 }
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 let ID = null
 try {
   const tags = (await api('GET', '/tags')).body

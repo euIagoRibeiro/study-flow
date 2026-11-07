@@ -10,8 +10,8 @@
 // medido (o total não cresce quando falha) e a contagem mínima de textos, fixa.
 // A sessão rodando do seed vai com o início 25 min atrás na resposta da API (o
 // seed a ancora no reseed; com 2h, o "Durou" abriria e o total mudaria).
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -19,7 +19,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${ok ? '' : ` (${detail})`}`)
 }
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
-const [works, tags, tasks, measures] = await Promise.all(['works', 'tags', 'tasks', 'measures'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
+const [works, tags, tasks, measures] = await Promise.all(['works', 'tags', 'tasks', 'measures'].map(async (p) => (await apiFetch(`${API}/${p}`)).json()))
 const desenho = tags.find((t) => t.name === 'Desenho' && t.parentId === null)
 const inktober = tags.find((t) => t.name === 'Inktober' && t.parentId === desenho.id)
 const task = tasks.find((t) => t.title === 'Desenhar')
@@ -42,13 +42,13 @@ const injectedWorks = JSON.stringify([...works, ...Array.from({ length: 20 }, (_
 const injectedMeasures = JSON.stringify([...measures, longMeasure])
 const injectedTasks = JSON.stringify([...tasks, longTask])
 const LINK = `https://exemplo.com/${'a'.repeat(1980)}`
-const entries = await (await fetch(`${API}/time-entries`)).json()
+const entries = await (await apiFetch(`${API}/time-entries`)).json()
 const running = entries.find((e) => e.endedAt === null && e.taskExecutionId.startsWith('5eed'))
 
 let browser
 try {
   if (!running) throw new Error('sessão rodando do seed não achada')
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let injected = false

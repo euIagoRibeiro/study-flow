@@ -2,6 +2,7 @@
 // Não muda nada: as escritas são recusadas de propósito (provam que os ids passam
 // pela validação de uuid de uma rota de escrita). Uso (raiz do repo): node <este arquivo>
 import { API } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -9,7 +10,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${ok ? '' : ` (${detail})`}`)
 }
 const call = async (method, path, body) => {
-  const res = await fetch(API + path, {
+  const res = await apiFetch(API + path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,

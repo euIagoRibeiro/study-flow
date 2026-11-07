@@ -1,8 +1,8 @@
 // A1d: Registrar e editar ABERTOS, com "Quando" e "Duração", de 320 a 1280.
 // Rolagem lateral, algo passando da borda, folga do anel de foco (4px)
 // dos campos novos dentro de quem corta. Só lê: não grava nada.
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 
 const FIELDS = ['Quando', 'Duração estimada (opcional)']
 
@@ -35,7 +35,7 @@ function measure(page) {
   }, FIELDS)
 }
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

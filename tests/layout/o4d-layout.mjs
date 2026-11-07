@@ -8,9 +8,9 @@
 // linha já dá entre eles (gap-x-2 = 8px na mesma linha, gap-y-1 = 4px entre
 // linhas), e não encosta no lápis. Contraste no pixel, nos dois temas: o chip
 // (a mesma classe do S6, vigiado) e o texto do link.
-import puppeteer from 'puppeteer-core'
 import pngjs from 'pngjs'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const { PNG } = pngjs
 const results = []
@@ -20,7 +20,7 @@ const check = (name, ok, detail = '') => {
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
-const [works, tasks, executions, entries] = await Promise.all(['works', 'tasks', 'executions', 'time-entries'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
+const [works, tasks, executions, entries] = await Promise.all(['works', 'tasks', 'executions', 'time-entries'].map(async (p) => (await apiFetch(`${API}/${p}`)).json()))
 const task = tasks.find((t) => t.title === 'Desenhar')
 const record = executions
   .filter((e) => e.taskId === task.id && e.completedAt && e.workId && e.description && e.selections.length > 0 &&
@@ -49,7 +49,7 @@ let browser
 try {
   if (!record) throw new Error('registro de Desenhar com obra, escolhas e sessão não achado no seed')
   if (LONG.length !== 2000) throw new Error(`endereço do pior caso com ${LONG.length} caracteres`)
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let state = null

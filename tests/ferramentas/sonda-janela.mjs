@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { setTimeout as later } from 'node:timers/promises'
 import pg from 'pg'
 import { TESTS } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 
 const CONTAINER = 'study-flow-postgres-1'
 const TEMP = 'studyflow_sonda'
@@ -34,7 +35,7 @@ const psql = (db, sql) => {
   if (r.status !== 0) throw new Error(r.stderr)
 }
 const call = async (method, path, body) => {
-  const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   return { status: res.status, body: text ? JSON.parse(text) : null }
 }

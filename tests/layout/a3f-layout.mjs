@@ -1,15 +1,15 @@
 // A3f: layout da edição com treino (1401) no Histórico e no cartão da Lista
 // (três cartões aninhados), e da lista de exercícios aberta no Histórico.
 // Só lê: nada é salvo. 4 estados × 2 lugares × 7 larguras, janela real.
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME, OUT } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 
 let ok = 0, bad = 0
 const check = (cond, msg) => { cond ? ok++ : bad++; if (!cond) console.log('FALHA', msg) }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const minField = {}
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   // Cada caso começa sem rascunho (N3): os rascunhos dos formulários ficam na

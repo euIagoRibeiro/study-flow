@@ -5,9 +5,9 @@
 // Iniciar. No fim, conta os toques de dois casos típicos no seed.
 // Árvore, seleções, tarefa e registros próprios (prefixo teste-s5), apagados no
 // finally. Pausa a sessão rodando do seed e devolve no fim.
-import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { createDiagnostico } from '../diagnostico.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 
@@ -26,7 +26,7 @@ const KEY = (id) => `studyflow:rascunho:registrar:${id}`
 const CORS = { 'Access-Control-Allow-Origin': '*' }
 
 async function api(method, path, body) {
-  const res = await fetch(API + path, {
+  const res = await apiFetch(API + path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
@@ -45,7 +45,7 @@ const sel = async (tagId, name, options, multiple = false) => {
 const paused = (await pool.query('UPDATE time_entries SET ended_at = now() WHERE ended_at IS NULL RETURNING id')).rows.map((r) => r.id)
 const made = { tags: [], selections: [], measure: null, task: null, past: [] }
 const seedExtras = []
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 
 async function clearExecutions(taskId, keep = []) {
   const ids = (await pool.query('SELECT id FROM task_executions WHERE task_id = $1 AND NOT (id = ANY($2))', [taskId, keep])).rows.map((r) => r.id)

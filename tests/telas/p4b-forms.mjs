@@ -1,10 +1,10 @@
 // P4b: campo de fase nos 3 formulários (Registrar, Finalizar, editar).
 // Mira pelo rótulo/conteúdo. Desfaz tudo no finally (API + pg), esperando a
 // API antes de cada pedido (o backend em dev reinicia sozinho às vezes).
-import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
@@ -26,7 +26,7 @@ function check(name, ok, detail = '') {
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
     try {
-      if ((await fetch(`${API}/tasks`)).ok) return
+      if ((await apiFetch(`${API}/tasks`)).ok) return
     } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
@@ -34,7 +34,7 @@ async function waitForApi() {
 }
 async function api(method, path, body) {
   await waitForApi()
-  const res = await fetch(API + path, {
+  const res = await apiFetch(API + path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
@@ -70,7 +70,7 @@ async function choose(page, scope, label, optionText) {
 const phaseOf = async (page, scope) =>
   (await fields(page, scope)).find((f) => f.label === 'Fase')?.value ?? '(sem campo)'
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

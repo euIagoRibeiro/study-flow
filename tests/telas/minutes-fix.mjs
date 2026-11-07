@@ -1,9 +1,9 @@
 // Conserto da Duração estimada: "4,5" nunca vira 45 (navegador em inglês
 // era o caso que corrompia). Registrar e editar. Apaga o que cria.
-import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const FINANCAS = '5eed0000-0000-4000-8000-000000000005'
@@ -16,17 +16,17 @@ const check = (name, ok, detail = '') => {
 }
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`${API}/tasks`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tasks`)).ok) return } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
   throw new Error('API não respondeu')
 }
-const get = async (p) => { await waitForApi(); return (await fetch(API + p)).json() }
+const get = async (p) => { await waitForApi(); return (await apiFetch(API + p)).json() }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 
 try {
   for (const lang of ['en-US', 'pt-BR']) {
-    const browser = await puppeteer.launch({
+    const browser = await launch({
       executablePath: CHROME,
       args: [`--lang=${lang}`],
     })

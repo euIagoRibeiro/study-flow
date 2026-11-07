@@ -1,6 +1,6 @@
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME, OUT } from '../config.mjs'
-const b = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+import { launch } from '../sessao.mjs'
+const b = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 let ok = 0, bad = 0
 const check = (cond, msg) => { cond ? ok++ : bad++; if (!cond) console.log('FALHA', msg) }
 try {

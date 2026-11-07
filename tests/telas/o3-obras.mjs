@@ -4,8 +4,8 @@
 // em Leitura › Mangá (nunca título das anotações). Uso (raiz do repo):
 //   node --env-file=backend/.env tests/telas/o3-obras.mjs
 import pg from 'pg'
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { deleteExecutions, deleteNewWorks, worksSnapshot } from '../limpeza.mjs'
 const { Pool } = pg
 if (!process.env.DATABASE_URL) {
@@ -21,7 +21,7 @@ const check = (name, ok, detail = '') => {
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const call = async (method, path, body) => {
-  const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   return { status: res.status, body: text ? JSON.parse(text) : null }
 }
@@ -44,7 +44,7 @@ const taskIds = []
 let browser
 try {
   // ---------- página e auxiliares
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   await page.setViewport({ width: 375, height: 900 })
@@ -482,7 +482,7 @@ try {
   const left = await pool.query(`SELECT (SELECT count(*) FROM tags WHERE name LIKE '${P}%')::int + (SELECT count(*) FROM tasks WHERE title LIKE '${P}%')::int AS n`)
   check('obras: diferença de contagem 0 depois da limpeza', delta === 0, String(delta))
   check('tags e tarefas de teste apagadas', left.rows[0].n === 0, `${left.rows[0].n} sobrando`)
-  const seedAfter = JSON.stringify((await (await fetch(`${API}/works`)).json()).filter((w) => w.id.startsWith('5eed'))) + (await seedStamps())
+  const seedAfter = JSON.stringify((await (await apiFetch(`${API}/works`)).json()).filter((w) => w.id.startsWith('5eed'))) + (await seedStamps())
   check('obras do seed iguais às de antes', seedAfter === seedBefore)
   await pool.end()
   const ok = results.filter(Boolean).length

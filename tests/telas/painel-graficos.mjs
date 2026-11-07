@@ -3,8 +3,8 @@
 // período (valor em cima de cada barra) e o detalhe de um contexto na mesma
 // página (?contexto=): subtags, e fases se o contexto usa. Compara com a API.
 // Só lê: nada é gravado.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const FUSO = 'America/Sao_Paulo'
 const results = []
@@ -21,10 +21,10 @@ const local = (ymd) => new Date(`${ymd}T00:00:00-03:00`)
 const ymdOf = (d) => new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 10)
 const addDays = (ymd, n) => ymdOf(new Date(local(ymd).getTime() + n * 86400e3 + 12 * 3600e3))
 const mondayOf = (ymd) => addDays(ymd, -((new Date(local(ymd).getTime() + 12 * 3600e3).getUTCDay() + 6) % 7))
-const api = async (route, params) => (await fetch(`${API}/dashboard/${route}?${new URLSearchParams(params)}`)).json()
+const api = async (route, params) => (await apiFetch(`${API}/dashboard/${route}?${new URLSearchParams(params)}`)).json()
 const phaseLabels = { requisitos: 'Requisitos', prototipo: 'Protótipo', validacao: 'Validação', implementacao: 'Implementação' }
 
-const tags = await (await fetch(`${API}/tags`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const byName = (n) => tags.find((t) => t.name === n && t.level === 1)
 const nameOf = (id) => (id === null ? '(sem tag)' : tags.find((t) => t.id === id)?.name)
 // Semana passada: completa, com Código (fases), Vestibular e outros (seed D1 + antigo)
@@ -32,7 +32,7 @@ const mon = mondayOf(ymdOf(new Date()))
 const prev = addDays(mon, -7)
 const period = { de: local(prev).toISOString(), ate: local(mon).toISOString(), fuso: FUSO }
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)

@@ -2,8 +2,8 @@
 // aviso da sessão rodando, nota de sobreposição e a tabela por contexto. A
 // tela é comparada com a API do mesmo período (a API foi provada no D2).
 // Só lê: nada é gravado.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const FUSO = 'America/Sao_Paulo'
 const results = []
@@ -31,12 +31,12 @@ const nextMonth = (ymd) => {
 }
 async function apiFor(start, end) {
   const q = new URLSearchParams({ de: local(start).toISOString(), ate: local(end).toISOString(), fuso: FUSO })
-  return (await fetch(`${API}/dashboard/tempo-por-contexto?${q}`)).json()
+  return (await apiFetch(`${API}/dashboard/tempo-por-contexto?${q}`)).json()
 }
 
-const tags = await (await fetch(`${API}/tags`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const nameOf = (id) => (id === null ? '(sem tag)' : tags.find((t) => t.id === id)?.name)
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)

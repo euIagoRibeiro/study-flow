@@ -2,15 +2,15 @@
 // em cima; abas embaixo) e barra de 4 abas no celular. 5 telas × 8 larguras,
 // janela real. E o foco por teclado: nada escondido atrás do topo fixo
 // (desktop, scroll-padding-top) nem da barra de baixo (celular).
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME, out } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 
 let ok = 0, bad = 0
 const check = (cond, msg) => { cond ? ok++ : bad++; if (!cond) console.log('FALHOU', msg) }
 const pages = ['/', '/executar', '/historico', '/painel', '/tags']
 const widths = [320, 360, 375, 414, 640, 768, 1024, 1280]
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   await page.emulateTimezone('America/Sao_Paulo')

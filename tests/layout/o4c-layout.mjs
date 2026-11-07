@@ -10,8 +10,8 @@
 // rótulo vira a legenda do fieldset). Nada é gravado (o Salvar não é tocado): a bateria confere que
 // nenhum pedido de escrita saiu. Uma checagem por texto medido (o total não
 // cresce quando falha) e a contagem mínima de textos, fixa.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -21,7 +21,7 @@ const check = (name, ok, detail = '') => {
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
 const FORM = 'form[id^="editar-"]'
-const [works, tags, tasks, measures, executions] = await Promise.all(['works', 'tags', 'tasks', 'measures', 'executions'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
+const [works, tags, tasks, measures, executions] = await Promise.all(['works', 'tags', 'tasks', 'measures', 'executions'].map(async (p) => (await apiFetch(`${API}/${p}`)).json()))
 const desenho = tags.find((t) => t.name === 'Desenho' && t.parentId === null)
 const inktober = tags.find((t) => t.name === 'Inktober' && t.parentId === desenho.id)
 const task = tasks.find((t) => t.title === 'Desenhar')
@@ -52,7 +52,7 @@ const LINK = `https://exemplo.com/${'a'.repeat(1980)}`
 let browser
 try {
   if (!record) throw new Error('registro de Desenhar com obra e descrição não achado no seed')
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let injected = false

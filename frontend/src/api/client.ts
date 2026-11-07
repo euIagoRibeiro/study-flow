@@ -25,8 +25,11 @@ export async function request<T>(
 ): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
-    // Content-Type só quando tem corpo: num GET, ele forçaria um preflight à toa
-    headers: options?.body ? { 'Content-Type': 'application/json' } : undefined,
+    // X-StudyFlow em todo pedido: a API recusa DELETE sem ele (só um script da
+    // mesma origem consegue mandá-lo). O cookie de sessão vai sozinho
+    headers: options?.body
+      ? { 'Content-Type': 'application/json', 'X-StudyFlow': '1' }
+      : { 'X-StudyFlow': '1' },
   })
 
   if (!response.ok) {

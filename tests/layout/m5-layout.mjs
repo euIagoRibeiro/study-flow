@@ -5,8 +5,8 @@
 // no seed, só Código tem tipos, 3).
 // Item 3 (2026-10-27): tipos UM EMBAIXO DO OUTRO no celular (< 640px), grade
 // 2×2 no computador, nos 4 lugares.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 function measure(page) {
   return page.evaluate(() => {
@@ -61,14 +61,14 @@ async function chooseContext(page, text) {
 }
 
 const M_IDIOMAS = '5eed0000-0000-4000-a000-000000000002'
-const measures = await (await fetch(`${API}/measures`)).json()
+const measures = await (await apiFetch(`${API}/measures`)).json()
 const model = measures.flatMap((m) => m.kinds)[0]
 if (!model || !measures.some((m) => m.id === M_IDIOMAS)) throw new Error('medida de Idiomas ou tipo modelo não achados')
 const injected = measures.map((m) => (m.id !== M_IDIOMAS ? m : {
   ...m,
   kinds: ['escrita', 'escuta', 'fala', 'leitura'].map((name, i) => ({ ...model, id: `aaaaaaaa-0000-4000-8000-00000000000${i}`, name })),
 }))
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

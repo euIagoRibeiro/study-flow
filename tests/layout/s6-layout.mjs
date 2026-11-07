@@ -3,9 +3,9 @@
 // injetado na resposta (5 seleções, uma múltipla com 30 opções MARCADAS, nomes de
 // 30 letras sem espaço). O cartão pode ficar alto; nada vaza. Contraste no pixel,
 // nos dois temas: o texto do chip é vigiado (4,74:1 no escuro).
-import puppeteer from 'puppeteer-core'
 import pngjs from 'pngjs'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const { PNG } = pngjs
 const results = []
@@ -14,7 +14,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${detail ? ` (${detail})` : ''}`)
 }
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
-const [selections, tasks, executions] = await Promise.all(['selections', 'tasks', 'executions'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
+const [selections, tasks, executions] = await Promise.all(['selections', 'tasks', 'executions'].map(async (p) => (await apiFetch(`${API}/${p}`)).json()))
 const task = tasks.find((t) => t.title === 'Desenhar')
 const record = executions.find((e) => e.taskId === task.id && e.selections.length > 0 && e.completedAt && e.description)
 if (!record) throw new Error('registro do seed com escolhas não achado')
@@ -38,7 +38,7 @@ const ratio = (a, b) => {
 
 let browser
 try {
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let worst = false

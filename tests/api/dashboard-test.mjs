@@ -5,6 +5,7 @@
 // só o bloco D1 tem Vestibular lá) confere a rota contra a conta do seed.
 import pg from 'pg'
 import { API } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 const { Pool } = pg
 
 if (!process.env.DATABASE_URL) throw new Error('rodar com --env-file=../backend/.env (npm run api)')
@@ -28,7 +29,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${ok ? '' : ` (${detail})`}`)
 }
 async function get(route, params) {
-  const res = await fetch(`${API}/dashboard/${route}?${new URLSearchParams(params)}`)
+  const res = await apiFetch(`${API}/dashboard/${route}?${new URLSearchParams(params)}`)
   const text = await res.text()
   let body = null
   try { body = text ? JSON.parse(text) : null } catch { /* rota inexistente: HTML do Express */ }
@@ -178,7 +179,7 @@ try {
   check('ano bissexto (366 dias) aceito: 12 faixas vazias, 0', r.status === 200 && r.body.items.length === 12 && r.body.items.every((x) => x.seconds === 0), `${r.status} ${JSON.stringify(r.body)}`)
 
   // ---- a rodando do seed: "até" depois dela conta até agora; antes, até o "até"
-  const running = (await (await fetch(`${API}/time-entries`)).json()).find((e) => e.endedAt === null)
+  const running = (await (await apiFetch(`${API}/time-entries`)).json()).find((e) => e.endedAt === null)
   if (!running) throw new Error('o seed não tem sessão rodando (reseed?)')
   const started = new Date(running.startedAt)
   r = await get('tempo-por-contexto', { de: new Date(started - 3600e3).toISOString(), ate: new Date(Date.now() + 3600e3).toISOString(), fuso: FUSO })

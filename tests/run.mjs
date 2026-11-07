@@ -8,6 +8,7 @@ import { freemem } from 'node:os'
 import { join } from 'node:path'
 import pg from 'pg'
 import { API, APP, TESTS } from './config.mjs'
+import { sessionCookie } from './sessao.mjs'
 
 // Ordem dentro de cada grupo = a das etapas. Argumento extra = outra rodada
 // (a3e1 com o navegador em inglês; minutes-fix e m5-forms já rodam os dois)
@@ -18,7 +19,7 @@ const groups = {
   api: ['p2-test.mjs', 'a1b-test.mjs', 'm2-test.mjs', 'a3b-test.mjs', 'dashboard-test.mjs', 's2a-test.mjs',
     's2b-test.mjs', 's2c-test.mjs', 'seed-selecoes.mjs', 'tag-corrida-test.mjs', 'o2a-test.mjs', 'o2b-test.mjs',
     'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs', 'seed-obras.mjs', 'tempo-test.mjs', 'host-test.mjs',
-    'estimativa-segundos-test.mjs'],
+    'estimativa-segundos-test.mjs', 'auth-test.mjs', 'rotas-fechadas-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
@@ -75,9 +76,16 @@ async function reachable(url) {
     return false
   }
 }
-if (needsApi && !(await reachable(`${API}/tags`))) {
+if (needsApi && !(await reachable(`${API}/health`))) {
   stop(`a API não responde em ${API} (o proxy /api do Vite). Suba o backend e o Vite ` +
     '(cd backend && npm run dev; cd frontend && npm run dev)')
+}
+if (needsApi) {
+  try {
+    await sessionCookie()
+  } catch (err) {
+    stop(`${err.message}. As baterias entram com TEST_PASSWORD do backend/.env`)
+  }
 }
 if (needsApp && !(await reachable(APP))) {
   stop(`o frontend não responde em ${APP}. Suba o Vite (cd frontend && npm run dev)`)

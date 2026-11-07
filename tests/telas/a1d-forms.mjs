@@ -1,10 +1,10 @@
 // A1d: duração estimada e "Quando" na tela (Registrar, editar, Histórico).
 // Mira pelo conteúdo. Restaura o 1301 e apaga os registros de teste no
 // finally, esperando a API antes de cada pedido.
-import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const FINANCAS = '5eed0000-0000-4000-8000-000000000005'
@@ -17,14 +17,14 @@ const check = (name, ok, detail = '') => {
 }
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`${API}/tasks`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tasks`)).ok) return } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
   throw new Error('API não respondeu em 30s')
 }
 async function get(path) {
   await waitForApi()
-  return (await fetch(API + path)).json()
+  return (await apiFetch(API + path)).json()
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const byDescription = async (text) => (await get('/executions')).find((e) => e.description === text)
@@ -61,7 +61,7 @@ async function card(page, description) {
 }
 const LABEL = 'Duração estimada (opcional)'
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })
@@ -181,7 +181,7 @@ try {
   check('rodou sem erro', false, err.message)
 } finally {
   await waitForApi()
-  await fetch(`${API}/executions/${E1301}`, {
+  await apiFetch(`${API}/executions/${E1301}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ description: original1301.description, completedAt: original1301.completedAt, estimatedMinutes: 90 }),
   })

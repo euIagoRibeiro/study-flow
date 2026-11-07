@@ -1,7 +1,7 @@
 // P4a: ligar/desligar fases na tela de tags. Mira pelo rótulo, nunca pela
 // posição. Exercícios volta a tracksPhase=false no finally.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const EXERCICIOS = '5eed0000-0000-4000-9000-000000000300'
 const CODIGO = '5eed0000-0000-4000-9000-000000000400'
@@ -15,7 +15,7 @@ function check(name, ok, detail = '') {
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
     try {
-      if ((await fetch(`${API}/tasks`)).ok) return
+      if ((await apiFetch(`${API}/tasks`)).ok) return
     } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
@@ -23,7 +23,7 @@ async function waitForApi() {
 }
 const tagFromApi = async (id) => {
   await waitForApi()
-  return (await (await fetch(`${API}/tags`)).json()).find((t) => t.id === id)
+  return (await (await apiFetch(`${API}/tags`)).json()).find((t) => t.id === id)
 }
 
 // Abre o menu ⋯ pelo aria-label e devolve os itens (texto + desabilitado)
@@ -52,7 +52,7 @@ const rowHasChip = (page, name, chip) =>
     return [...row.querySelectorAll('span')].some((s) => s.textContent.trim() === c)
   }, name, chip)
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })
@@ -105,7 +105,7 @@ try {
   check('rodou sem erro', false, err.message)
 } finally {
   await waitForApi()
-  await fetch(`${API}/tags/${EXERCICIOS}`, {
+  await apiFetch(`${API}/tags/${EXERCICIOS}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tracksPhase: false }),
   })
   check('Exercícios terminou sem fases', (await tagFromApi(EXERCICIOS)).tracksPhase === false)

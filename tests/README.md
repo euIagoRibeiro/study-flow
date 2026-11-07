@@ -22,6 +22,14 @@ seed que ela mexe voltam ao que eram). Nada aqui faz reseed sozinho.
    docker exec -i study-flow-postgres-1 psql -U studyflow -d studyflow -v ON_ERROR_STOP=1 < backend/seeds/dev_seed.sql
    ```
 
+5. **Sessão**: a API tem trava. As baterias entram com `TEST_PASSWORD` do
+   `backend/.env` (só dev, nunca a senha de produção; o hash dela no
+   `AUTH_PASSWORD_HASH`), por `sessao.mjs`: `apiFetch` é o `fetch` do lado
+   Node com o cookie e o `X-StudyFlow` (a API recusa DELETE sem ele), e
+   `launch` abre o Chrome com o cookie posto. Bateria nova usa os dois; um
+   `fetch` dentro do `page.evaluate` já leva o cookie da página, mas DELETE ali
+   precisa do `X-StudyFlow` à mão.
+
 O `run.mjs` confere tudo isso antes de começar e **para** dizendo o que
 falta.
 
@@ -110,8 +118,11 @@ API_PROXY_TARGET=http://127.0.0.1:3334 npx vite --port 5174 --strictPort
 
 # baterias contra a instância (em tests/): o APP_URL leva a API junto (5174/api);
 # as que usam o banco direto também precisam do DATABASE_URL da cópia
-APP_URL=http://localhost:5174 node api/seed-obras.mjs
+APP_URL=http://localhost:5174 node --env-file=../backend/.env api/seed-obras.mjs
 ```
+
+- O backend da instância lê o mesmo `.env`: a mesma senha de teste e o mesmo
+  `SESSION_SECRET`, então o cookie das baterias vale nas duas.
 
 - `--strictPort`: com a 5174 ocupada, o Vite para com erro em vez de pegar
   outra porta em silêncio.

@@ -5,8 +5,8 @@
 // ("Termina às"), longo (aviso e campo à vista) e erro (zero no longo e Finalizar: a frase da tela). Nada é
 // gravado: a bateria confere que nenhum pedido de escrita saiu. Uma checagem por
 // texto medido e a contagem mínima, fixa.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -15,15 +15,15 @@ const check = (name, ok, detail = '') => {
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
-const entries = await (await fetch(`${API}/time-entries`)).json()
-const executions = await (await fetch(`${API}/executions`)).json()
+const entries = await (await apiFetch(`${API}/time-entries`)).json()
+const executions = await (await apiFetch(`${API}/executions`)).json()
 const running = entries.find((e) => e.endedAt === null && e.taskExecutionId.startsWith('5eed'))
 const taskId = executions.find((e) => e.id === running?.taskExecutionId)?.taskId
 
 let browser
 try {
   if (!running || !taskId) throw new Error('sessão rodando do seed não achada')
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let longStart = null

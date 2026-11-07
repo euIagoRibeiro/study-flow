@@ -5,8 +5,8 @@
 // formulário e logo abaixo do campo, folga do anel de foco. Só lê: digita no
 // campo, nunca salva (nenhum pedido de escrita).
 // Uso (raiz do repo): node --env-file=backend/.env tests/layout/estimativa-layout.mjs
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const LABEL = 'Duração estimada (opcional)'
 const FINANCAS = '5eed0000-0000-4000-8000-000000000005'
@@ -20,9 +20,9 @@ const check = (name, ok, detail = '') => {
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 
-const record = (await (await fetch(`${API}/executions`)).json()).find((e) => e.id === E1301)
-const task = (await (await fetch(`${API}/tasks`)).json()).find((t) => t.id === record.taskId)
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const record = (await (await apiFetch(`${API}/executions`)).json()).find((e) => e.id === E1301)
+const task = (await (await apiFetch(`${API}/tasks`)).json()).find((t) => t.id === record.taskId)
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 const writes = []
 try {
   const page = await browser.newPage()

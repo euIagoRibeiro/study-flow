@@ -1,6 +1,7 @@
 // Sugestões das seleções (S2c) sobre o seed do S3a, contra a conta à mão do
 // comentário do dev_seed.sql. Só lê. Uso (raiz do repo): node <este arquivo>
 import { API } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -8,7 +9,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${detail ? ` (${detail})` : ''}`)
 }
 const get = async (path) => {
-  const res = await fetch(API + path)
+  const res = await apiFetch(API + path)
   return { status: res.status, body: await res.json() }
 }
 const tag = (n) => `5eed0000-0000-4000-9000-000000000${n}`

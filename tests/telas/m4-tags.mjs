@@ -1,10 +1,10 @@
 // M4: definir e editar medida na tela de tags. Cria a própria árvore
 // (teste-m4 › sub › neto) e apaga tudo no finally, esperando a API antes de
 // cada pedido. Mira pelo rótulo/conteúdo.
-import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const results = []
@@ -14,21 +14,21 @@ const check = (name, ok, detail = '') => {
 }
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`${API}/tasks`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tasks`)).ok) return } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
   throw new Error('API não respondeu')
 }
 async function api(method, path, body) {
   await waitForApi()
-  const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   return text ? JSON.parse(text) : null
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const measureOf = async (tagId) => (await api('GET', '/measures')).find((m) => m.tagId === tagId)
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

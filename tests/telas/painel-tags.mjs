@@ -3,8 +3,8 @@
 // (estável ao trocar o período), tabela e "Juntas" = API, aviso de aninhada,
 // arquivada na busca, limite de 5, URL (?tags=) com período, detalhe, voltar
 // e lixo na URL, erro + Tentar de novo. Só lê: nada é gravado.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const FUSO = 'America/Sao_Paulo'
 const results = []
@@ -28,7 +28,7 @@ const diffOf = (cur, prev) => {
 }
 const pct = (part, total) => { const v = (part / total) * 100; return v > 0 && v < 1 ? '<1%' : `${Math.round(v)}%` }
 
-const tags = await (await fetch(`${API}/tags`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const byId = new Map(tags.map((t) => [t.id, t]))
 const pathOf = (t) => (t.parentId ? `${pathOf(byId.get(t.parentId))} › ${t.name}` : t.name)
 const byPath = (p) => tags.find((t) => pathOf(t) === p)
@@ -36,7 +36,7 @@ const VMA = byPath('Vestibular › Matemática › Álgebra'), MA = byPath('Mate
 const archived = tags.find((t) => !t.active)
 if (!VMA || !MA || !VEST || !archived) throw new Error('o seed não tem as tags esperadas (reseed?)')
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
@@ -119,7 +119,7 @@ try {
   const expectFor = async (ids) => {
     const reqs = tagReqs.filter((u) => u.searchParams.get('tags') === ids.join(','))
     const [cur, prev] = reqs.slice(-2)
-    const call = async (u) => (await fetch(`${API}/dashboard/tempo-por-tags?${u.searchParams}`)).json()
+    const call = async (u) => (await apiFetch(`${API}/dashboard/tempo-por-tags?${u.searchParams}`)).json()
     return { cur: await call(cur), prev: await call(prev) }
   }
 

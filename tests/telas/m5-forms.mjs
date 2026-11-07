@@ -1,10 +1,10 @@
 // M5: medidas nos formulários (Registrar, Finalizar, editar) e no Histórico.
 // pt-BR e en-US (o en-US corrompia "5,5" em campo numérico). Mira pelo
 // conteúdo; desfaz tudo no finally e confere que o seed voltou.
-import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { createDiagnostico } from '../diagnostico.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 const { Pool } = pg
@@ -30,15 +30,15 @@ const check = (name, ok, detail = '') => {
 }
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`${API}/tasks`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tasks`)).ok) return } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
   throw new Error('API não respondeu')
 }
-const get = async (p) => { await waitForApi(); return (await fetch(API + p)).json() }
+const get = async (p) => { await waitForApi(); return (await apiFetch(API + p)).json() }
 const send = async (method, p, body) => {
   await waitForApi()
-  const r = await fetch(API + p, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const r = await apiFetch(API + p, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!r.ok) throw new Error(`${method} ${p}: ${r.status} ${await r.text()}`)
   return r.json()
 }
@@ -162,7 +162,7 @@ let browser
 
 try {
   for (const lang of ['pt-BR', 'en-US']) {
-    browser = await puppeteer.launch({
+    browser = await launch({
       executablePath: CHROME,
       args: [`--lang=${lang}`],
     })

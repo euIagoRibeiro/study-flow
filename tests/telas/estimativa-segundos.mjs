@@ -7,9 +7,9 @@
 // Dados próprios (prefixo teste-estimativa-t), apagados no fim; pausa a sessão
 // do seed e devolve. Uso (raiz do repo):
 //   node --env-file=backend/.env tests/telas/estimativa-segundos.mjs
-import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { deleteExecutions, pauseRunning, resumeRunning } from '../limpeza.mjs'
 
 if (!process.env.DATABASE_URL) {
@@ -29,14 +29,14 @@ const check = (name, ok, detail = '') => {
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`${API}/tasks`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tasks`)).ok) return } catch {}
     await pause(1000)
   }
   throw new Error('API não respondeu em 30s')
 }
 async function api(method, path, body) {
   await waitForApi()
-  const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   if (res.status >= 300) throw new Error(`${method} ${path}: ${res.status} ${text}`)
   return text ? JSON.parse(text) : null
@@ -56,7 +56,7 @@ let taskId = null
 let browser
 try {
   taskId = (await api('POST', '/tasks', { title: `${P} tarefa` })).id
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 
   for (const lang of ['pt-BR', 'en-US']) {
     const page = await browser.newPage()

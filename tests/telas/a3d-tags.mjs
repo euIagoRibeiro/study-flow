@@ -2,10 +2,10 @@
 // árvore (teste-a3d › sub › neto), um exercício pra apagar e uma marcadora
 // com 1 registro (Exercícios › teste-casa); usa Treino e o catálogo do seed só
 // pra ler e pra mudanças que desfaz no finally.
-import puppeteer from 'puppeteer-core'
 
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { createDiagnostico } from '../diagnostico.mjs'
 const { Pool } = pg
 const diag = createDiagnostico()
@@ -22,14 +22,14 @@ const check = (name, ok, detail = '') => {
 }
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`${API}/tasks`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tasks`)).ok) return } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
   throw new Error('API não respondeu')
 }
 async function api(method, path, body) {
   await waitForApi()
-  const res = await fetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  const res = await apiFetch(API + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   return text ? JSON.parse(text) : null
 }
@@ -37,7 +37,7 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const tagById = async (id) => (await api('GET', '/tags')).find((t) => t.id === id)
 const exerciseById = async (id) => (await api('GET', '/exercises')).find((x) => x.id === id)
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

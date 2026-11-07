@@ -1,7 +1,7 @@
 // P3: a tela atual (sem o P4) com o seed novo. Rolagem lateral de 320 a 1280.
 
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME, out } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 
 const CODIGO = '5eed0000-0000-4000-9000-000000000400'
 const PROGRAMAR = '5eed0000-0000-4000-8000-000000000012'
@@ -14,7 +14,7 @@ const pages = [
 ]
 const widths = [320, 375, 414, 768, 1024, 1280]
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

@@ -1,7 +1,7 @@
 // M4: formulário de medida ABERTO na raiz (Código, editar) e num neto
 // (Código › Pessoal › ai-boundaries, definir), de 320 a 1280. Só lê.
-import puppeteer from 'puppeteer-core'
 import { APP, CHROME, out } from '../config.mjs'
+import { launch } from '../sessao.mjs'
 
 function measure(page, formLabel) {
   return page.evaluate((fl) => {
@@ -32,7 +32,7 @@ function measure(page, formLabel) {
   }, formLabel)
 }
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

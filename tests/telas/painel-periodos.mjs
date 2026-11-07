@@ -2,8 +2,8 @@
 // tabela, sem barras (e sem pedir o período). Ano: 12 barras por mês SEM valor
 // em cima + tabela mês a mês. URL, rótulos, anterior/próximo e a troca de tipo.
 // Compara com a API do mesmo período. Só lê: nada é gravado.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const FUSO = 'America/Sao_Paulo'
 const results = []
@@ -24,13 +24,13 @@ const mondayOf = (ymd) => addDays(ymd, -((new Date(local(ymd).getTime() + 12 * 3
 const todayYmd = ymdOf(new Date())
 const year = Number(todayYmd.slice(0, 4))
 const api = async (route, start, end, extra = {}) =>
-  (await fetch(`${API}/dashboard/${route}?${new URLSearchParams({ de: local(start).toISOString(), ate: local(end).toISOString(), fuso: FUSO, ...extra })}`)).json()
+  (await apiFetch(`${API}/dashboard/${route}?${new URLSearchParams({ de: local(start).toISOString(), ate: local(end).toISOString(), fuso: FUSO, ...extra })}`)).json()
 const dayLabel = (ymd, withYear) => new Date(`${ymd}T12:00:00-03:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: FUSO, ...(withYear ? { year: 'numeric' } : {}) })
 const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
 
-const tags = await (await fetch(`${API}/tags`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const nameOf = (id) => (id === null ? '(sem tag)' : tags.find((t) => t.id === id)?.name)
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)

@@ -12,6 +12,7 @@
 // Prefixo teste-corrida-o; apaga tudo no finally (pg).
 import pg from 'pg'
 import { API } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 const { Pool } = pg
 if (!process.env.DATABASE_URL) {
@@ -28,7 +29,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${ok ? '' : ` (${detail})`}`)
 }
 async function api(method, path, body) {
-  const res = await fetch(API + path, {
+  const res = await apiFetch(API + path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,

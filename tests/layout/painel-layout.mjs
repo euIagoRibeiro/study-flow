@@ -8,13 +8,13 @@
 // Confere: sem rolagem lateral, nada fora da coluna, rótulos dos gráficos
 // dentro do desenho (texto fora do viewBox some cortado), tabela sem
 // estourar, fonte dos gráficos ≥ 9px e folga do anel de foco.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 let ok = 0, bad = 0
 const check = (cond, msg) => { cond ? ok++ : bad++; if (!cond) console.log('FALHOU', msg) }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
-const tags = await (await fetch(`${API}/tags`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const codigo = tags.find((t) => t.name === 'Código' && t.level === 1).id
 const byId = new Map(tags.map((t) => [t.id, t]))
 const pathOf = (t) => (t.parentId ? `${pathOf(byId.get(t.parentId))} › ${t.name}` : t.name)
@@ -39,7 +39,7 @@ const typing = { tags: 'mat', longo: 'x' }
 const LONG = 'Implementacaodesistemasembarcadosmedicos'
 const widths = [320, 360, 375, 414, 640, 768, 1024, 1280]
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   await page.emulateTimezone('America/Sao_Paulo')

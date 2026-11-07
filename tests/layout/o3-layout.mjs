@@ -5,8 +5,8 @@
 // obras confere que nada foi gravado. Uso (raiz do repo):
 //   node --env-file=backend/.env tests/layout/o3-layout.mjs
 import pg from 'pg'
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, OUT } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { worksSnapshot } from '../limpeza.mjs'
 const { Pool } = pg
 if (!process.env.DATABASE_URL) {
@@ -20,7 +20,7 @@ const check = (name, ok, detail = '') => {
   if (!ok) console.log(`FALHOU ${name} (${detail})`)
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
-const get = async (p) => (await fetch(API + p)).json()
+const get = async (p) => (await apiFetch(API + p)).json()
 const WIDTHS = [320, 360, 375, 414, 768, 1024, 1280]
 
 const before = await worksSnapshot(pool)
@@ -58,7 +58,7 @@ fake.push(stale)
 
 let browser
 try {
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let injected = false

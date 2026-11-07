@@ -1,4 +1,4 @@
-// O backend escuta só na própria máquina por padrão (a API não tem login):
+// O backend escuta só na própria máquina por padrão (a rede local não chega nele):
 // sobe o backend numa porta de teste SEM a variável HOST e confere que
 // 127.0.0.1 responde e um IPv4 da máquina fora do loopback (Wi-Fi, cabo)
 // recusa. Controle: com HOST=0.0.0.0 o mesmo IP responde (a checagem acerta
@@ -23,7 +23,7 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const lan = Object.values(networkInterfaces()).flat().find((a) => a && a.family === 'IPv4' && !a.internal && !a.address.startsWith('169.254.'))?.address
 async function reach(host) {
   try {
-    const res = await fetch(`http://${host}:${PORT}/tags`, { signal: AbortSignal.timeout(3000) })
+    const res = await fetch(`http://${host}:${PORT}/health`, { signal: AbortSignal.timeout(3000) })
     return res.status
   } catch (err) {
     return err.cause?.code ?? err.name

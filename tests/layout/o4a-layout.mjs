@@ -7,8 +7,8 @@
 // 2000 caracteres. Nada é gravado (o
 // Registrar não é enviado). Uma checagem por texto medido (o total não cresce
 // quando falha) e a contagem mínima de textos, fixa.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -16,7 +16,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${ok ? '' : ` (${detail})`}`)
 }
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
-const [works, tags, tasks, measures] = await Promise.all(['works', 'tags', 'tasks', 'measures'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
+const [works, tags, tasks, measures] = await Promise.all(['works', 'tags', 'tasks', 'measures'].map(async (p) => (await apiFetch(`${API}/${p}`)).json()))
 const desenho = tags.find((t) => t.name === 'Desenho' && t.parentId === null)
 const inktober = tags.find((t) => t.name === 'Inktober' && t.parentId === desenho.id)
 const task = tasks.find((t) => t.title === 'Desenhar')
@@ -41,7 +41,7 @@ const LINK = `https://exemplo.com/${'a'.repeat(1980)}`
 
 let browser
 try {
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let injected = false

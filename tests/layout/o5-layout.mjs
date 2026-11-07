@@ -6,8 +6,8 @@
 // pelas listas de tarefas, "Em andamento" e "Escolha uma tarefa"); vazio (sem obras nem registros: as duas
 // seções não aparecem). Nada é gravado. Checagens fixas por estado e largura
 // (o total não depende do que acontece).
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -15,7 +15,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${ok ? '' : ` (${detail})`}`)
 }
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
-const [works, tags, tasks, executions, entries] = await Promise.all(['works', 'tags', 'tasks', 'executions', 'time-entries'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
+const [works, tags, tasks, executions, entries] = await Promise.all(['works', 'tags', 'tasks', 'executions', 'time-entries'].map(async (p) => (await apiFetch(`${API}/${p}`)).json()))
 const running = entries.find((e) => e.endedAt === null)
 const runningTask = executions.find((e) => e.id === running?.taskExecutionId)?.taskId
 const longTags = tags.map((t, i) => ({ ...t, name: `${String(i).padStart(2, '0')}${'g'.repeat(28)}` }))
@@ -37,7 +37,7 @@ const STATES = {
 let browser
 try {
   if (!running || !runningTask || !leaf) throw new Error('seed sem sessão rodando ou sem tag de nível 3')
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let bodies = {}

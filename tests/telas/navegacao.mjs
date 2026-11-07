@@ -5,8 +5,8 @@
 // de pingue-pongue); "← Voltar" na tela de tags (volta pra onde estava; sem
 // histórico no app, vai pra Lista). P4: "StudyFlow" no topo leva à Lista.
 // Só navega: nada é gravado.
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -16,11 +16,11 @@ const check = (name, ok, detail = '') => {
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // Uma tarefa do seed sem registro aberto (abre o formulário, não o painel)
-const tasks = await (await fetch(`${API}/tasks`)).json()
+const tasks = await (await apiFetch(`${API}/tasks`)).json()
 const TASK = tasks.find((t) => t.title === 'Exercício físico')
 if (!TASK) throw new Error('o seed não tem "Exercício físico" (reseed?)')
 
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)

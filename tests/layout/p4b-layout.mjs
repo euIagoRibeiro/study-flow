@@ -1,22 +1,22 @@
 // P4b: os 3 formulários ABERTOS com o campo de fase, de 320 a 1280.
 // Rolagem lateral (página e roláveis), algo passando da borda e a folga
 // do anel de foco (4px) do campo Fase dentro de quem corta (overflow).
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const BOOK = '5eed0000-0000-4000-8000-000000000401'
 const CODIGO = '5eed0000-0000-4000-9000-000000000400'
 const EQUIP = '5eed0000-0000-4000-9000-000000000421'
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`${API}/tasks`)).ok) return } catch {}
+    try { if ((await apiFetch(`${API}/tasks`)).ok) return } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
   throw new Error('API não respondeu')
 }
 async function putBook(body) {
   await waitForApi()
-  await fetch(`${API}/executions/${BOOK}`, {
+  await apiFetch(`${API}/executions/${BOOK}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   })
 }
@@ -65,7 +65,7 @@ function measure(page) {
   })
 }
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

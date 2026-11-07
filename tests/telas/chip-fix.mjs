@@ -2,8 +2,8 @@
 // do botão do nome, nenhum chip encosta no nome/seta (folga >= 8px na mesma
 // linha) e nada passa da borda da linha. Com o seed e com 2 contextos de
 // nome longo injetados na resposta da API (nada no banco).
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, OUT } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const LONG = [
   { id: 'aaaaaaaa-0000-4000-8000-000000000001', name: 'Desenvolvimento de software profissional', parentId: null, level: 1, active: true, tracksPhase: true },
@@ -97,10 +97,10 @@ async function expandAll(page) {
   }
 }
 
-const realTags = await (await fetch(`${API}/tags`)).json()
+const realTags = await (await apiFetch(`${API}/tags`)).json()
 const activeCount = (tags) => tags.filter((t) => t.active).length
 const expectedRows = { seed: activeCount(realTags), 'nomes longos': activeCount([...realTags, ...LONG]) }
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: CHROME,
   ignoreDefaultArgs: ['--hide-scrollbars'],
 })

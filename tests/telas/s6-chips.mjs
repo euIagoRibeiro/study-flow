@@ -4,9 +4,9 @@
 // tela não conhece fica de fora, nunca um chip vazio.
 // Árvore, seleções, tarefa e registros próprios (prefixo teste-s6), apagados no
 // finally. Confere que as escolhas do seed não mudaram, par a par.
-import puppeteer from 'puppeteer-core'
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 import { createDiagnostico } from '../diagnostico.mjs'
 import { deleteExecutions } from '../limpeza.mjs'
 
@@ -23,7 +23,7 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const P = 'teste-s6'
 
 async function api(method, path, body) {
-  const res = await fetch(API + path, {
+  const res = await apiFetch(API + path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
@@ -43,7 +43,7 @@ const seedPairs = async () => (await pool.query(
 
 const pairsBefore = await seedPairs()
 const made = { tags: [], selections: [], task: null }
-const browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+const browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
 
 try {
   const R = await tag(`${P} raiz`)

@@ -1,7 +1,7 @@
 // S4: layout das seleções na tela de tags, janela real com a barra de rolagem,
 // 320 a 1280: seed + pior caso injetado (30 opções de 30 letras sem espaço).
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -9,8 +9,8 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'OK    ' : 'FALHOU'} ${name}${detail ? ` (${detail})` : ''}`)
 }
 const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
-const selections = await (await fetch(`${API}/selections`)).json()
-const tags = await (await fetch(`${API}/tags`)).json()
+const selections = await (await apiFetch(`${API}/selections`)).json()
+const tags = await (await apiFetch(`${API}/tags`)).json()
 const option = (i) => ({ id: crypto.randomUUID(), name: `${'x'.repeat(29)}${i % 10}`, position: i + 1, active: true })
 const long = (tagId) => ({ id: crypto.randomUUID(), tagId, name: 'y'.repeat(30), multiple: true, active: true,
   options: Array.from({ length: 30 }, (_, i) => option(i)) })
@@ -21,7 +21,7 @@ const opened = [byName('Desenho').id, byName('Fundamentos').id]
 
 let browser
 try {
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   await page.evaluateOnNewDocument((ids) => localStorage.setItem('studyflow:tags-abertas', JSON.stringify(ids)), opened)

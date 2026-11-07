@@ -8,6 +8,7 @@
 // mudança: bateria que restaura dado pelo fluxo real devolve id novo
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { API, out } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 
 const label = process.argv[2]
 if (!['antes', 'depois'].includes(label)) {
@@ -26,7 +27,7 @@ const byId = (list) => [...list].map(strip).sort((a, b) => (a.id < b.id ? -1 : 1
 
 const now = {}
 for (const name of endpoints) {
-  const res = await fetch(`${API}/${name}`)
+  const res = await apiFetch(`${API}/${name}`)
   if (!res.ok) throw new Error(`GET /${name}: ${res.status}`)
   now[name] = await res.json()
 }

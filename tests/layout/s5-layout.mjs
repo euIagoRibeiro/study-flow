@@ -5,8 +5,8 @@
 // no limite). No painel, o caminho é só escolhido na tela: nada é gravado. A
 // sessão rodando do seed vai com o início 25 min atrás na resposta da API (o
 // seed a ancora no reseed; com 2h, o painel ganharia o aviso e o "Durou" aberto).
-import puppeteer from 'puppeteer-core'
 import { API, APP, CHROME, out } from '../config.mjs'
+import { apiFetch, launch } from '../sessao.mjs'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -17,7 +17,7 @@ const WIDTHS = [320, 360, 375, 414, 640, 768, 1280]
 const RUNNING_TASK = '5eed0000-0000-4000-8000-000000000002'
 const PAUSED_TASK = '5eed0000-0000-4000-8000-000000000004'
 const EDIT = 'form[id^="editar-"]'
-const [selections, tags, tasks] = await Promise.all(['selections', 'tags', 'tasks'].map(async (p) => (await fetch(`${API}/${p}`)).json()))
+const [selections, tags, tasks] = await Promise.all(['selections', 'tags', 'tasks'].map(async (p) => (await apiFetch(`${API}/${p}`)).json()))
 const desenho = tags.find((t) => t.name === 'Desenho' && t.parentId === null)
 const task = tasks.find((t) => t.title === 'Desenhar')
 const option = (i) => ({ id: crypto.randomUUID(), name: `${'x'.repeat(28)}${String(i).padStart(2, '0')}`, position: i + 1, active: true })
@@ -25,15 +25,15 @@ const long = (multiple) => ({ id: crypto.randomUUID(), tagId: desenho.id, name: 
   options: Array.from({ length: 30 }, (_, i) => option(i)) })
 const worst = [...selections, long(true), long(false)]
 // Um registro do seed em Desenho, da tarefa Desenhar
-const executions = await (await fetch(`${API}/executions`)).json()
+const executions = await (await apiFetch(`${API}/executions`)).json()
 const record = executions.find((e) => e.taskId === task.id && e.rootTagId === desenho.id && e.completedAt && e.description)
-const entries = await (await fetch(`${API}/time-entries`)).json()
+const entries = await (await apiFetch(`${API}/time-entries`)).json()
 const running = entries.find((e) => e.endedAt === null && e.taskExecutionId.startsWith('5eed'))
 
 let browser
 try {
   if (!running) throw new Error('sessão rodando do seed não achada')
-  browser = await puppeteer.launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let body = null

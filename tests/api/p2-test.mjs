@@ -6,6 +6,7 @@ import { join } from 'node:path'
 
 import pg from 'pg'
 import { API } from '../config.mjs'
+import { apiFetch } from '../sessao.mjs'
 const { Pool } = pg
 
 const PREFIX = 'teste-p2'
@@ -19,7 +20,7 @@ function check(name, ok, detail = '') {
 async function waitForApi() {
   for (let i = 0; i < 30; i++) {
     try {
-      if ((await fetch(API + '/tasks')).ok) return
+      if ((await apiFetch(API + '/tasks')).ok) return
     } catch {}
     await new Promise((r) => setTimeout(r, 1000))
   }
@@ -28,7 +29,7 @@ async function waitForApi() {
 
 async function api(method, path, body) {
   await waitForApi()
-  const res = await fetch(API + path, {
+  const res = await apiFetch(API + path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,

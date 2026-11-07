@@ -1,0 +1,115 @@
+import express from 'express'
+import {
+  checkPassword,
+  clearedCookie,
+  COOKIE,
+  loginLimiter,
+  newSession,
+  readCookie,
+  sessionCookie,
+  validSession,
+} from './auth.js'
+import { dashboardRouter } from './routes/dashboard.js'
+import { executionsRouter } from './routes/executions.js'
+import { exercisesRouter } from './routes/exercises.js'
+import { measureKindsRouter, measuresRouter } from './routes/measures.js'
+import {
+  selectionOptionsRouter,
+  selectionsRouter,
+} from './routes/selections.js'
+import { tagsRouter } from './routes/tags.js'
+import { tasksRouter } from './routes/tasks.js'
+import { timeEntriesRouter } from './routes/timeEntries.js'
+import { worksRouter } from './routes/works.js'
+
+// Toda rota de dados mora aqui, montada DEPOIS da trava
+// (tests/api/rotas-fechadas-test.mjs percorre esta lista)
+export const mounts = [
+  ['/tasks', tasksRouter],
+  ['/executions', executionsRouter],
+  ['/time-entries', timeEntriesRouter],
+  ['/tags', tagsRouter],
+  ['/measures', measuresRouter],
+  ['/measure-kinds', measureKindsRouter],
+  ['/exercises', exercisesRouter],
+  ['/selections', selectionsRouter],
+  ['/selection-options', selectionOptionsRouter],
+  ['/works', worksRouter],
+  ['/dashboard', dashboardRouter],
+]
+
+const hasBody = (req) =>
+  req.headers['transfer-encoding'] !== undefined ||
+  Number(req.headers['content-length'] ?? 0) > 0
+
+// Sem CORS: o site chama a API pela mesma origem (/api, o proxy do Vite em dev
+// e o da Vercel na hospedagem), e uma página de outra origem não lê as respostas.
+// Ordem: cabeçalhos (415, 403), corpo, rotas liberadas, trava, dados, erro
+export function createApp(config, { loginUnitMs } = {}) {
+  const app = express()
+  const limiter = loginLimiter({ unitMs: loginUnitMs })
+  app.set('trust proxy', config.trustProxy)
+
+  // Um formulário de outra origem só manda corpo que não é JSON sem preflight
+  app.use(function requireJson(req, res, next) {
+    if (
+      ['POST', 'PUT', 'PATCH'].includes(req.method) &&
+      hasBody(req) &&
+      !req.is('application/json')
+    ) {
+      return res.status(415).json({ error: 'Mande o corpo em JSON.' })
+    }
+    next()
+  })
+  // DELETE não tem corpo: o cabeçalho próprio exige um pedido feito por script da
+  // mesma origem (de outra origem, ele pediria preflight, que a API não aceita)
+  app.use(function requireDeleteHeader(req, res, next) {
+    if (req.method === 'DELETE' && req.get('X-StudyFlow') === undefined) {
+      return res.status(403).json({ error: 'Pedido recusado.' })
+    }
+    next()
+  })
+  app.use(express.json())
+
+  app.get('/health', (req, res) => res.json({ ok: true }))
+  app.post('/login', async (req, res) => {
+    const delay = limiter.delayFor(req.ip)
+    if (delay > 0) await new Promise((r) => setTimeout(r, delay))
+    const password =
+      typeof req.body?.password === 'string' ? req.body.password : ''
+    if (!(await checkPassword(config.passwordHash, password))) {
+      limiter.failed(req.ip)
+      return res.status(401).json({ error: 'Senha incorreta.' })
+    }
+    limiter.succeeded(req.ip)
+    res.set('Set-Cookie', sessionCookie(newSession(config.sessionSecret)))
+    res.status(204).end()
+  })
+  app.post('/logout', (req, res) => {
+    res.set('Set-Cookie', clearedCookie())
+    res.status(204).end()
+  })
+
+  app.use(function requireSession(req, res, next) {
+    if (
+      validSession(config.sessionSecret, readCookie(req.headers.cookie, COOKIE))
+    ) {
+      return next()
+    }
+    res.status(401).json({ error: 'Entre para continuar.' })
+  })
+
+  app.get('/session', (req, res) => res.json({ ok: true }))
+  for (const [path, router] of mounts) app.use(path, router)
+
+  // Os 4 parâmetros são obrigatórios: é pela contagem que o Express
+  // reconhece um middleware de erro
+  app.use((err, req, res, next) => {
+    const status = err.status ?? 500
+    if (status >= 500) console.error(err)
+    res
+      .status(status)
+      .json({ error: status >= 500 ? 'Erro interno' : 'Requisição inválida' })
+  })
+  return app
+}
