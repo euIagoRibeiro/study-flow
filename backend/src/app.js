@@ -1,10 +1,12 @@
 import express from 'express'
+import helmet from 'helmet'
 import {
   checkPassword,
   clearedCookie,
   COOKIE,
   loginLimiter,
   newSession,
+  rateLimiter,
   readCookie,
   sessionCookie,
   validSession,
@@ -42,13 +44,46 @@ const hasBody = (req) =>
   req.headers['transfer-encoding'] !== undefined ||
   Number(req.headers['content-length'] ?? 0) > 0
 
+const isPostgres = (err) =>
+  typeof err?.code === 'string' && /^[0-9A-Z]{5}$/.test(err.code)
+
+// Erro do Postgres sem message, detail nem where: eles trazem valores da linha
+// (nome, descrição). Fica o que diz onde foi, não o que estava gravado
+export function errorHandler(err, req, res, next) {
+  const status = err.status ?? 500
+  if (status >= 500) {
+    const where = `${req.method} ${req.originalUrl.split('?')[0]}`
+    if (isPostgres(err)) {
+      const fields = ['code', 'constraint', 'table', 'column', 'routine']
+        .filter((k) => err[k])
+        .map((k) => `${k}=${err[k]}`)
+        .join(' ')
+      const stack = (err.stack ?? '').split('\n').slice(1).join('\n')
+      console.error(`Erro 500 em ${where}: Postgres ${fields}\n${stack}`)
+    } else {
+      console.error(`Erro 500 em ${where}:`, err)
+    }
+  }
+  const message =
+    status >= 500
+      ? 'Erro interno'
+      : status === 413
+        ? 'Corpo grande demais.'
+        : 'Requisição inválida'
+  res.status(status).json({ error: message })
+}
+
 // Sem CORS: o site chama a API pela mesma origem (/api, o proxy do Vite em dev
 // e o da Vercel na hospedagem), e uma página de outra origem não lê as respostas.
-// Ordem: cabeçalhos (415, 403), corpo, rotas liberadas, trava, dados, erro
-export function createApp(config, { loginUnitMs } = {}) {
+// Ordem: cabeçalhos de segurança, limite geral, cabeçalhos (415, 403), corpo,
+// rotas liberadas, trava, dados, erro
+export function createApp(config, { loginUnitMs, now } = {}) {
   const app = express()
   const limiter = loginLimiter({ unitMs: loginUnitMs })
   app.set('trust proxy', config.trustProxy)
+  app.use(helmet())
+  // Antes da trava: pedidos sem cookie também contam
+  app.use(rateLimiter(config.rateLimitPerMin, now))
 
   // Um formulário de outra origem só manda corpo que não é JSON sem preflight
   app.use(function requireJson(req, res, next) {
@@ -69,7 +104,7 @@ export function createApp(config, { loginUnitMs } = {}) {
     }
     next()
   })
-  app.use(express.json())
+  app.use(express.json({ limit: '100kb' }))
 
   app.get('/health', (req, res) => res.json({ ok: true }))
   app.post('/login', async (req, res) => {
@@ -102,14 +137,8 @@ export function createApp(config, { loginUnitMs } = {}) {
   app.get('/session', (req, res) => res.json({ ok: true }))
   for (const [path, router] of mounts) app.use(path, router)
 
-  // Os 4 parâmetros são obrigatórios: é pela contagem que o Express
-  // reconhece um middleware de erro
-  app.use((err, req, res, next) => {
-    const status = err.status ?? 500
-    if (status >= 500) console.error(err)
-    res
-      .status(status)
-      .json({ error: status >= 500 ? 'Erro interno' : 'Requisição inválida' })
-  })
+  // Os 4 parâmetros do errorHandler são obrigatórios: é pela contagem que o
+  // Express reconhece um middleware de erro
+  app.use(errorHandler)
   return app
 }

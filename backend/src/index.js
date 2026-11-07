@@ -14,5 +14,7 @@ const port = process.env.PORT ?? 3333
 // interfaces (a rede Wi-Fi inclusive). HOST sobrescreve
 const host = process.env.HOST ?? '127.0.0.1'
 createApp(config).listen(port, host, () =>
-  console.log(`API rodando em http://${host}:${port}`),
+  console.log(
+    `API rodando em http://${host}:${port} (limite geral: ${config.rateLimitPerMin} pedidos por minuto por IP)`,
+  ),
 )

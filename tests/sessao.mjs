@@ -30,10 +30,14 @@ export async function sessionCookie(base = API) {
 export async function apiFetch(url, options = {}) {
   const base = String(url).startsWith(API) ? API : new URL(url).origin
   const value = await sessionCookie(base)
-  return fetch(url, {
+  const res = await fetch(url, {
     ...options,
     headers: { ...options.headers, Cookie: `sf_session=${value}`, 'X-StudyFlow': '1' },
   })
+  // Limite geral (RATE_LIMIT_PER_MIN): todas as baterias saem do mesmo IP. Para
+  // alto, em vez de virar uma checagem que falha sem dizer por quê
+  if (res.status === 429) throw new Error(`limite geral da API atingido (429) em ${url}: subir RATE_LIMIT_PER_MIN?`)
+  return res
 }
 
 export async function launch(options) {

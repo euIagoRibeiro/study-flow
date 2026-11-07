@@ -30,6 +30,14 @@ seed que ela mexe voltam ao que eram). Nada aqui faz reseed sozinho.
    `fetch` dentro do `page.evaluate` já leva o cookie da página, mas DELETE ali
    precisa do `X-StudyFlow` à mão.
 
+6. **Limite geral**: a API aceita no máximo `RATE_LIMIT_PER_MIN` pedidos por
+   minuto por IP, e as baterias saem todas do mesmo IP (pico medido de ~950 por
+   minuto, na `painel-layout`). No `backend/.env` de dev: `RATE_LIMIT_PER_MIN=1500`
+   (aceita de 30 a 1500; fora disso vale 300). **A variável NÃO existe em
+   produção** (lá vale 300, o uso humano). A linha "API rodando…" da partida diz
+   o limite em vigor. Um 429 no `apiFetch` para a bateria com o motivo; na página,
+   a tela mostra erro e a bateria falha.
+
 O `run.mjs` confere tudo isso antes de começar e **para** dizendo o que
 falta.
 

@@ -24,10 +24,42 @@ export function loadConfig(env) {
       'TRUST_PROXY: "false" ou o número de proxies na frente da API',
     )
   }
+  const rate = Number(env.RATE_LIMIT_PER_MIN)
   return {
     passwordHash,
     sessionSecret,
     trustProxy: proxy === 'false' ? false : Number(proxy),
+    // Teto fixo: a variável só ajusta dentro da faixa, nunca desliga o limite
+    rateLimitPerMin:
+      Number.isInteger(rate) && rate >= RATE_MIN && rate <= RATE_MAX
+        ? rate
+        : RATE_DEFAULT,
+  }
+}
+
+// Limite geral por IP, em todas as rotas: uso humano fica bem abaixo de 300 por
+// minuto. Janela fixa de 1 minuto; passou, 429 até a próxima (nunca mais que isso)
+export const RATE_DEFAULT = 300
+const RATE_MIN = 30
+const RATE_MAX = 1500
+const RATE_WINDOW_MS = 60 * 1000
+
+export function rateLimiter(perMin = RATE_DEFAULT, now = () => Date.now()) {
+  const byIp = new Map()
+  return function rateLimit(req, res, next) {
+    const t = now()
+    let entry = byIp.get(req.ip)
+    if (!entry || t - entry.start >= RATE_WINDOW_MS) {
+      byIp.delete(req.ip)
+      entry = { start: t, count: 0 }
+      byIp.set(req.ip, entry)
+      if (byIp.size > 10_000) byIp.delete(byIp.keys().next().value)
+    }
+    entry.count += 1
+    if (entry.count <= perMin) return next()
+    const wait = Math.ceil((entry.start + RATE_WINDOW_MS - t) / 1000)
+    res.set('Retry-After', String(Math.max(1, wait)))
+    res.status(429).json({ error: 'Muitos pedidos. Espere um pouco.' })
   }
 }
 
