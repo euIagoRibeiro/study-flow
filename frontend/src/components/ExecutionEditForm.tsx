@@ -333,7 +333,12 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     try {
       await props.onSubmit({
         description: description.trim(),
-        completedAt: fromDatetimeLocalValue(completedAt),
+        // Sem mexer, o gravado exato: o campo não tem segundos, e reler o texto
+        // zeraria os do "Quando" (e moveria a estimativa junto)
+        completedAt:
+          completedAt === pristine.completedAt
+            ? execution.completedAt
+            : fromDatetimeLocalValue(completedAt),
         // Registro antigo com mais de uma folha, sem mexer nas tags: não
         // manda tags, e o servidor mantém as que estavam
         ...(selection.legacyCount > 0

@@ -13,20 +13,35 @@ function TimeEntryEditForm(props: {
   }) => Promise<unknown>
   onCancel: () => void // fecha sem gravar
 }) {
-  const [startedAt, setStartedAt] = useState(
-    toDatetimeLocalValue(props.entry.startedAt),
-  )
-  const [endedAt, setEndedAt] = useState(
-    toDatetimeLocalValue(props.entry.endedAt ?? new Date().toISOString()),
-  )
+  // O que o campo mostrou ao abrir e o horário exato por trás dele
+  const [opened] = useState(() => {
+    const started = props.entry.startedAt
+    const ended = props.entry.endedAt ?? new Date().toISOString()
+    return {
+      started,
+      ended,
+      startedText: toDatetimeLocalValue(started),
+      endedText: toDatetimeLocalValue(ended),
+    }
+  })
+  const [startedAt, setStartedAt] = useState(opened.startedText)
+  const [endedAt, setEndedAt] = useState(opened.endedText)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const startedIso = fromDatetimeLocalValue(startedAt)
-    const endedIso = fromDatetimeLocalValue(endedAt)
+    // Campo sem mexer manda o horário exato: o campo não tem segundos, e reler
+    // o texto zeraria os do horário que a pessoa não editou
+    const startedIso =
+      startedAt === opened.startedText
+        ? opened.started
+        : fromDatetimeLocalValue(startedAt)
+    const endedIso =
+      endedAt === opened.endedText
+        ? opened.ended
+        : fromDatetimeLocalValue(endedAt)
     if (endedIso <= startedIso) {
       setError('O fim precisa ser depois do início.')
       return
