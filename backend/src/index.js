@@ -45,4 +45,9 @@ app.use((err, req, res, next) => {
 })
 
 const port = process.env.PORT ?? 3333
-app.listen(port, () => console.log(`API rodando em http://localhost:${port}`))
+// Só na própria máquina por padrão: a API não tem login, e sem host o Node
+// escutaria em todas as interfaces (a rede Wi-Fi inclusive). HOST sobrescreve
+const host = process.env.HOST ?? '127.0.0.1'
+app.listen(port, host, () =>
+  console.log(`API rodando em http://${host}:${port}`),
+)
