@@ -68,7 +68,7 @@ try {
     await page.setRequestInterception(true)
     page.on('request', (req) => {
       const url = new URL(req.url())
-      if (url.pathname === '/dashboard/tempo-por-contexto') {
+      if (`${url.origin}${url.pathname}` === `${API}/dashboard/tempo-por-contexto`) {
         contextReqs.push(url)
         const isCurrent = url.searchParams.get('de') === currentDe
         const seconds = isCurrent ? fake.current : fake.previous

@@ -1,4 +1,3 @@
-import cors from 'cors'
 import express from 'express'
 import { dashboardRouter } from './routes/dashboard.js'
 import { executionsRouter } from './routes/executions.js'
@@ -13,14 +12,10 @@ import { tasksRouter } from './routes/tasks.js'
 import { timeEntriesRouter } from './routes/timeEntries.js'
 import { worksRouter } from './routes/works.js'
 
-// Sem origem configurada, o cors() liberaria qualquer site ('*')
-if (!process.env.CORS_ORIGIN) {
-  throw new Error('CORS_ORIGIN não definida no .env')
-}
-
+// Sem CORS: o site chama a API pela mesma origem (/api, o proxy do Vite em dev
+// e o da Vercel na hospedagem), e uma página de outra origem não lê as respostas
 const app = express()
 
-app.use(cors({ origin: process.env.CORS_ORIGIN }))
 app.use(express.json())
 app.use('/tasks', tasksRouter)
 app.use('/executions', executionsRouter)

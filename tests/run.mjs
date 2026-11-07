@@ -27,7 +27,7 @@ const groups = {
     'cronometro-inicio.mjs', 'cronometro-escolha.mjs', 'navegacao.mjs', 'cartoes.mjs', 'rascunhos.mjs',
     's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs', 's5-lapis.mjs', 's6-chips.mjs', 'o3-obras.mjs',
     'o4a-registrar.mjs', 'o4b-painel.mjs', 'o4c-lapis.mjs', 'o4d-chips.mjs', 'tempo-painel.mjs', 'o5-executar.mjs', 'lapis-segundos.mjs',
-    'estimativa-segundos.mjs', 'treino-ordem.mjs',
+    'estimativa-segundos.mjs', 'treino-ordem.mjs', 'mesma-origem.mjs',
   ],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
@@ -76,7 +76,8 @@ async function reachable(url) {
   }
 }
 if (needsApi && !(await reachable(`${API}/tags`))) {
-  stop(`a API não responde em ${API}. Suba o backend (cd backend && npm run dev)`)
+  stop(`a API não responde em ${API} (o proxy /api do Vite). Suba o backend e o Vite ` +
+    '(cd backend && npm run dev; cd frontend && npm run dev)')
 }
 if (needsApp && !(await reachable(APP))) {
   stop(`o frontend não responde em ${APP}. Suba o Vite (cd frontend && npm run dev)`)
