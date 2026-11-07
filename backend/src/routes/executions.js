@@ -114,6 +114,23 @@ const estimatedMinutes = z
   .nullable()
   .optional()
 
+// A mesma estimativa em segundos (até 24 h), pra durações como "1:22". Um ou
+// outro no pedido, nunca os dois
+const estimatedSeconds = z
+  .number('estimatedSeconds precisa ser um número de segundos ou null')
+  .int('estimatedSeconds precisa ser um número inteiro de segundos')
+  .min(1, 'estimatedSeconds precisa ser de 1 a 86400')
+  .max(86400, 'estimatedSeconds precisa ser de 1 a 86400')
+  .nullable()
+  .optional()
+
+// A estimativa do pedido em segundos: undefined = ausente, null = remover
+function estimateOf(data) {
+  if (data.estimatedSeconds !== undefined) return data.estimatedSeconds
+  if (data.estimatedMinutes == null) return data.estimatedMinutes
+  return data.estimatedMinutes * 60
+}
+
 // Medida por contexto: o servidor descobre QUAL medida pelo caminho; a
 // tela manda só os valores. No PUT, ausente mantém e [] remove
 const measureValues = z
@@ -196,7 +213,15 @@ function withTagRule(schema) {
       'tagIds precisa de rootTagId',
     )
     .refine(
-      (data) => !(data.estimatedMinutes && data.completedAt === null),
+      (data) =>
+        !(
+          data.estimatedMinutes !== undefined &&
+          data.estimatedSeconds !== undefined
+        ),
+      'Mande estimatedMinutes ou estimatedSeconds, não os dois',
+    )
+    .refine(
+      (data) => !(estimateOf(data) && data.completedAt === null),
       'Duração estimada só em registro concluído',
     )
 }
@@ -213,6 +238,7 @@ const newExecutionSchema = withTagRule(
     completedAt,
     phase,
     estimatedMinutes,
+    estimatedSeconds,
     measureValues,
     selectionOptionIds,
     workId,
@@ -227,6 +253,7 @@ const executionChangesSchema = withTagRule(
     completedAt,
     phase,
     estimatedMinutes,
+    estimatedSeconds,
     measureValues,
     workout: workout.optional(),
     selectionOptionIds,
@@ -605,18 +632,18 @@ function selectionConstraintError(err) {
 }
 
 // A estimativa é uma sessão marcada: termina no "Quando" do registro e
-// começa X minutos antes. Trocar = apagar e criar (nunca duas ao mesmo tempo)
-async function setEstimate(client, executionId, minutes) {
+// começa X segundos antes. Trocar = apagar e criar (nunca duas ao mesmo tempo)
+async function setEstimate(client, executionId, seconds) {
   await client.query(
     'DELETE FROM time_entries WHERE task_execution_id = $1 AND estimated',
     [executionId],
   )
-  if (minutes === null) return
+  if (seconds === null) return
   await client.query(
     `INSERT INTO time_entries (task_execution_id, started_at, ended_at, estimated)
-     SELECT id, completed_at - make_interval(mins => $2), completed_at, true
+     SELECT id, completed_at - make_interval(secs => $2), completed_at, true
      FROM task_executions WHERE id = $1`,
-    [executionId, minutes],
+    [executionId, seconds],
   )
 }
 
@@ -864,8 +891,8 @@ executionsRouter.post('/', async (req, res) => {
       // Sem tag: o banco recusa (fase precisa de contexto)
       await setPhase(client, id, execution.phase)
     }
-    if (execution.estimatedMinutes) {
-      await setEstimate(client, id, execution.estimatedMinutes)
+    if (estimateOf(execution)) {
+      await setEstimate(client, id, estimateOf(execution))
     }
     // Depois das tags: a medida sai do caminho já gravado
     if (execution.measureValues?.length) {
@@ -1012,8 +1039,8 @@ executionsRouter.put('/:id', async (req, res) => {
     } else if (changes.phase !== undefined) {
       await setPhase(client, req.params.id, changes.phase)
     }
-    if (changes.estimatedMinutes !== undefined) {
-      await setEstimate(client, req.params.id, changes.estimatedMinutes)
+    if (estimateOf(changes) !== undefined) {
+      await setEstimate(client, req.params.id, estimateOf(changes))
     } else {
       await followCompletedAt(client, req.params.id)
     }

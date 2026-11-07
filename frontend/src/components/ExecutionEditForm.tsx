@@ -44,7 +44,7 @@ import type {
   WorkoutExercise,
   WorkPicker,
 } from '../types'
-import { MINUTES_ERROR, parseMinutes } from '../numbers'
+import { DURATION_ERROR, durationText, parseDuration } from '../numbers'
 import { useMeasure } from '../useMeasure'
 import { useSelectionChoices } from '../useSelectionChoices'
 import { describeWorkout, emptyExerciseError, workoutMarker } from '../workouts'
@@ -70,7 +70,7 @@ type EditProps = {
   tags: Tag[]
   measures: Measure[]
   selections: Selection[]
-  estimateMinutes: number | null // a estimativa que o registro já tem
+  estimateSeconds: number | null // a estimativa que o registro já tem
   workoutCatalog: WorkoutCatalog
   workPicker: WorkPicker
   onSubmit: (changes: ExecutionChanges) => Promise<unknown>
@@ -130,7 +130,8 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
     ...(execution.rootTagId ? [execution.rootTagId] : []),
     ...execution.tagIds,
   ]
-  const initialMinutes = props.estimateMinutes?.toString() ?? ''
+  const initialMinutes =
+    props.estimateSeconds === null ? '' : durationText(props.estimateSeconds)
   // Como o formulário abre sem rascunho (o registro como está gravado)
   const [pristine] = useState<EditDraft>(() => {
     const selected = executionSelection(execution, byId)
@@ -289,9 +290,9 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const estimate = parseMinutes(minutes)
+    const estimate = parseDuration(minutes)
     if (estimate === null) {
-      setError(MINUTES_ERROR)
+      setError(DURATION_ERROR)
       return
     }
     const sent = measure.toSend()
@@ -347,7 +348,7 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
         // Sem mexer, não vai: o servidor mantém e move junto com o "Quando"
         ...(minutes === initialMinutes
           ? {}
-          : { estimatedMinutes: estimate === '' ? null : estimate }),
+          : { estimatedSeconds: estimate === '' ? null : estimate }),
         // Idem: sem mexer (nem no caminho), o servidor mantém a medida
         ...(sent.values ? { measureValues: sent.values } : {}),
         ...(sendWorkout ? { workout: draft } : {}),

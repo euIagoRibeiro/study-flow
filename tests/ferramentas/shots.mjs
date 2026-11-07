@@ -7,7 +7,8 @@
 // o mesmo pra seção Obras; --sem-obra-campo, pros campos Obra e Link e o chip e
 // o link do Histórico
 // --sem-duracao, pro "Durou" do Finalizar e o aviso de sessão longa;
-// --sem-atalhos, pras seções "Obras em andamento" e "Recentes" do Executar (O5)
+// --sem-atalhos, pras seções "Obras em andamento" e "Recentes" do Executar (O5);
+// --sem-estimativa, pro campo da duração estimada (Registrar e lápis)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
@@ -82,6 +83,17 @@ if (process.argv.includes('--sem-atalhos')) {
     const style = document.createElement('style')
     style.textContent = '[data-shortcuts] { display: none !important; }'
     document.head.append(style)
+  }))
+}
+// Com --sem-estimativa, esconde o campo da duração estimada (rótulo, campo e a
+// linha de baixo), pelo começo do rótulo: o antigo e o novo têm textos diferentes
+if (process.argv.includes('--sem-estimativa')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const hide = () => document.querySelectorAll('label').forEach((l) => {
+      if (l.querySelector('span')?.textContent.trim().startsWith('Duração estimada')) l.style.setProperty('display', 'none', 'important')
+    })
+    new MutationObserver(hide).observe(document.body, { childList: true, subtree: true })
+    hide()
   }))
 }
 // Formulário de edição aberto num registro SEM treino ("Desenho da fase de

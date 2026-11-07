@@ -268,7 +268,7 @@ export type ExecutionChanges = {
   description: string
   completedAt: string
   // Ausente: mantém (e acompanha o "Quando"). null remove
-  estimatedMinutes?: number | null
+  estimatedSeconds?: number | null
   // Ausente: mantém. [] remove a medida do registro
   measureValues?: MeasureValue[]
   // Ausente: mantém (mas a marcadora fora do caminho apaga). [] remove

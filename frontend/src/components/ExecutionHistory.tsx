@@ -289,10 +289,8 @@ function ExecutionHistory(props: {
           <ExecutionEditForm
             execution={execution}
             tags={props.tags}
-            estimateMinutes={
-              estimate
-                ? Math.round(entryMs(estimate, execution) / 60_000)
-                : null
+            estimateSeconds={
+              estimate ? Math.round(entryMs(estimate, execution) / 1000) : null
             }
             measures={props.measures}
             selections={props.selections}

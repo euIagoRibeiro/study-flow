@@ -118,7 +118,7 @@ try {
 
   // ---- 4. "Quando" e estimativa não vão (são do registro manual)
   await page.goto(url, { waitUntil: 'networkidle0' })
-  await type('Duração estimada (min, opcional)', '30')
+  await type('Duração estimada (opcional)', '30')
   await choose('Contexto', 'Exercícios')
   await start()
   db = await saved()

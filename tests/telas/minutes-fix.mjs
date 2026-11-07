@@ -7,8 +7,8 @@ import { API, APP, CHROME } from '../config.mjs'
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const FINANCAS = '5eed0000-0000-4000-8000-000000000005'
-const LABEL = 'Duração estimada (min, opcional)'
-const ERROR = 'Duração: minutos inteiros, de 1 a 1440'
+const LABEL = 'Duração estimada (opcional)'
+const ERROR = 'Duração: minutos (90), min:s (1:22) ou h:mm:ss (1:07:10), até 24 horas'
 const results = []
 const check = (name, ok, detail = '') => {
   results.push(ok)

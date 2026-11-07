@@ -59,7 +59,7 @@ async function card(page, description) {
   }, description)
   return '[data-card="1"]'
 }
-const LABEL = 'Duração estimada (min, opcional)'
+const LABEL = 'Duração estimada (opcional)'
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,

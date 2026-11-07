@@ -40,7 +40,7 @@ import type {
   Work,
   WorkLink,
 } from '../types'
-import { MINUTES_ERROR, parseMinutes } from '../numbers'
+import { DURATION_ERROR, parseDuration } from '../numbers'
 import { useMeasure } from '../useMeasure'
 import { useSelectionChoices } from '../useSelectionChoices'
 import {
@@ -76,7 +76,7 @@ type FormProps = {
     description: string,
     completedAt: string,
     tags: TagChoice,
-    estimatedMinutes: number | null,
+    estimatedSeconds: number | null,
     measureValues: MeasureValue[],
     selectionOptionIds: string[],
     link: WorkLink,
@@ -328,9 +328,9 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const estimate = parseMinutes(minutes)
+    const estimate = parseDuration(minutes)
     if (estimate === null) {
-      setError(MINUTES_ERROR)
+      setError(DURATION_ERROR)
       return
     }
     const sent = measure.toSend()

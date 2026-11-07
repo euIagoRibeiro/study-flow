@@ -20,7 +20,7 @@ function postExecution(
     taskId: string
     description: string | null
     completedAt: string | null
-    estimatedMinutes?: number
+    estimatedSeconds?: number
     measureValues?: MeasureValue[]
     selectionOptionIds?: string[]
   } & Partial<TagChoice> &
@@ -33,13 +33,13 @@ function postExecution(
 }
 
 // Sem rootTagId/tagIds no corpo, o servidor não mexe nas tags; sem
-// estimatedMinutes, mantém a estimativa; sem measureValues, mantém a medida
+// estimatedSeconds, mantém a estimativa; sem measureValues, mantém a medida
 function putExecution(
   id: string,
   changes: {
     description: string | null
     completedAt: string | null
-    estimatedMinutes?: number | null
+    estimatedSeconds?: number | null
     measureValues?: MeasureValue[]
     workout?: WorkoutExercise[]
     selectionOptionIds?: string[]
@@ -65,7 +65,7 @@ export function createExecution(
   description: string,
   completedAt: string,
   tags: TagChoice,
-  estimatedMinutes: number | null,
+  estimatedSeconds: number | null,
   measureValues: MeasureValue[],
   selectionOptionIds: string[],
   link: WorkLink,
@@ -75,7 +75,7 @@ export function createExecution(
     description,
     completedAt,
     ...tags,
-    ...(estimatedMinutes ? { estimatedMinutes } : {}),
+    ...(estimatedSeconds ? { estimatedSeconds } : {}),
     ...(measureValues.length > 0 ? { measureValues } : {}),
     ...(selectionOptionIds.length > 0 ? { selectionOptionIds } : {}),
     ...workLinkBody(link),

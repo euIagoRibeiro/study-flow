@@ -183,6 +183,8 @@ try {
   check(`bateria sem erro inesperado: ${err.message}`, false)
 } finally {
   await browser?.close()
+  // Total mínimo: um texto que some do formulário tira uma checagem sem falhar nenhuma
+  check(`checagens feitas: ${results.length}, esperado ao menos 1065`, results.length >= 1065, String(results.length))
   const ok = results.filter(Boolean).length
   console.log(`\n${ok} de ${results.length}`)
   process.exitCode = ok === results.length && ok > 0 ? 0 : 1

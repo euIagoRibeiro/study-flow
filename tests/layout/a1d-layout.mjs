@@ -4,7 +4,7 @@
 import puppeteer from 'puppeteer-core'
 import { APP, CHROME } from '../config.mjs'
 
-const FIELDS = ['Quando', 'Duração estimada (min, opcional)']
+const FIELDS = ['Quando', 'Duração estimada (opcional)']
 
 function measure(page) {
   return page.evaluate((fields) => {
