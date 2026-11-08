@@ -44,8 +44,9 @@ const RATE_MIN = 30
 const RATE_MAX = 1500
 const RATE_WINDOW_MS = 60 * 1000
 
-// Uma linha por janela no máximo, com a contagem e o primeiro pedido (método e
-// rota, sem query, sem caracteres de controle, até 80): nunca IP, cabeçalho ou corpo
+// Uma linha por janela no máximo, com a contagem (e, no limite geral, o primeiro
+// pedido: método e rota, sem query, sem caracteres de controle, até 80): nunca IP,
+// cabeçalho ou corpo
 const routeOf = (req) =>
   `${req.method} ${req.originalUrl.split('?')[0]}`
     .replace(/\p{Cc}/gu, '')
@@ -53,9 +54,9 @@ const routeOf = (req) =>
 
 function windowLog(log, schedule, line) {
   let pending = null
-  return (req) => {
+  return (first) => {
     if (pending) return void (pending.count += 1)
-    pending = { count: 1, first: routeOf(req) }
+    pending = { count: 1, first }
     schedule(() => {
       log(line(pending))
       pending = null
@@ -89,7 +90,7 @@ export function rateLimiter(
     entry.count += 1
     if (entry.count <= perMin) return next()
     const wait = Math.ceil((entry.start + RATE_WINDOW_MS - t) / 1000)
-    refused(req)
+    refused(routeOf(req))
     res.set('Retry-After', String(Math.max(1, wait)))
     res.status(429).json({ error: 'Muitos pedidos. Espere um pouco.' })
   }
@@ -145,9 +146,20 @@ export function loginDelayMs(ipFails, globalFails, unitMs = 1000) {
   return Math.min(MAX_UNITS, Math.max(ip, global)) * unitMs
 }
 
-export function loginLimiter({ unitMs = 1000, now = () => Date.now() } = {}) {
+export function loginLimiter({
+  unitMs = 1000,
+  now = () => Date.now(),
+  log = console.warn,
+  schedule = later,
+} = {}) {
   const byIp = new Map()
   let globalFails = []
+  // Só a contagem: o IP fica fora do log
+  const wrong = windowLog(
+    log,
+    schedule,
+    ({ count }) => `Login: ${count} senha(s) errada(s) em 1 minuto`,
+  )
   const forget = () => {
     const since = now() - WINDOW_MS
     globalFails = globalFails.filter((t) => t > since)
@@ -163,6 +175,7 @@ export function loginLimiter({ unitMs = 1000, now = () => Date.now() } = {}) {
       byIp.delete(ip)
       byIp.set(ip, { fails: entry.fails + 1, last: now() })
       globalFails.push(now())
+      wrong()
       // Memória limitada mesmo com IPs forjados: o teto já passou de 30 s bem antes
       if (globalFails.length > 1000) globalFails.shift()
       if (byIp.size > 10_000) byIp.delete(byIp.keys().next().value)

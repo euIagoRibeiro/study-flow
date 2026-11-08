@@ -5,7 +5,8 @@
 // 3. backends de teste na 3335 (não sobe sem a trava; trocar o SESSION_SECRET
 //    derruba o cookie: o botão de pânico);
 // 4. o app no próprio processo, com a espera em 25 ms por unidade e IPs forjados
-//    (por IP, teto geral, a senha certa entra depois de esperar);
+//    (por IP, teto geral, a senha certa entra depois de esperar); as erradas viram
+//    UMA linha de log por janela, só com a contagem;
 // 5. login pelo NAVEGADOR de verdade (Secure em http://localhost, /session 200);
 // 6. scripts/hash-senha.mjs (recusa senha curta e a TEST_PASSWORD).
 // Uso (raiz do repo): node --env-file=backend/.env tests/api/auth-test.mjs
@@ -187,6 +188,23 @@ try {
   await timed(base, 'errada', '10.2.0.2')
   const forged = (await timed(base, 'errada', '10.2.0.3')).ms - base0
   check('sem TRUST_PROXY (dev), X-Forwarded-For forjado não troca o IP (a espera acumula)', forged >= 1.4 * UNIT, `${forged} ms`)
+
+  // Log das erradas: uma linha por janela, só a contagem (log e agendamento injetados)
+  const lines = []
+  const timers = []
+  const lim = auth.loginLimiter({ unitMs: UNIT, log: (l) => lines.push(l), schedule: (fn, ms) => timers.push({ fn, ms }) })
+  lim.succeeded('10.5.5.5')
+  check('log do login: a certa não deixa linha nem abre janela', lines.length === 0 && timers.length === 0, `${lines.length} ${timers.length}`)
+  for (const ip of ['10.5.5.5', '10.5.5.5', '10.6.6.6']) lim.failed(ip)
+  check('log do login: 3 erradas, nenhuma linha antes de a janela fechar, um agendamento de 60 s', lines.length === 0 && timers.length === 1 && timers[0].ms === 60_000, `${lines.length} ${JSON.stringify(timers.map((t) => t.ms))}`)
+  lim.succeeded('10.5.5.5')
+  timers.shift()?.fn()
+  check('log do login: a janela fecha com UMA linha "Login: 3 senha(s) errada(s) em 1 minuto"', lines.length === 1 && lines[0] === 'Login: 3 senha(s) errada(s) em 1 minuto', JSON.stringify(lines))
+  check('log do login: sem IP', lines.length === 1 && !/10\.[56]\./.test(lines[0]), JSON.stringify(lines))
+  lim.failed('10.5.5.5')
+  check('log do login: janela nova abre um agendamento novo', timers.length === 1 && lines.length === 1, `${timers.length} ${lines.length}`)
+  timers.shift()?.fn()
+  check('log do login: nova janela, nova linha, com a contagem dela (1)', lines.length === 2 && lines[1] === 'Login: 1 senha(s) errada(s) em 1 minuto', JSON.stringify(lines))
 
   // ---------- 5. login pelo navegador de verdade
   browser = await puppeteer.launch({ executablePath: CHROME })
