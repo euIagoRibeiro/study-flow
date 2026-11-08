@@ -5,7 +5,8 @@
 //    a partida diz o limite em vigor;
 // 4. limite geral por IP, no próprio processo com relógio falso: o pedido N+1 dá
 //    429 com Retry-After, conta antes da trava, por IP só com TRUST_PROXY, volta
-//    na janela nova;
+//    na janela nova; os 429 viram UMA linha de log por janela, com a contagem e o
+//    primeiro pedido (método e rota), sem IP, query, cabeçalhos nem corpo;
 // 5. log do erro 500: o erro do Postgres sai sem message, detail, where nem a
 //    query string; um erro que não é do Postgres sai com a mensagem.
 // Uso (raiz do repo): node --env-file=backend/.env tests/api/protecoes-test.mjs
@@ -148,6 +149,36 @@ try {
   const D = await listen({ ...base, trustProxy: false })
   const def = await statuses(`${D}/health`, 301)
   check('config sem o campo: limite 300 (o 300º passa, o 301º dá 429)', def[299] === 200 && def[300] === 429, `${def[299]} ${def[300]}`)
+
+  // ---------- 4b. log dos 429: agregado, uma linha por janela, sem dados do pedido
+  const lines = []
+  const timers = []
+  const limiter = auth.rateLimiter(2, now, { log: (l) => lines.push(l), schedule: (fn, ms) => timers.push({ fn, ms }) })
+  const hit = (url, headers = {}) => {
+    let status = 200
+    const res = { set: () => res, status: (c) => ((status = c), res), json: () => res }
+    limiter({ ip: '10.7.7.7', method: 'GET', originalUrl: url, headers }, res, () => {})
+    return status
+  }
+  const MARKS = { 'X-Forwarded-For': '10.66.66.66', 'X-Marca': 'MARCA-CABECALHO', Cookie: 'sid=MARCA-COOKIE' }
+  clock += 60_000
+  const ok2 = [hit('/tags', MARKS), hit('/tags', MARKS)]
+  check('log do 429: pedidos aceitos não deixam linha nem abrem janela', ok2.every((s) => s === 200) && lines.length === 0 && timers.length === 0, `${ok2} ${lines.length} ${timers.length}`)
+  const refusedNow = [hit('/tags?q=MARCA-QUERY', MARKS), hit('/works', MARKS), hit('/works', MARKS), hit('/tags', MARKS), hit('/tags', MARKS)]
+  check('log do 429: 5 recusados na janela, nenhuma linha antes de ela fechar, um agendamento de 60 s', refusedNow.every((s) => s === 429) && lines.length === 0 && timers.length === 1 && timers[0].ms === 60_000, `${refusedNow} ${lines.length} ${JSON.stringify(timers.map((t) => t.ms))}`)
+  timers.shift()?.fn()
+  check('log do 429: a janela fecha com UMA linha, a contagem 5 e o primeiro pedido', lines.length === 1 && /\b5 pedido/.test(lines[0]) && lines[0].includes('GET /tags'), JSON.stringify(lines))
+  check('log do 429: sem query, IP, X-Forwarded-For, cabeçalho nem cookie', lines.length === 1 && !/MARCA|10\.7\.7\.7|10\.66\.66\.66/.test(lines[0]), JSON.stringify(lines))
+  clock += 60_000
+  hit('/a', MARKS)
+  hit('/a', MARKS)
+  hit('/tags\r\nFORJADO: ' + 'z'.repeat(200), MARKS)
+  hit('/b', MARKS)
+  check('log do 429: janela nova abre um agendamento novo', timers.length === 1 && lines.length === 1, `${timers.length} ${lines.length}`)
+  timers.shift()?.fn()
+  const first2 = lines[1]?.split('o primeiro: ')[1] ?? ''
+  check('log do 429: nova janela, nova linha, com a contagem dela (2)', lines.length === 2 && /\b2 pedido/.test(lines[1]), JSON.stringify(lines))
+  check('log do 429: o primeiro pedido sem caracteres de controle e com até 80 caracteres', first2.startsWith('GET /tagsFORJADO') && first2.length <= 80 && !/\p{Cc}/u.test(lines[1]), JSON.stringify(first2))
 
   // ---------- 5. log do erro 500
   const capture = (fn) => {

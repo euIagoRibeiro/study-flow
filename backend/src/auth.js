@@ -44,8 +44,39 @@ const RATE_MIN = 30
 const RATE_MAX = 1500
 const RATE_WINDOW_MS = 60 * 1000
 
-export function rateLimiter(perMin = RATE_DEFAULT, now = () => Date.now()) {
+// Uma linha por janela no máximo, com a contagem e o primeiro pedido (método e
+// rota, sem query, sem caracteres de controle, até 80): nunca IP, cabeçalho ou corpo
+const routeOf = (req) =>
+  `${req.method} ${req.originalUrl.split('?')[0]}`
+    .replace(/\p{Cc}/gu, '')
+    .slice(0, 80)
+
+function windowLog(log, schedule, line) {
+  let pending = null
+  return (req) => {
+    if (pending) return void (pending.count += 1)
+    pending = { count: 1, first: routeOf(req) }
+    schedule(() => {
+      log(line(pending))
+      pending = null
+    }, RATE_WINDOW_MS)
+  }
+}
+
+const later = (fn, ms) => setTimeout(fn, ms).unref()
+
+export function rateLimiter(
+  perMin = RATE_DEFAULT,
+  now = () => Date.now(),
+  { log = console.warn, schedule = later } = {},
+) {
   const byIp = new Map()
+  const refused = windowLog(
+    log,
+    schedule,
+    ({ count, first }) =>
+      `Limite geral: ${count} pedido(s) recusado(s) com 429 em 1 minuto; o primeiro: ${first}`,
+  )
   return function rateLimit(req, res, next) {
     const t = now()
     let entry = byIp.get(req.ip)
@@ -58,6 +89,7 @@ export function rateLimiter(perMin = RATE_DEFAULT, now = () => Date.now()) {
     entry.count += 1
     if (entry.count <= perMin) return next()
     const wait = Math.ceil((entry.start + RATE_WINDOW_MS - t) / 1000)
+    refused(req)
     res.set('Retry-After', String(Math.max(1, wait)))
     res.status(429).json({ error: 'Muitos pedidos. Espere um pouco.' })
   }
