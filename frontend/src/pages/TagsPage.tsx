@@ -16,6 +16,7 @@ import ExerciseCatalog from '../components/ExerciseCatalog'
 import GeneralSelections from '../components/GeneralSelections'
 import MeasureForm from '../components/MeasureForm'
 import SelectionForm from '../components/SelectionForm'
+import SignOut from '../components/SignOut'
 import TagForm from '../components/TagForm'
 import WorkCatalog from '../components/WorkCatalog'
 import { describeSelection, selectionError, selectionNote } from '../selections'
@@ -100,6 +101,7 @@ function TagsPage(props: {
   onSetPhases: (id: string, tracksPhase: boolean) => void
   onSetWorkout: (id: string, tracksWorkout: boolean) => void
   onDelete: (id: string) => void
+  onLogout: () => Promise<void>
 }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -720,6 +722,7 @@ function TagsPage(props: {
         executions={props.executions}
         actions={props.exerciseActions}
       />
+      <SignOut onLogout={props.onLogout} />
     </div>
   )
 }

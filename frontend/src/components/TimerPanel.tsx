@@ -5,7 +5,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
-import { ApiError } from '../api/client'
+import { ApiError, SESSION_ENDED } from '../api/client'
 import { formatClock, formatDuration } from '../dates'
 import {
   cardClass,
@@ -412,9 +412,11 @@ function TimerPanel(props: {
       clearTimerMemory(execution.id)
     } catch (err) {
       setError(
-        err instanceof ApiError && err.status === 400
-          ? recordError(err.message)
-          : 'Não foi possível finalizar. Tente de novo.',
+        err instanceof ApiError && err.status === 401
+          ? SESSION_ENDED
+          : err instanceof ApiError && err.status === 400
+            ? recordError(err.message)
+            : 'Não foi possível finalizar. Tente de novo.',
       )
       return
     } finally {

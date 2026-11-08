@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
-import { ApiError } from './api/client'
+import { ApiError, SESSION_ENDED } from './api/client'
 import * as executionsApi from './api/executions'
 import * as exercisesApi from './api/exercises'
 import * as measuresApi from './api/measures'
@@ -51,7 +51,7 @@ function isConflict(error: unknown) {
   return error instanceof ApiError && error.status === 409
 }
 
-function App() {
+function App(props: { onLogout: () => Promise<void> }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
   // Mudar esse número faz o useEffect rodar de novo (botão "Tentar de novo")
@@ -272,9 +272,11 @@ function App() {
       console.error(error)
       // 400: o servidor diz o motivo (ex.: fim no futuro, relógio do aparelho)
       setSaveError(
-        error instanceof ApiError && error.status === 400
-          ? `Não foi possível pausar: ${error.message} O cronômetro continua rodando.`
-          : 'Não foi possível pausar. O cronômetro continua rodando.',
+        error instanceof ApiError && error.status === 401
+          ? SESSION_ENDED
+          : error instanceof ApiError && error.status === 400
+            ? `Não foi possível pausar: ${error.message} O cronômetro continua rodando.`
+            : 'Não foi possível pausar. O cronômetro continua rodando.',
       )
     }
   }
@@ -797,6 +799,7 @@ function App() {
               onSetPhases={setTagPhases}
               onSetWorkout={setTagWorkout}
               onDelete={deleteTag}
+              onLogout={props.onLogout}
             />
           }
         />

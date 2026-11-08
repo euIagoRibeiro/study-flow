@@ -4,6 +4,8 @@ if (!API_URL) {
   throw new Error('VITE_API_URL não definida no frontend/.env')
 }
 
+export const SESSION_ENDED = 'Sua sessão terminou. Entre e toque de novo.'
+
 // Carrega o status HTTP, pra quem chamou distinguir, por exemplo, um 409
 // (conflito com o estado atual) de uma falha qualquer
 export class ApiError extends Error {
@@ -11,11 +13,29 @@ export class ApiError extends Error {
   // O corpo da resposta, quando o servidor manda mais que o motivo (ex.: o
   // 409 do exercício traz o existente)
   body: unknown
+  // Segundos do Retry-After (429), quando vier
+  retryAfter: number | null
 
-  constructor(status: number, message: string, body?: unknown) {
+  constructor(
+    status: number,
+    message: string,
+    body?: unknown,
+    retryAfter: number | null = null,
+  ) {
     super(message)
     this.status = status
     this.body = body
+    this.retryAfter = retryAfter
+  }
+}
+
+// Um 401 fora do /login = a sessão venceu: quem mostra a tela de entrada
+// (SessionGate) ouve aqui. O /login com 401 é só senha errada
+let sessionEnded: (() => void) | null = null
+export function onSessionEnded(listener: () => void) {
+  sessionEnded = listener
+  return () => {
+    if (sessionEnded === listener) sessionEnded = null
   }
 }
 
@@ -51,7 +71,17 @@ export async function request<T>(
     } catch {
       // Resposta sem JSON: fica a genérica
     }
-    throw new ApiError(response.status, message, body)
+    if (response.status === 401 && path !== '/login') {
+      sessionEnded?.()
+      message = SESSION_ENDED
+    }
+    const retryAfter = Number(response.headers.get('Retry-After'))
+    throw new ApiError(
+      response.status,
+      message,
+      body,
+      retryAfter > 0 ? retryAfter : null,
+    )
   }
   // 204 não tem corpo (ex.: DELETE): response.json() quebraria
   if (response.status === 204) return undefined as T

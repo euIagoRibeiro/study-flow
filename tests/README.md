@@ -28,7 +28,8 @@ seed que ela mexe voltam ao que eram). Nada aqui faz reseed sozinho.
    Node com o cookie e o `X-StudyFlow` (a API recusa DELETE sem ele), e
    `launch` abre o Chrome com o cookie posto. Bateria nova usa os dois; um
    `fetch` dentro do `page.evaluate` já leva o cookie da página, mas DELETE ali
-   precisa do `X-StudyFlow` à mão.
+   precisa do `X-StudyFlow` à mão. Sem o cookie, o site mostra a tela de entrada
+   (é o que `telas/entrada` e `layout/entrada` testam, com um Chrome sem cookie).
 
 6. **Limite geral**: a API aceita no máximo `RATE_LIMIT_PER_MIN` pedidos por
    minuto por IP, e as baterias saem todas do mesmo IP (pico medido de ~950 por
