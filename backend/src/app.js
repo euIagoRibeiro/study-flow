@@ -75,13 +75,29 @@ export function errorHandler(err, req, res, next) {
 
 // Sem CORS: o site chama a API pela mesma origem (/api, o proxy do Vite em dev
 // e o da Vercel na hospedagem), e uma página de outra origem não lê as respostas.
-// Ordem: cabeçalhos de segurança, limite geral, cabeçalhos (415, 403), corpo,
-// rotas liberadas, trava, dados, erro
+// Ordem: cabeçalhos de segurança, cache, limite geral, cabeçalhos (415, 403),
+// corpo, rotas liberadas, trava, dados, erro
+
+// Toda resposta: private (CDN e proxy não guardam) e no-cache (o navegador confere
+// antes de reusar). Entrar, sair e a sessão nem ficam guardados (no-store). O
+// Express aceita /LOGIN e /login/ como /login: a comparação também
+const NO_STORE = new Set(['/login', '/session', '/logout'])
+function cacheControl(req, res, next) {
+  const path = req.path.toLowerCase().replace(/\/+$/, '')
+  res.set(
+    'Cache-Control',
+    NO_STORE.has(path) ? 'no-store' : 'private, no-cache',
+  )
+  next()
+}
+
 export function createApp(config, { loginUnitMs, now } = {}) {
   const app = express()
   const limiter = loginLimiter({ unitMs: loginUnitMs })
   app.set('trust proxy', config.trustProxy)
   app.use(helmet())
+  // Antes de tudo que responde: os 429, 415, 403 e 401 também levam o cabeçalho
+  app.use(cacheControl)
   // Antes da trava: pedidos sem cookie também contam
   app.use(rateLimiter(config.rateLimitPerMin, now))
 

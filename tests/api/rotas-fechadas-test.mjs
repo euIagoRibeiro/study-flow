@@ -10,6 +10,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { API } from '../config.mjs'
+import { ask, dataRoutes, EXTRAS } from '../rotas.mjs'
 import { apiFetch } from '../sessao.mjs'
 
 const REAL = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'backend')
@@ -19,7 +20,6 @@ const DIRECT = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3333'
 // propósito (e confere que ela entrou fechada)
 const EXPECTED_ROUTES = 42
 const PUBLIC = ['get /health', 'post /login', 'post /logout']
-const GHOST = '00000000-0000-4000-8000-000000000000'
 const results = []
 const check = (name, ok, detail = '') => {
   results.push(ok)
@@ -39,26 +39,11 @@ try {
   const routers = stack.slice(gate + 1).filter((l) => l.name === 'router')
   check(`os ${mounts.length} roteiros de dados montados depois da trava`, routers.length === mounts.length, `${routers.length}`)
 
-  const routes = []
-  for (const [base, router] of mounts) {
-    for (const layer of router.stack) {
-      if (!layer.route) {
-        check(`roteiro ${base}: só rotas, nenhum middleware solto`, false, layer.name)
-        continue
-      }
-      for (const method of Object.keys(layer.route.methods)) {
-        routes.push({ method: method.toUpperCase(), path: `${base}${layer.route.path === '/' ? '' : layer.route.path}`.replace(/:\w+/g, GHOST) })
-      }
-    }
-  }
-  routes.push({ method: 'GET', path: '/session' }, { method: 'GET', path: '/nao-existe' }, { method: 'DELETE', path: `/nao-existe/${GHOST}` })
+  const { routes, soltos } = dataRoutes(mounts)
+  for (const solto of soltos) check(`roteiro ${solto}: só rotas, nenhum middleware solto`, false, solto)
+  routes.push(...EXTRAS)
   check(`${EXPECTED_ROUTES} rotas de dados (+ /session e duas inexistentes)`, routes.length === EXPECTED_ROUTES + 3, `${routes.length - 3}`)
 
-  const ask = (base, { method, path }, cookie) => {
-    const body = ['POST', 'PUT', 'PATCH'].includes(method) ? '{}' : undefined
-    const headers = { 'X-StudyFlow': '1', ...(body ? { 'Content-Type': 'application/json' } : {}), ...(cookie ? { Cookie: cookie } : {}) }
-    return fetch(`${base}${path}`, { method, headers, body })
-  }
   const bad = 'sf_session=9999999999.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
   for (const [label, base, cookie] of [['pelo proxy, sem cookie', API, null], ['direto, sem cookie', DIRECT, null], ['direto, cookie adulterado', DIRECT, bad]]) {
     const open = []
