@@ -110,6 +110,14 @@ próprio na 5433, apagado no fim, com a CA de teste numa pasta temporária):
 node ferramentas/ssl-container.mjs
 ```
 
+**Backup e restauração** (`ops/backup.sh` e `ops/restaurar.sh` de verdade, em
+contêineres próprios numa rede própria, com chave age descartável; tudo apagado
+no fim):
+
+```
+node ferramentas/backup-local.mjs
+```
+
 ## Instância isolada
 
 Um backend e um Vite a mais, numa cópia do banco, sem tocar no par de

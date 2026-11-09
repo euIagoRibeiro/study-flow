@@ -1,0 +1,52 @@
+# Backup diário do banco hospedado: ops/backup.sh num postgres:17.11 (a mesma
+# versão do servidor), com um Postgres de serviço pra restauração de teste. Sai só
+# o arquivo cifrado com a chave pública age, guardado 60 dias como artefato.
+# BACKUP_DATABASE_URL (secret): studyflow_backup pelo pooler em modo sessão (IPv4),
+# sem parâmetro de SSL. AGE_RECIPIENT (variável): a chave pública.
+name: backup
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: postgres:17.11
+    services:
+      restaurado:
+        image: postgres:17.11
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar o age
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends age >/dev/null
+      - name: Backup cifrado e restauração de teste
+        shell: bash
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
+          PGSSLROOTCERT: ops/supabase-ca.crt
+          RESTORE_URL: postgresql://postgres@restaurado:5432/postgres?sslmode=disable
+          OUT: out
+        run: bash ops/backup.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_id }}
+          path: out/*.dump.age
+          retention-days: 60
+          if-no-files-found: error
+          compression-level: 0
