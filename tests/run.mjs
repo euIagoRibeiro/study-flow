@@ -20,7 +20,7 @@ const groups = {
     's2b-test.mjs', 's2c-test.mjs', 'seed-selecoes.mjs', 'tag-corrida-test.mjs', 'o2a-test.mjs', 'o2b-test.mjs',
     'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs', 'seed-obras.mjs', 'tempo-test.mjs', 'host-test.mjs',
     'estimativa-segundos-test.mjs', 'auth-test.mjs', 'rotas-fechadas-test.mjs',
-    'protecoes-test.mjs', 'db-ssl-test.mjs', 'cache-test.mjs'],
+    'protecoes-test.mjs', 'db-ssl-test.mjs', 'cache-test.mjs', 'vercel-config-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
