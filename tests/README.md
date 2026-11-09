@@ -103,6 +103,13 @@ node --env-file=../backend/.env ferramentas/api-snapshot.mjs depois --ignorar=ca
 Rodar o "depois" **logo depois** da mudança: bateria que restaura dado pelo
 fluxo real devolve id novo e a comparação acusaria diferença sem regressão.
 
+**SSL do banco contra um Postgres de verdade** (precisa do Docker; contêiner
+próprio na 5433, apagado no fim, com a CA de teste numa pasta temporária):
+
+```
+node ferramentas/ssl-container.mjs
+```
+
 ## Instância isolada
 
 Um backend e um Vite a mais, numa cópia do banco, sem tocar no par de

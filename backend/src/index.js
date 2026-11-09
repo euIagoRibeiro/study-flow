@@ -1,5 +1,5 @@
-import { createApp } from './app.js'
 import { loadConfig } from './auth.js'
+import { dbConfig } from './dbconfig.js'
 
 let config
 try {
@@ -8,6 +8,14 @@ try {
   console.error(`A API não sobe sem a trava: ${err.message}`)
   process.exit(1)
 }
+try {
+  dbConfig(process.env)
+} catch (err) {
+  console.error(`A API não sobe sem o banco verificado: ${err.message}`)
+  process.exit(1)
+}
+// O app.js carrega o db.js, que cria o Pool na importação: só depois da conferência
+const { createApp } = await import('./app.js')
 
 const port = process.env.PORT ?? 3333
 // Só na própria máquina por padrão: sem host, o Node escutaria em todas as
