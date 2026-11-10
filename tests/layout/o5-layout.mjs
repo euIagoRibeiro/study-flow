@@ -1,8 +1,9 @@
 // O5: "Obras em andamento" e "Recentes" na lista do Executar, janela real com a
 // barra de rolagem, 320 a 1280. Estados: seed; longo (respostas injetadas: nomes
 // de tag com 30 letras e títulos de tarefa com 100, sem espaço; 10 obras em
-// andamento com títulos de 100 letras, uma na tarefa que está rodando, com a
-// nota "A tarefa já está aberta"; os títulos de tarefa longos passam também
+// andamento com títulos de 100 letras, duas na tarefa que está rodando: a do
+// registro, com a nota "A tarefa já está aberta", e outra com "<tarefa> está
+// aberta com <obra>."; os títulos de tarefa longos passam também
 // pelas listas de tarefas, "Em andamento" e "Escolha uma tarefa"); vazio (sem obras nem registros: as duas
 // seções não aparecem). Nada é gravado. Checagens fixas por estado e largura
 // (o total não depende do que acontece).
@@ -23,14 +24,18 @@ const longTasks = tasks.map((t, i) => ({ ...t, title: `${String(i).padStart(2, '
 const leaf = tags.find((t) => t.parentId !== null && t.active && tags.find((p) => p.id === t.parentId)?.parentId)
 const fake = (i) => ({
   id: crypto.randomUUID(), title: `${String(i).padStart(2, '0')}${'o'.repeat(98)}`, status: 'em_andamento',
-  defaultTagId: leaf.id, defaultTaskId: i === 0 ? runningTask : tasks.find((t) => t.active).id, measureId: null, total: null, url: null,
+  defaultTagId: leaf.id, defaultTaskId: i < 2 ? runningTask : tasks.find((t) => t.active).id, measureId: null, total: null, url: null,
   defaultTagActive: true, defaultTaskActive: true, measureCurrent: true, records: 1234, seconds: 360000, progress: null,
 })
-const longWorks = [...works, ...Array.from({ length: 10 }, (_, i) => fake(i))]
+const fakes = Array.from({ length: 10 }, (_, i) => fake(i))
+const longWorks = [...works, ...fakes]
+// O registro rodando fica com a 1ª obra longa (o chip e "A tarefa já está
+// aberta."); a 2ª, na mesma tarefa, ganha "<tarefa de 100> está aberta com <obra de 100>."
+const longExecutions = executions.map((e) => (e.id === running?.taskExecutionId ? { ...e, workId: fakes[0].id } : e))
 const inProgress = (list) => list.filter((w) => w.status === 'em_andamento').length
 const STATES = {
   seed: { bodies: {}, works: inProgress(works), recents: 8 },
-  longo: { bodies: { tags: longTags, tasks: longTasks, works: longWorks }, works: inProgress(longWorks), recents: 8 },
+  longo: { bodies: { tags: longTags, tasks: longTasks, works: longWorks, executions: longExecutions }, works: inProgress(longWorks), recents: 8 },
   vazio: { bodies: { works: [], executions: [], 'time-entries': [] }, works: 0, recents: 0 },
 }
 
@@ -83,6 +88,7 @@ try {
           works: named('Obras em andamento')?.querySelectorAll(':scope > ul > li').length ?? 0,
           recents: named('Recentes')?.querySelectorAll(':scope > ul > li').length ?? 0,
           openNotes: items.filter((li) => li.innerText.includes('A tarefa já está aberta.')).length,
+          otherNotes: items.filter((li) => / está aberta com /.test(li.innerText)).length,
           texts,
           leak,
           scroll: document.documentElement.scrollWidth - useful,
@@ -97,6 +103,9 @@ try {
       // longo: a obra da tarefa que está rodando tem a nota (no seed, depende dos Recentes do dia)
       if (state === 'longo') check(`${tag}: nota "A tarefa já está aberta." medida`, m.openNotes >= 1, String(m.openNotes))
       else check(`${tag}: notas contadas (${m.openNotes})`, state !== 'vazio' || m.openNotes === 0, String(m.openNotes))
+      // longo: a outra obra da tarefa aberta, com os dois nomes de 100 letras
+      if (state === 'longo') check(`${tag}: nota "<tarefa> está aberta com <obra>." medida`, m.otherNotes >= 1, String(m.otherNotes))
+      else check(`${tag}: notas de outra obra contadas (${m.otherNotes})`, state !== 'vazio' || m.otherNotes === 0, String(m.otherNotes))
       const minTexts = (spec.works * 3) + (spec.recents * 2)
       check(`${tag}: textos medidos ${m.texts} ≥ ${minTexts}`, m.texts >= minTexts, String(m.texts))
       check(`${tag}: texto dentro do item`, m.leak === null, m.leak)

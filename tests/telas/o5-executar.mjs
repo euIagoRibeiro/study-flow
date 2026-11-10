@@ -1,8 +1,9 @@
 // O5: "Obras em andamento" e "Recentes" na lista do Executar. Obras: só em
 // andamento, pela data do último registro concluído (todos os registros
 // carregados: um de 2 anos atrás conta), sem registro no fim por título; tarefa
-// padrão arquivada sem toque, com o motivo; tarefa já aberta: o item diz e o
-// toque abre o painel sem aplicar. Recentes: 8 pares tarefa + caminho, sem
+// padrão arquivada sem toque, com o motivo; tarefa já aberta: só a obra do
+// registro aberto tem o chip, as outras da tarefa dizem com qual obra (ou "sem
+// obra", ou "outra obra") ela está aberta, e o toque abre o painel sem aplicar. Recentes: 8 pares tarefa + caminho, sem
 // repetir, sem registro de obra em andamento, sem tarefa ou tag arquivada. O
 // toque abre a tarefa com a obra (o caminho dela) ou o caminho; a URL volta a
 // ?tarefa=; nada é gravado antes do Iniciar/Registrar; rascunho fica por baixo;
@@ -296,27 +297,95 @@ try {
   check('caminho padrão arquivado: o Iniciar grava a obra, sem a tag arquivada', open.length === 1 && open[0].work_id === W7.id && !(open[0].tags ?? '').includes(X.id), JSON.stringify(open))
   await dropOpen(T1.id)
 
-  // ---------- 9. tarefa padrão já aberta (com outra obra): o item diz; o toque abre o painel sem aplicar
-  const T3open = await api('POST', '/executions', { taskId: T3.id, description: null, completedAt: null, rootTagId: R.id, tagIds: [], workId: W1.id })
-  for (const state of ['Pausado', 'Rodando']) {
-    if (state === 'Rodando') await api('POST', '/time-entries', { taskExecutionId: T3open.id, startedAt: ago(5) })
-    await picker()
-    const item = (await section('Obras em andamento')).items.find((i) => i.text.startsWith(nameOf(W6)))
-    check(`tarefa aberta (${state}): o item diz`, item?.text.endsWith(`${state} | A tarefa já está aberta.`), item?.text)
-    writes.length = 0
+  // ---------- 9. tarefa padrão já aberta: só a obra do registro aberto tem o chip;
+  // as outras da mesma tarefa dizem com qual obra ela está aberta (um registro
+  // aberto por tarefa); o toque abre o painel desse registro, sem aplicar
+  // W8: a "obra B" da tarefa T3 (W6 é a "A"). Criadas aqui: na seção 1 mudariam
+  // a ordem das sem registro. W9 concluída: fora da lista, com o nome na tela
+  const W8 = await work('outra da tarefa aberta', { defaultTaskId: T3.id })
+  const W9 = await work('concluída', { status: 'concluido' })
+  const workItem = async (w) => (await section('Obras em andamento')).items.find((i) => i.text.startsWith(nameOf(w)))
+  const noChip = (item) => !/\| (Rodando|Pausado) \|/.test(item?.text ?? '|Rodando|') && !item?.text.includes('A tarefa já está aberta.')
+  const tapWork = async (w) => {
     await page.evaluate((title) => {
       const s = [...document.querySelectorAll('main section')].find((x) => x.querySelector('h2')?.textContent.trim() === 'Obras em andamento')
       ;[...s.querySelectorAll(':scope > ul > li button')].find((b) => b.querySelector('span')?.textContent.trim() === title).click()
-    }, nameOf(W6))
+    }, nameOf(w))
     await page.waitForFunction(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Finalizar'))
     await pause(300)
+  }
+  const memoryText = () => page.evaluate(() => Object.keys(sessionStorage).map((k) => sessionStorage.getItem(k)).join(' '))
+  const openNote = (text) => `| ${P} aberta está aberta ${text}`
+  const T3open = await api('POST', '/executions', { taskId: T3.id, description: null, completedAt: null, rootTagId: R.id, tagIds: [], workId: W6.id })
+  for (const state of ['Pausado', 'Rodando']) {
+    if (state === 'Rodando') await api('POST', '/time-entries', { taskExecutionId: T3open.id, startedAt: ago(5) })
+    await picker()
+    const a = await workItem(W6)
+    const b = await workItem(W8)
+    check(`tarefa aberta com a obra A (${state}): o item da A diz`, a?.text.endsWith(`${state} | A tarefa já está aberta.`), a?.text)
+    check(`tarefa aberta com a obra A (${state}): a B diz com qual obra, sem chip`,
+      b?.text.endsWith(openNote(`com ${nameOf(W6)}.`)) && noChip(b), b?.text)
+    writes.length = 0
+    await tapWork(W8)
     f = await form()
-    const memory = await page.evaluate(() => Object.keys(sessionStorage).map((k) => sessionStorage.getItem(k)).join(' '))
-    check(`tarefa aberta (${state}): painel com a obra do registro, sem aplicar, nada gravado`,
-      f.url === `/executar?tarefa=${T3.id}` && f.selects.Obra === W1.id && !memory.includes(W6.id) && writes.length === 0, JSON.stringify({ f, writes }))
+    const memory = await memoryText()
+    check(`tarefa aberta com a obra A (${state}): tocar na B abre o painel da A, sem aplicar, nada gravado`,
+      f.url === `/executar?tarefa=${T3.id}` && f.selects.Obra === W6.id && !memory.includes(W8.id) && writes.length === 0, JSON.stringify({ f, writes }))
+  }
+  await dropOpen(T3.id)
+
+  // Registro aberto sem obra: todas as obras da tarefa dizem "sem obra"
+  await api('POST', '/executions', { taskId: T3.id, description: null, completedAt: null, rootTagId: R.id, tagIds: [] })
+  await picker()
+  for (const w of [W6, W8]) {
+    const item = await workItem(w)
+    check(`registro aberto sem obra: ${nameOf(w)} diz "sem obra", sem chip`, item?.text.endsWith(openNote('sem obra.')) && noChip(item), item?.text)
+  }
+  writes.length = 0
+  await tapWork(W8)
+  f = await form()
+  check('registro aberto sem obra: o toque abre o painel com "Nenhuma obra", nada gravado',
+    f.url === `/executar?tarefa=${T3.id}` && f.selects.Obra === '' && writes.length === 0, JSON.stringify({ f, writes }))
+  await dropOpen(T3.id)
+
+  // Obra do registro aberto fora das em andamento (concluída): o nome dela
+  await api('POST', '/executions', { taskId: T3.id, description: null, completedAt: null, rootTagId: R.id, tagIds: [], workId: W9.id })
+  await picker()
+  for (const w of [W6, W8]) {
+    const item = await workItem(w)
+    check(`registro aberto com obra concluída: ${nameOf(w)} diz o nome dela, sem chip`, item?.text.endsWith(openNote(`com ${nameOf(W9)}.`)) && noChip(item), item?.text)
   }
   await dropOpen(T3.id)
   await page.close()
+
+  // Obra do registro aberto que a tela não tem (id inexistente, só na resposta
+  // injetada de GET /executions; o banco não aceitaria): "outra obra"
+  const ghost = '00000000-0000-4000-8000-00000000f05e'
+  const T3ghost = await api('POST', '/executions', { taskId: T3.id, description: null, completedAt: null, rootTagId: R.id, tagIds: [] })
+  const injected = await browser.newPage()
+  injected.setDefaultTimeout(10000)
+  await injected.setViewport({ width: 390, height: 900 })
+  await injected.setRequestInterception(true)
+  injected.on('request', async (req) => {
+    if (req.method() === 'GET' && new URL(req.url()).pathname === '/api/executions') {
+      const list = await (await apiFetch(`${API}/executions`)).json()
+      const body = list.map((e) => (e.id === T3ghost.id ? { ...e, workId: ghost } : e))
+      return req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+    }
+    req.continue()
+  })
+  await injected.goto(`${APP}/executar`, { waitUntil: 'networkidle0' })
+  await injected.waitForSelector('main section h2')
+  const ghostItems = await injected.evaluate((titles) => {
+    const s = [...document.querySelectorAll('main section')].find((x) => x.querySelector('h2')?.textContent.trim() === 'Obras em andamento')
+    return titles.map((t) => [...s.querySelectorAll(':scope > ul > li')].map((li) => li.innerText.replace(/\n/g, ' | ')).find((x) => x.startsWith(t)))
+  }, [nameOf(W6), nameOf(W8)])
+  for (const [i, w] of [W6, W8].entries()) {
+    const item = { text: ghostItems[i] }
+    check(`registro aberto com obra que a tela não tem: ${nameOf(w)} diz "outra obra", sem chip`, item.text?.endsWith(openNote('com outra obra.')) && noChip(item), item.text)
+  }
+  await injected.close()
+  await dropOpen(T3.id)
 
   // ---------- 10. toques: da Lista ao cronômetro rodando pela obra
   const touch = await browser.newPage()

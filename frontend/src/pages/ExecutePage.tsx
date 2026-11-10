@@ -298,12 +298,15 @@ function ExecutePage(props: {
     setPendingUndo(null)
   }
 
-  // Estado de cada tarefa no seletor: em andamento (rodando/pausado) ou nada
-  function openStateOf(taskId: string): 'rodando' | 'pausado' | null {
-    const open = props.executions.find(
+  const openExecutionOf = (taskId: string) =>
+    props.executions.find(
       (execution) =>
         execution.taskId === taskId && execution.completedAt === null,
     )
+
+  // Estado de cada tarefa no seletor: em andamento (rodando/pausado) ou nada
+  function openStateOf(taskId: string): 'rodando' | 'pausado' | null {
+    const open = openExecutionOf(taskId)
     if (!open) return null
     return props.timeEntries.some(
       (entry) => entry.taskExecutionId === open.id && entry.endedAt === null,
@@ -363,6 +366,26 @@ function ExecutePage(props: {
     )
   }
 
+  // Obra cuja tarefa está aberta: só a obra do registro aberto ganha o chip. As
+  // outras dizem com qual obra a tarefa está aberta (um registro aberto por
+  // tarefa), e o toque abre esse painel
+  function workOpenNote(work: Work, task: Task) {
+    const open = openExecutionOf(task.id)
+    if (!open) return null
+    if (open.workId === work.id) return openNote(task.id)
+    const other =
+      open.workId === null
+        ? null
+        : (props.works.find((w) => w.id === open.workId)?.title ?? 'outra obra')
+    return (
+      <span className="text-meta [overflow-wrap:anywhere] text-tinta-suave">
+        {other === null
+          ? `${task.title} está aberta sem obra.`
+          : `${task.title} está aberta com ${other}.`}
+      </span>
+    )
+  }
+
   function renderWorkItem(work: Work) {
     const task = props.tasks.find((t) => t.id === work.defaultTaskId)
     const lines = (
@@ -403,7 +426,7 @@ function ExecutePage(props: {
           className={`${pickerButtonClass} flex flex-col items-start gap-0.5`}
         >
           {lines}
-          {openNote(task.id)}
+          {workOpenNote(work, task)}
         </button>
       </li>
     )
