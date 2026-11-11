@@ -6,8 +6,12 @@
 // de 100 letras sem espaço, domínio de 63 letras, endereço de 2000 caracteres).
 // Nada vaza; o link tem a altura dos botões "N sessões" e o mesmo espaço que a
 // linha já dá entre eles (gap-x-2 = 8px na mesma linha, gap-y-1 = 4px entre
-// linhas), e não encosta no lápis. Contraste no pixel, nos dois temas: o chip
-// (a mesma classe do S6, vigiado) e o texto do link.
+// linhas), e não encosta no lápis. Tempos (segundos): sessão de 25h01min01s com
+// título de 100 letras, e um título real medido e estimado; o total desce pra
+// linha de baixo só quando não cabe, e o cabeçalho tem no máximo as linhas do
+// título com a largura toda, mais uma.
+// Contraste no pixel, nos dois temas: o chip (a mesma classe do S6, vigiado) e o
+// texto do link.
 import pngjs from 'pngjs'
 import { API, APP, CHROME, out } from '../config.mjs'
 import { apiFetch, launch } from '../sessao.mjs'
@@ -53,9 +57,16 @@ try {
   const page = await browser.newPage()
   page.setDefaultTimeout(10000)
   let state = null
+  let times = null
   await page.setRequestInterception(true)
   page.on('request', (req) => {
     const headers = { 'Access-Control-Allow-Origin': '*' }
+    if (times && req.method() === 'GET' && req.url() === `${API}/executions`) {
+      return req.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(times.executions) })
+    }
+    if (times && req.method() === 'GET' && req.url() === `${API}/time-entries`) {
+      return req.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(times.entries) })
+    }
     if (state && req.method() === 'GET' && req.url() === `${API}/executions`) {
       const body = JSON.stringify(executions.map((e) => (e.id === record.id ? { ...e, ...state } : e)))
       return req.respond({ status: 200, contentType: 'application/json', headers, body })
@@ -152,6 +163,134 @@ try {
       }
     }
   }
+
+  // Tempos (segundos no Histórico), respostas injetadas: o registro só. "Longo":
+  // título de 100 letras sem espaço e 25h01min01s (a mais larga com horas de 2
+  // dígitos); "real": um título do dia a dia, medido e estimado. O total fica ao
+  // lado do título quando cabe (sem encostar: o gap-3) e desce pra linha de baixo,
+  // à direita, quando não cabe; o cabeçalho tem no máximo as linhas do título com
+  // a largura toda, mais uma. A linha da sessão não invade o lápis; o total do dia
+  // não encosta no rótulo; sem rolagem lateral. "Justo": título de N letras (fonte
+  // de largura fixa) calculado em cada largura pra sobrar menos que o gap-3 ao lado
+  // do total: prova o gap (sem ele, o total ficaria colado). "Sessão longa":
+  // 1000h00min00s, a linha precisa quebrar pra caber com o lápis no cartão
+  const end = new Date(record.completedAt).getTime()
+  const template = entries.find((x) => x.taskExecutionId === record.id)
+  const TIMES = [
+    ['longo', 't'.repeat(100), 90061, false, '25h01min01s', '· 25h01min01s', '25h01min01s'],
+    ['real', 'Assistir vídeo em inglês', 4052, false, '1h07min32s', '· 1h07min32s', '1h07min32s'],
+    ['real estimado', 'Assistir vídeo em inglês', 82, true, '1min22s', '· 1min22s · estimada', '1min22s'],
+    ['justo', null, 4052, false, '1h07min32s', '· 1h07min32s', '1h07min32s'],
+    ['sessão longa', 'Assistir vídeo em inglês', 3_600_000, false, '1000h00min00s', '· 1000h00min00s', '1000h00min00s'],
+  ]
+  let sessionWrapped = 0
+  for (const [caseName, fixedTitle, seconds, estimated, TOTAL, SESSION, DAY] of TIMES) {
+    const setTimes = (title) => {
+      times = {
+        executions: [{ ...record, taskTitleAtTime: title }],
+        entries: [{ ...template, id: crypto.randomUUID(), taskExecutionId: record.id, startedAt: new Date(end - seconds * 1000).toISOString(), endedAt: new Date(end).toISOString(), estimated }],
+      }
+    }
+    for (const [where, enter] of places) {
+      for (const width of WIDTHS) {
+        await page.setViewport({ width, height: 800 })
+        if (fixedTitle === null) {
+          // Sonda: largura do cabeçalho, do total e de uma letra (a fonte do título é de largura fixa)
+          setTimes('x')
+          await enter()
+          const n = await page.evaluate((description) => {
+            const a = [...document.querySelectorAll('article')].find((x) => [...x.querySelectorAll(':scope > p')].some((p) => p.textContent.trim() === description))
+            const h4 = a.querySelector('h4')
+            const probe = document.createElement('span')
+            probe.textContent = 'm'.repeat(40)
+            probe.style.cssText = 'position: absolute; white-space: nowrap; visibility: hidden'
+            h4.append(probe)
+            const letter = probe.getBoundingClientRect().width / 40
+            probe.remove()
+            const room = h4.parentElement.getBoundingClientRect().width - h4.nextElementSibling.getBoundingClientRect().width
+            return Math.floor((room - 1) / letter)
+          }, record.description)
+          setTimes('m'.repeat(n))
+        } else setTimes(fixedTitle)
+        await enter()
+        await page.evaluate((description) => {
+          const a = [...document.querySelectorAll('article')].find((x) => [...x.querySelectorAll(':scope > p')].some((p) => p.textContent.trim() === description))
+          ;[...a.querySelectorAll('button')].find((b) => /sess(ão|ões)/.test(b.textContent)).click()
+        }, record.description)
+        await pause(200)
+        const m = await page.evaluate((description) => {
+          const useful = document.documentElement.clientWidth
+          const a = [...document.querySelectorAll('article')].find((x) => [...x.querySelectorAll(':scope > p')].some((p) => p.textContent.trim() === description))
+          const rects = (el) => {
+            const range = document.createRange()
+            range.selectNodeContents(el)
+            return [...range.getClientRects()]
+          }
+          const h4 = a.querySelector('h4')
+          const total = h4.nextElementSibling
+          const header = h4.parentElement
+          const line = [...a.querySelectorAll('li > div')].find((d) => /\d\d:\d\d–\d\d:\d\d/.test(d.textContent))
+          const session = line?.querySelector('span')
+          const pencil = line?.querySelector('button')
+          const h3 = a.closest('section')?.querySelector('h3')
+          const [label, day] = h3 ? h3.querySelectorAll('span') : []
+          const titleBox = h4.getBoundingClientRect()
+          const totalBox = total.getBoundingClientRect()
+          const cardBox = a.getBoundingClientRect()
+          const sessionRects = session ? rects(session) : []
+          const headerBox = header.getBoundingClientRect()
+          const titleRight = Math.max(...rects(h4).map((r) => r.right))
+          const totalLeft = Math.min(...rects(total).map((r) => r.left))
+          const gap3 = 0.75 * parseFloat(getComputedStyle(document.documentElement).fontSize)
+          // o título com a largura toda: o total fora do fluxo
+          total.style.display = 'none'
+          const fullTitle = h4.getBoundingClientRect().height
+          total.style.display = ''
+          return {
+            total: total.firstChild.textContent,
+            session: session?.textContent ?? null,
+            day: day?.textContent ?? null,
+            scroll: document.documentElement.scrollWidth - useful,
+            beside: totalBox.top < titleBox.bottom - 0.5,
+            titleGap: totalLeft - titleRight,
+            belowGap: totalBox.top - titleBox.bottom,
+            rightGap: headerBox.right - totalBox.right,
+            gap3,
+            titleOut: Math.max(0, ...rects(h4).map((r) => r.right - titleBox.right)),
+            grow: headerBox.height - fullTitle,
+            lineHeight: parseFloat(getComputedStyle(h4).lineHeight),
+            // sobra ao lado do total se o título (numa linha) e ele dividissem a linha
+            spare: headerBox.width - totalBox.width - (titleRight - Math.min(...rects(h4).map((r) => r.left))),
+            sessionLines: new Set(sessionRects.map((r) => Math.round(r.top))).size,
+            lineOut: Math.max(0, ...sessionRects.map((r) => r.right - cardBox.right), pencil ? pencil.getBoundingClientRect().right - cardBox.right : 0),
+            intoPencil: session && pencil ? Math.max(...rects(session).map((r) => r.right)) - pencil.getBoundingClientRect().left : null,
+            dayGap: label && day ? Math.min(...rects(day).map((r) => r.left)) - Math.max(...rects(label).map((r) => r.right)) : null,
+          }
+        }, record.description)
+        const tag = `${where}, ${caseName} ${width}px`
+        check(`${tag}: total, sessão e dia (${TOTAL})`, m.total === TOTAL && m.day === DAY && (m.session ?? '').endsWith(SESSION), JSON.stringify([m.total, m.session, m.day]))
+        check(`${tag}: sem rolagem lateral`, m.scroll <= 0, `${m.scroll}px`)
+        check(`${tag}: título dentro do cabeçalho`, m.titleOut <= 0.5, `${m.titleOut}px`)
+        if (m.beside) {
+          check(`${tag}: total ao lado não encosta no título (≥ gap-3, ${m.gap3}px)`, m.titleGap >= m.gap3 - 0.5, `${m.titleGap.toFixed(1)}px`)
+        } else {
+          check(`${tag}: total embaixo, sem invadir o título e à direita`, m.belowGap >= -0.5 && Math.abs(m.rightGap) <= 0.5, `abaixo ${m.belowGap.toFixed(1)}px, direita ${m.rightGap.toFixed(1)}px`)
+        }
+        check(`${tag}: cabeçalho ≤ título com a largura toda + 1 linha (${m.lineHeight}px)`, m.grow <= m.lineHeight + 0.5, `${m.grow.toFixed(1)}px`)
+        // a sessão estimada não tem lápis (ajusta-se pelo registro)
+        if (estimated) check(`${tag}: sessão estimada, sem lápis`, m.session !== null && m.intoPencil === null, JSON.stringify([m.session, m.intoPencil]))
+        else check(`${tag}: sessão não invade o lápis`, m.intoPencil !== null && m.intoPencil <= 0.5, String(m.intoPencil))
+        check(`${tag}: total do dia não encosta no rótulo (≥ 8px)`, m.dayGap !== null && m.dayGap >= 7.5, String(m.dayGap))
+        check(`${tag}: sessão e lápis dentro do cartão`, m.lineOut <= 0.5, `${m.lineOut}px`)
+        if (fixedTitle === null) check(`${tag}: título justo, sobraria menos que o gap-3 ao lado do total (0 ≤ sobra < ${m.gap3}px)`, m.spare >= 0 && m.spare < m.gap3, `${m.spare.toFixed(1)}px`)
+        if (caseName === 'sessão longa' && m.sessionLines > 1) sessionWrapped++
+        if (width === 320 && caseName === 'longo') await page.screenshot({ path: out(`o4d-${where === 'Lista' ? 'lista' : 'historico'}-tempos-longos-320.png`) })
+      }
+    }
+  }
+  times = null
+  // O caso só prova a quebra se a linha quebrou em algum lugar
+  check(`sessão longa: a linha quebrou em ${sessionWrapped} de ${places.length * WIDTHS.length} combinações (> 0)`, sessionWrapped > 0, String(sessionWrapped))
 
   // Contraste no pixel. Fundo = a cor mais frequente na área (um ponto só já caiu
   // fora do elemento, CLAUDE.md). Chip: a classe do S6, valor vigiado; link: texto

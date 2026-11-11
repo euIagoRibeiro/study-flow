@@ -100,6 +100,29 @@ export function formatClock(ms: number): string {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
 }
 
+// Segundos de uma sessão, arredondados: os totais somam estes, não os
+// milissegundos, pra fechar com o que cada sessão mostra
+export function sessionSeconds(ms: number): number {
+  return Math.round(Math.max(0, ms) / 1000)
+}
+
+// "1h07min32s", "7min32s", "32s": o tempo cheio de uma sessão ou registro
+// (Histórico e "antes:" do cronômetro). Acima de 24 h continua em horas.
+// Estimado: sem as unidades zeradas do fim ("15min", "1h", "1min22s")
+export function formatSeconds(seconds: number, estimated = false): string {
+  const total = Math.round(Math.max(0, seconds))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const rest = String(total % 60).padStart(2, '0')
+  if (estimated && total % 60 === 0 && total > 0) {
+    if (hours === 0) return `${minutes}min`
+    return minutes > 0 ? `${hours}h${pad(minutes)}min` : `${hours}h`
+  }
+  if (hours > 0) return `${hours}h${pad(minutes)}min${rest}s`
+  if (minutes > 0) return `${minutes}min${rest}s`
+  return `${total}s`
+}
+
 export function formatDuration(ms: number): string {
   const totalMinutes = Math.round(Math.max(0, ms) / 60000)
   const hours = Math.floor(totalMinutes / 60)

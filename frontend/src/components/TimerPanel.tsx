@@ -6,7 +6,12 @@ import {
   type ReactNode,
 } from 'react'
 import { ApiError, SESSION_ENDED } from '../api/client'
-import { formatClock, formatDuration } from '../dates'
+import {
+  formatClock,
+  formatDuration,
+  formatSeconds,
+  sessionSeconds,
+} from '../dates'
 import {
   cardClass,
   fieldClass,
@@ -334,6 +339,18 @@ function TimerPanel(props: {
           new Date(entry.startedAt).getTime()),
       0,
     )
+  // O "antes:" em segundos, somado como no Histórico (cada sessão arredondada)
+  const closedSeconds = entries
+    .filter((entry) => entry.endedAt !== null)
+    .reduce(
+      (sum, entry) =>
+        sum +
+        sessionSeconds(
+          new Date(entry.endedAt ?? entry.startedAt).getTime() -
+            new Date(entry.startedAt).getTime(),
+        ),
+      0,
+    )
   const sessions = entries.length
 
   async function runTimerAction(action: () => Promise<unknown>) {
@@ -539,7 +556,7 @@ function TimerPanel(props: {
         <p className="font-dados text-meta text-tinta-suave">
           {runningEntry
             ? closedMs > 0
-              ? `Sessão ${sessions} · antes: ${formatDuration(closedMs)}`
+              ? `Sessão ${sessions} · antes: ${formatSeconds(closedSeconds)}`
               : 'Primeira sessão'
             : `${sessions} ${sessions === 1 ? 'sessão' : 'sessões'} até agora`}
         </p>

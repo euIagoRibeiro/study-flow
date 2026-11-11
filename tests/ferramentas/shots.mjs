@@ -8,7 +8,8 @@
 // o link do Histórico
 // --sem-duracao, pro "Durou" do Finalizar e o aviso de sessão longa;
 // --sem-atalhos, pras seções "Obras em andamento" e "Recentes" do Executar (O5);
-// --sem-estimativa, pro campo da duração estimada (Registrar e lápis)
+// --sem-estimativa, pro campo da duração estimada (Registrar e lápis);
+// --sem-segundos, pros tempos do Histórico e o "antes:" do cronômetro
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { APP, CHROME, OUT as here } from '../config.mjs'
@@ -93,6 +94,21 @@ if (process.argv.includes('--sem-estimativa')) {
       if (l.querySelector('span')?.textContent.trim().startsWith('Duração estimada')) l.style.setProperty('display', 'none', 'important')
     })
     new MutationObserver(hide).observe(document.body, { childList: true, subtree: true })
+    hide()
+  }))
+}
+// Com --sem-segundos, esconde os tempos do Histórico (total do registro, cada
+// sessão, total do dia) e a linha "Sessão N · antes:" do cronômetro. Pela
+// estrutura da página, não por atributo: o "antes" (o código de antes) não teria
+if (process.argv.includes('--sem-segundos')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = 'article h4 + span.font-dados, article li > div.font-dados > span:first-child, section[aria-label] > h3 > span:nth-of-type(2) { display: none !important; }'
+    document.head.append(style)
+    const hide = () => document.querySelectorAll('main p.font-dados').forEach((p) => {
+      if (/^(Sessão \d+ · antes: |Primeira sessão|\d+ sess(ão|ões) até agora)/.test(p.textContent)) p.style.setProperty('visibility', 'hidden', 'important')
+    })
+    new MutationObserver(hide).observe(document.body, { childList: true, subtree: true, characterData: true })
     hide()
   }))
 }

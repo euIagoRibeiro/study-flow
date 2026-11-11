@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import {
   formatDayLabel,
-  formatDuration,
+  formatSeconds,
   formatTime,
   localDayKey,
+  sessionSeconds,
 } from '../dates'
 import { frequencyLabels } from '../frequency'
 import { describeValue, sortValues } from '../measures'
@@ -31,7 +32,7 @@ import TimeEntryEditForm from './TimeEntryEditForm'
 type Item = {
   execution: CompletedExecution
   entries: TimeEntry[]
-  totalMs: number
+  totalSeconds: number
 }
 
 // Sessão encerrada usa o próprio fim; a última de uma execução finalizada
@@ -101,11 +102,12 @@ function ExecutionHistory(props: {
     const entries = props.timeEntries
       .filter((entry) => entry.taskExecutionId === execution.id)
       .sort((a, b) => (a.startedAt > b.startedAt ? 1 : -1))
-    const totalMs = entries.reduce(
-      (sum, entry) => sum + entryMs(entry, execution),
+    // Soma dos segundos que cada sessão mostra: o total fecha com elas
+    const totalSeconds = entries.reduce(
+      (sum, entry) => sum + sessionSeconds(entryMs(entry, execution)),
       0,
     )
-    const item = { execution, entries, totalMs }
+    const item = { execution, entries, totalSeconds }
     const key = localDayKey(execution.completedAt)
     const last = groups[groups.length - 1]
     if (last?.key === key) last.items.push(item)
@@ -117,7 +119,7 @@ function ExecutionHistory(props: {
       })
   }
 
-  function renderCard({ execution, entries, totalMs }: Item) {
+  function renderCard({ execution, entries, totalSeconds }: Item) {
     const dateLabel = new Date(execution.completedAt).toLocaleDateString(
       'pt-BR',
     )
@@ -143,13 +145,15 @@ function ExecutionHistory(props: {
 
     return (
       <article className={`${cardClass} flex flex-col gap-1`}>
-        <div className="flex items-baseline gap-3">
-          <h4 className="min-w-0 flex-1 font-titulo text-base font-semibold break-words">
+        {/* O total desce pra linha de baixo, à direita, só quando não cabe ao
+            lado do título: o título usa a largura toda e cresce no máximo 1 linha */}
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <h4 className="min-w-0 flex-[1_1_auto] font-titulo text-base font-semibold break-words">
             {execution.taskTitleAtTime}
           </h4>
           {entries.length > 0 && (
-            <span className="shrink-0 font-dados text-conteudo font-semibold tabular-nums">
-              {formatDuration(totalMs)}
+            <span className="ml-auto shrink-0 font-dados text-conteudo font-semibold tabular-nums">
+              {formatSeconds(totalSeconds, allEstimated)}
               {allEstimated && (
                 <span className="ml-1.5 text-meta font-normal text-tinta-suave">
                   estimado
@@ -336,7 +340,10 @@ function ExecutionHistory(props: {
                   <div className="flex items-center justify-between font-dados text-meta text-tinta-suave tabular-nums">
                     <span>
                       {start}–{end} ·{' '}
-                      {formatDuration(entryMs(entry, execution))}
+                      {formatSeconds(
+                        sessionSeconds(entryMs(entry, execution)),
+                        entry.estimated,
+                      )}
                       {entry.estimated && ' · estimada'}
                     </span>
                     {/* Estimada: sem lápis, ajusta-se pelo registro (a âncora) */}
@@ -383,14 +390,21 @@ function ExecutionHistory(props: {
     <div className="flex flex-col gap-6">
       {groups.map((group) => {
         // Total do dia: soma do que está na tela, derivado — não é Dashboard
-        const dayMs = group.items.reduce((sum, item) => sum + item.totalMs, 0)
+        const daySeconds = group.items.reduce(
+          (sum, item) => sum + item.totalSeconds,
+          0,
+        )
+        // Dia só de tempo estimado: o total segue a regra do estimado
+        const dayEntries = group.items.flatMap((item) => item.entries)
+        const dayAllEstimated =
+          dayEntries.length > 0 && dayEntries.every((entry) => entry.estimated)
         return (
           <section key={group.key} aria-label={group.label}>
             <h3 className="mb-2 flex items-baseline justify-between font-dados text-xs font-bold tracking-wider text-tinta-suave uppercase">
               <span>{group.label}</span>
-              {dayMs > 0 && (
+              {daySeconds > 0 && (
                 <span className="text-meta tracking-normal normal-case tabular-nums">
-                  {formatDuration(dayMs)}
+                  {formatSeconds(daySeconds, dayAllEstimated)}
                 </span>
               )}
             </h3>
