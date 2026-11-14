@@ -153,7 +153,7 @@ function ExecutionHistory(props: {
           </h4>
           {entries.length > 0 && (
             <span className="ml-auto shrink-0 font-dados text-conteudo font-semibold tabular-nums">
-              {formatSeconds(totalSeconds, allEstimated)}
+              {formatSeconds(totalSeconds)}
               {allEstimated && (
                 <span className="ml-1.5 text-meta font-normal text-tinta-suave">
                   estimado
@@ -340,10 +340,7 @@ function ExecutionHistory(props: {
                   <div className="flex items-center justify-between font-dados text-meta text-tinta-suave tabular-nums">
                     <span>
                       {start}–{end} ·{' '}
-                      {formatSeconds(
-                        sessionSeconds(entryMs(entry, execution)),
-                        entry.estimated,
-                      )}
+                      {formatSeconds(sessionSeconds(entryMs(entry, execution)))}
                       {entry.estimated && ' · estimada'}
                     </span>
                     {/* Estimada: sem lápis, ajusta-se pelo registro (a âncora) */}
@@ -394,17 +391,13 @@ function ExecutionHistory(props: {
           (sum, item) => sum + item.totalSeconds,
           0,
         )
-        // Dia só de tempo estimado: o total segue a regra do estimado
-        const dayEntries = group.items.flatMap((item) => item.entries)
-        const dayAllEstimated =
-          dayEntries.length > 0 && dayEntries.every((entry) => entry.estimated)
         return (
           <section key={group.key} aria-label={group.label}>
             <h3 className="mb-2 flex items-baseline justify-between font-dados text-xs font-bold tracking-wider text-tinta-suave uppercase">
               <span>{group.label}</span>
               {daySeconds > 0 && (
                 <span className="text-meta tracking-normal normal-case tabular-nums">
-                  {formatSeconds(daySeconds, dayAllEstimated)}
+                  {formatSeconds(daySeconds)}
                 </span>
               )}
             </h3>

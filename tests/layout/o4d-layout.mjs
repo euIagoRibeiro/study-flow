@@ -6,7 +6,7 @@
 // de 100 letras sem espaço, domínio de 63 letras, endereço de 2000 caracteres).
 // Nada vaza; o link tem a altura dos botões "N sessões" e o mesmo espaço que a
 // linha já dá entre eles (gap-x-2 = 8px na mesma linha, gap-y-1 = 4px entre
-// linhas), e não encosta no lápis. Tempos (segundos): sessão de 25h01min01s com
+// linhas), e não encosta no lápis. Tempos (relógio): sessão de 25:01:01 com
 // título de 100 letras, e um título real medido e estimado; o total desce pra
 // linha de baixo só quando não cabe, e o cabeçalho tem no máximo as linhas do
 // título com a largura toda, mais uma.
@@ -164,8 +164,8 @@ try {
     }
   }
 
-  // Tempos (segundos no Histórico), respostas injetadas: o registro só. "Longo":
-  // título de 100 letras sem espaço e 25h01min01s (a mais larga com horas de 2
+  // Tempos (relógio no Histórico), respostas injetadas: o registro só. "Longo":
+  // título de 100 letras sem espaço e 25:01:01 (a mais larga com horas de 2
   // dígitos); "real": um título do dia a dia, medido e estimado. O total fica ao
   // lado do título quando cabe (sem encostar: o gap-3) e desce pra linha de baixo,
   // à direita, quando não cabe; o cabeçalho tem no máximo as linhas do título com
@@ -173,15 +173,15 @@ try {
   // não encosta no rótulo; sem rolagem lateral. "Justo": título de N letras (fonte
   // de largura fixa) calculado em cada largura pra sobrar menos que o gap-3 ao lado
   // do total: prova o gap (sem ele, o total ficaria colado). "Sessão longa":
-  // 1000h00min00s, a linha precisa quebrar pra caber com o lápis no cartão
+  // 10000:00:00, a linha precisa quebrar pra caber com o lápis no cartão
   const end = new Date(record.completedAt).getTime()
   const template = entries.find((x) => x.taskExecutionId === record.id)
   const TIMES = [
-    ['longo', 't'.repeat(100), 90061, false, '25h01min01s', '· 25h01min01s', '25h01min01s'],
-    ['real', 'Assistir vídeo em inglês', 4052, false, '1h07min32s', '· 1h07min32s', '1h07min32s'],
-    ['real estimado', 'Assistir vídeo em inglês', 82, true, '1min22s', '· 1min22s · estimada', '1min22s'],
-    ['justo', null, 4052, false, '1h07min32s', '· 1h07min32s', '1h07min32s'],
-    ['sessão longa', 'Assistir vídeo em inglês', 3_600_000, false, '1000h00min00s', '· 1000h00min00s', '1000h00min00s'],
+    ['longo', 't'.repeat(100), 90061, false, '25:01:01', '· 25:01:01', '25:01:01'],
+    ['real', 'Assistir vídeo em inglês', 4052, false, '01:07:32', '· 01:07:32', '01:07:32'],
+    ['real estimado', 'Assistir vídeo em inglês', 82, true, '00:01:22', '· 00:01:22 · estimada', '00:01:22'],
+    ['justo', null, 4052, false, '01:07:32', '· 01:07:32', '01:07:32'],
+    ['sessão longa', 'Assistir vídeo em inglês', 36_000_000, false, '10000:00:00', '· 10000:00:00', '10000:00:00'],
   ]
   let sessionWrapped = 0
   for (const [caseName, fixedTitle, seconds, estimated, TOTAL, SESSION, DAY] of TIMES) {
