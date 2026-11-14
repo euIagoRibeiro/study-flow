@@ -55,6 +55,11 @@ npm run telas -- painel.mjs   # nome exato: só ela (não a s5-painel nem a o4b-
 # FILTRO_EXATO=1 recusa um filtro que não seja o nome exato de uma bateria
 ```
 
+O grupo é sempre explícito: `node run.mjs` sem argumento (ou com grupo que não existe) só
+mostra o uso e sai com 2, sem rodar nada; `tudo` também se escreve. Quem chama o `run.mjs`
+direto (roteiro de regressão) passa o grupo e, de preferência, `FILTRO_EXATO=1` com o nome
+da bateria. `api/run-uso-test.mjs` prova isso num ambiente sem `DATABASE_URL`.
+
 Uma bateria só passa com **saída 0 e "N de N" com N > 0**: a que não achou o
 que medir, ou que parou sem resumo, conta como falha.
 

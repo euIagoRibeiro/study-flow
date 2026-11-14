@@ -1,7 +1,8 @@
 // Roda as baterias por grupo (banco, api, telas, layout) ou todas, depois de
 // conferir as pré-condições. Nunca faz reseed sozinho: se o seed não for de
 // hoje, para e diz o comando. Uso: npm run tudo | banco | api | telas | layout
-// (com filtro: npm run telas -- a3e1)
+// (com filtro: npm run telas -- a3e1). O grupo é sempre explícito: sem argumento
+// ele recusa e lista os grupos (tudo também se escreve)
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { freemem } from 'node:os'
@@ -20,7 +21,8 @@ const groups = {
     's2b-test.mjs', 's2c-test.mjs', 'seed-selecoes.mjs', 'tag-corrida-test.mjs', 'o2a-test.mjs', 'o2b-test.mjs',
     'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs', 'seed-obras.mjs', 'tempo-test.mjs', 'host-test.mjs',
     'estimativa-segundos-test.mjs', 'auth-test.mjs', 'rotas-fechadas-test.mjs',
-    'protecoes-test.mjs', 'db-ssl-test.mjs', 'cache-test.mjs', 'vercel-config-test.mjs'],
+    'protecoes-test.mjs', 'db-ssl-test.mjs', 'cache-test.mjs', 'vercel-config-test.mjs',
+    'run-uso-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
@@ -41,7 +43,17 @@ const groups = {
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'
 
-const which = process.argv[2] ?? 'tudo'
+// Grupo sempre explícito: sem argumento, ou com grupo que não existe, só mostra o uso
+// (o padrão antigo era "tudo", que roda tudo sem a trava de memória)
+function usage(problem) {
+  console.error(`\n${problem}\n`)
+  console.error('USO: node run.mjs <grupo> [bateria]   (pelo npm: npm run <grupo>)')
+  console.error(`grupos: tudo | ${Object.keys(groups).join(' | ')}`)
+  console.error('"tudo" roda todas as baterias sem a trava de memória. Na regressão, um grupo por vez,')
+  console.error('com FILTRO_EXATO=1 e o nome exato da bateria.')
+  process.exit(2)
+}
+const which = process.argv[2]
 // Filtro opcional: só as baterias cujo nome contém o texto (npm run telas -- a3e1).
 // O nome exato de uma bateria roda só ela ("painel.mjs" não leva a s5-painel;
 // "a3e1.mjs en-US" é a rodada em inglês): quem confere algo antes de cada
@@ -49,9 +61,8 @@ const which = process.argv[2] ?? 'tudo'
 const only = process.argv[3]
 const nameOf = (entry) => [].concat(entry).join(' ')
 const chosen = which === 'tudo' ? Object.keys(groups) : [which]
-if (!chosen.every((g) => groups[g])) {
-  throw new Error(`grupo desconhecido: ${which} (tudo, ${Object.keys(groups).join(', ')})`)
-}
+if (which === undefined) usage('Falta o grupo.')
+if (!chosen.every((g) => Object.hasOwn(groups, g))) usage(`Grupo desconhecido: "${which}".`)
 const exact = only !== undefined && chosen.some((g) => groups[g].some((e) => nameOf(e) === only))
 
 // ---- pré-condições: para no primeiro problema, com o que fazer
