@@ -29,7 +29,12 @@ import {
   type FormField,
   type SelectionChoiceMap,
 } from '../selections'
-import { fieldClass, primaryButtonClass, secondaryButtonClass } from '../styles'
+import {
+  fieldClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  textareaClass,
+} from '../styles'
 import { phaseApplies } from '../phases'
 import { executionSelection, indexTags, pathToChoice } from '../tags'
 import { isChoosablePath } from '../timerMemory'
@@ -468,11 +473,11 @@ function EditForm(props: EditProps & { onDiscard: () => void }) {
             <span className="text-sm text-tinta-suave">
               O que foi feito (opcional)
             </span>
-            <input
-              type="text"
+            <textarea
+              rows={2}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              className={fieldClass}
+              className={textareaClass}
             />
           </label>
           <label className="flex flex-col gap-1.5">

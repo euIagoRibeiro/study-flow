@@ -118,7 +118,7 @@ try {
     url: location.pathname + location.search,
     task: document.querySelector('main h2')?.textContent.trim() ?? null,
     finalizar: [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Finalizar'),
-    description: [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)')?.querySelector('input')?.value ?? null,
+    description: [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)')?.querySelector('input, textarea')?.value ?? null,
     selects: Object.fromEntries([...document.querySelectorAll('main form label')].filter((l) => l.querySelector(':scope > select')).map((l) => [l.querySelector('span')?.textContent, l.querySelector('select').value])),
     alert: document.querySelector('[role="alert"]')?.textContent.trim() ?? null,
   }))
@@ -180,7 +180,7 @@ try {
   // ---------- 4b. tocar num campo depois do atalho: vira rascunho, com a obra; volta como "Rascunho recuperado"
   await picker()
   await tapItem('Obras em andamento', nameOf(W1))
-  const descInput = await page.evaluateHandle(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input'))
+  const descInput = await page.evaluateHandle(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input, textarea'))
   await descInput.type('toque o5')
   await pause(400)
   const saved = JSON.parse((await draft()) ?? 'null')
@@ -238,7 +238,7 @@ try {
   await picker()
   await page.goto(`${APP}/executar?tarefa=${T1.id}`, { waitUntil: 'networkidle0' })
   const plain = (await form()).selects
-  const desc = await page.evaluateHandle(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input'))
+  const desc = await page.evaluateHandle(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input, textarea'))
   await desc.type('rascunho o5')
   await pause(300)
   await page.goto(`${APP}/executar`, { waitUntil: 'networkidle0' })

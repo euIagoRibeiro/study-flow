@@ -14,9 +14,9 @@ import {
 } from '../dates'
 import {
   cardClass,
-  fieldClass,
   primaryButtonClass,
   secondaryButtonClass,
+  textareaClass,
 } from '../styles'
 import { phaseApplies } from '../phases'
 import { LONG_SESSION_MS, sessionEnd } from '../sessionEnd'
@@ -596,14 +596,14 @@ function TimerPanel(props: {
             <span className="text-sm text-tinta-suave">
               O que foi feito (opcional)
             </span>
-            <input
-              type="text"
+            <textarea
+              rows={2}
               value={description}
               onChange={(event) => {
                 setDescription(event.target.value)
                 remember({ description: event.target.value })
               }}
-              className={fieldClass}
+              className={textareaClass}
             />
           </label>
           {FORM_FIELD_ORDER.map((field) => (

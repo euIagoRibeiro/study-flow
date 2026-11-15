@@ -83,7 +83,7 @@ try {
   await page.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
   const typeIn = async (label, text) => {
     const handle = await page.evaluateHandle((l) => [...document.querySelectorAll('main label')]
-      .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input'), label)
+      .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input, textarea'), label)
     await handle.evaluate((el) => { el.scrollIntoView({ block: 'center' }); el.focus(); el.select() })
     await page.keyboard.press('Backspace')
     await handle.type(text)
@@ -106,7 +106,7 @@ try {
   }, `${P} registro`)
   await page.waitForSelector('[data-card="1"] form')
   const field = await page.evaluateHandle(() => [...document.querySelectorAll('[data-card="1"] form label')]
-    .find((x) => x.querySelector('span')?.textContent.trim() === 'O que foi feito (opcional)').querySelector('input'))
+    .find((x) => x.querySelector('span')?.textContent.trim() === 'O que foi feito (opcional)').querySelector('input, textarea'))
   await field.evaluate((el) => { el.focus(); el.select() })
   await page.keyboard.press('Backspace')
   await field.type(`${P} editado`)

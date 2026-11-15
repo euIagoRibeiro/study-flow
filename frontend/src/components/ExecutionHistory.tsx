@@ -163,7 +163,7 @@ function ExecutionHistory(props: {
           )}
         </div>
         {execution.description && (
-          <p className="font-texto text-conteudo break-words">
+          <p className="font-texto text-conteudo break-words whitespace-pre-wrap">
             {execution.description}
           </p>
         )}

@@ -77,7 +77,7 @@ try {
     const field = (s) => page.evaluate((sel, l) => {
       const lab = [...document.querySelector(sel).querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim() === l)
       if (!lab) return null
-      const input = lab.querySelector('input')
+      const input = lab.querySelector('input, textarea')
       const note = lab.querySelector('[data-estimate-note]')
       return {
         type: input.type, inputMode: input.getAttribute('inputmode'), step: input.getAttribute('step'),
@@ -91,7 +91,7 @@ try {
     // Digita de verdade (teclado), apagando o que havia
     const typeIn = async (s, label, text) => {
       const handle = await page.evaluateHandle((sel, l) => [...document.querySelector(sel).querySelectorAll('label')]
-        .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input'), s, label)
+        .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input, textarea'), s, label)
       await handle.evaluate((el) => { el.scrollIntoView({ block: 'center' }); el.focus(); el.select() })
       await page.keyboard.press('Backspace')
       if (text) await handle.type(text)
@@ -222,7 +222,7 @@ try {
   }
   const editField = (s) => page.evaluate((sel, l) => {
     const lab = [...document.querySelector(sel).querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim() === l)
-    return lab ? { value: lab.querySelector('input').value, note: lab.querySelector('[data-estimate-note]')?.textContent ?? null } : null
+    return lab ? { value: lab.querySelector('input, textarea').value, note: lab.querySelector('[data-estimate-note]')?.textContent ?? null } : null
   }, s, LABEL)
   const save = async (s) => {
     puts.length = 0
@@ -235,7 +235,7 @@ try {
   }
   const typeEdit = async (s, label, text) => {
     const handle = await page.evaluateHandle((sel, l) => [...document.querySelector(sel).querySelectorAll('label')]
-      .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input'), s, label)
+      .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input, textarea'), s, label)
     await handle.evaluate((el) => { el.scrollIntoView({ block: 'center' }); el.focus(); el.select() })
     await page.keyboard.press('Backspace')
     if (text) await handle.type(text)

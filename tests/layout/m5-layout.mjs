@@ -17,7 +17,8 @@ function measure(page) {
     const scrollers = all.filter((el) => ['auto', 'scroll'].includes(style(el)))
     const inside = (el) => scrollers.some((s) => s !== el && s.contains(el))
     const past = all.filter((el) => !inside(el) && el.getBoundingClientRect().right > vw + 0.5).length
-    const bars = scrollers.filter((s) => s.offsetHeight - s.clientHeight > 0).length
+    // A barra é o que sobra além da borda: o textarea da descrição (overflow auto) tem 2px de borda e não tem barra
+    const bars = scrollers.filter((s) => { const cs = getComputedStyle(s); return s.offsetHeight - s.clientHeight - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth) > 0 }).length
     const form = document.querySelector('[data-form="f"]')
     const fr = form.getBoundingClientRect()
     const card = form.closest('article') ?? form.parentElement

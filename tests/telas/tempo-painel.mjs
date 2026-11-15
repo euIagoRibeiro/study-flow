@@ -113,12 +113,12 @@ try {
     await pause(200)
   }
   const typeDescription = async (text) => {
-    const handle = await page.evaluateHandle(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input'))
+    const handle = await page.evaluateHandle(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input, textarea'))
     await handle.evaluate((el) => { el.scrollIntoView({ block: 'center' }); el.select() })
     await page.keyboard.press('Backspace')
     await handle.type(text)
   }
-  const description = () => page.evaluate(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input').value)
+  const description = () => page.evaluate(() => [...document.querySelectorAll('main form label')].find((l) => l.querySelector('span')?.textContent === 'O que foi feito (opcional)').querySelector('input, textarea').value)
   const formError = () => page.evaluate(() => document.querySelector('main [role="alert"]')?.textContent.trim() ?? '')
   const finish = () => page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Finalizar').click())
   const finished = async () => {

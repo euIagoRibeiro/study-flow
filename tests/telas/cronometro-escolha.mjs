@@ -43,8 +43,8 @@ try {
   page.setDefaultTimeout(10000)
   await page.setViewport({ width: 390, height: 900 })
   const url = `${APP}/executar?tarefa=${taskId}`
-  const fields = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('label')].filter((l) => l.querySelector('select, input[type="text"]')).map((l) => {
-    const el = l.querySelector('select, input[type="text"]')
+  const fields = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('label')].filter((l) => l.querySelector('select, input[type="text"], textarea')).map((l) => {
+    const el = l.querySelector('select, input[type="text"], textarea')
     return [l.querySelector('span')?.textContent.trim(), el.tagName === 'SELECT' ? el.selectedOptions[0]?.textContent.trim() : el.value]
   })))
   const treino = () => page.evaluate(() => !!document.querySelector('section[aria-label="Treino"]'))
@@ -62,10 +62,10 @@ try {
     await pause(150)
   }
   const type = async (label, text) => {
-    await page.evaluate((label) => [...document.querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim() === label).querySelector('input').setAttribute('data-type', '1'), label)
-    await page.evaluate(() => document.querySelector('input[data-type]').scrollIntoView({ block: 'center' }))
-    await page.type('input[data-type="1"]', text)
-    await page.evaluate(() => document.querySelector('input[data-type]')?.removeAttribute('data-type'))
+    await page.evaluate((label) => [...document.querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim() === label).querySelector('input, textarea').setAttribute('data-type', '1'), label)
+    await page.evaluate(() => document.querySelector('[data-type]').scrollIntoView({ block: 'center' }))
+    await page.type('[data-type="1"]', text)
+    await page.evaluate(() => document.querySelector('[data-type]')?.removeAttribute('data-type'))
   }
   const clickText = async (text, scope = 'body') => {
     const ok = await page.evaluate((t, s) => {

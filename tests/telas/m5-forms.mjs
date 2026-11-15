@@ -86,7 +86,7 @@ async function value(page, label) {
   return page.evaluate((s, l) => {
     const lab = [...document.querySelector(s).querySelectorAll('label')]
       .find((x) => x.querySelector('span')?.textContent.trim() === l)
-    return lab?.querySelector('input')?.value
+    return lab?.querySelector('input, textarea')?.value
   }, S, label)
 }
 async function choose(page, label, optionText) {
@@ -110,7 +110,7 @@ async function path(page, ...steps) {
 async function type(page, label, text) {
   await page.evaluate((s, l) => {
     const input = [...document.querySelector(s).querySelectorAll('label')]
-      .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input')
+      .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input, textarea')
     input.focus()
     input.select()
   }, S, label)

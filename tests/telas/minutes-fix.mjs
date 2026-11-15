@@ -48,7 +48,7 @@ try {
       const desc = `teste minutos ${lang} ${typed}`
       // Digita de verdade (teclado), como a pessoa faria
       const focus = (label) => page.evaluate((l) => [...document.querySelectorAll('label')]
-        .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input').focus(), label)
+        .find((x) => x.querySelector('span')?.textContent.trim() === l).querySelector('input, textarea').focus(), label)
       await focus('O que foi feito (opcional)')
       await page.keyboard.type(desc)
       await focus(LABEL)

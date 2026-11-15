@@ -53,8 +53,8 @@ try {
   const url = `${APP}/executar?tarefa=${taskId}`
   const go = async (u) => { await page.goto(u, { waitUntil: 'networkidle0' }); await pause(200) }
   // Campos visíveis (dentro de `scope`): rótulo → valor
-  const fields = (scope = 'main') => page.evaluate((s) => Object.fromEntries([...document.querySelector(s).querySelectorAll('label')].filter((l) => l.querySelector('select, input')).map((l) => {
-    const el = l.querySelector('select, input')
+  const fields = (scope = 'main') => page.evaluate((s) => Object.fromEntries([...document.querySelector(s).querySelectorAll('label')].filter((l) => l.querySelector('select, input, textarea')).map((l) => {
+    const el = l.querySelector('select, input, textarea')
     return [l.querySelector('span')?.textContent.trim(), el.tagName === 'SELECT' ? el.selectedOptions[0]?.textContent.trim() : el.value]
   })), scope)
   const notice = (scope = 'main') => page.evaluate((s) => document.querySelector(s)?.textContent.includes('Rascunho recuperado') ?? false, scope)
@@ -73,13 +73,14 @@ try {
   }
   const type = async (label, text, scope = 'main', replace = false) => {
     await page.evaluate((label, s) => {
-      const input = [...document.querySelector(s).querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim() === label).querySelector('input')
+      const input = [...document.querySelector(s).querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim() === label).querySelector('input, textarea')
       input.setAttribute('data-type', '1')
       input.scrollIntoView({ block: 'center' })
     }, label, scope)
-    if (replace) await page.click('input[data-type="1"]', { clickCount: 3 })
-    await page.type('input[data-type="1"]', text)
-    await page.evaluate(() => document.querySelector('input[data-type]')?.removeAttribute('data-type'))
+    // Cursor no fim (um textarea focado por código começa no início; o input, no fim) ou tudo selecionado
+    await page.evaluate((all) => { const el = document.querySelector('[data-type="1"]'); el.focus(); if (all) el.select(); else el.setSelectionRange(el.value.length, el.value.length) }, replace)
+    await page.type('[data-type="1"]', text)
+    await page.evaluate(() => document.querySelector('[data-type]')?.removeAttribute('data-type'))
     await pause(150)
   }
   const clickText = async (text, scope = 'main') => {

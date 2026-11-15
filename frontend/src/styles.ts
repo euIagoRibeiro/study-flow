@@ -5,7 +5,13 @@ export const focusRing =
 const centered = 'flex items-center justify-center'
 
 // Campo é onde você escreve: fonte de texto, não a mono da interface
-export const fieldClass = `h-11 rounded-[10px] border border-tinta-suave/45 bg-papel px-3 font-texto text-base text-tinta aria-invalid:border-2 aria-invalid:border-alerta ${focusRing}`
+const fieldBase = `rounded-[10px] border border-tinta-suave/45 bg-papel px-3 font-texto text-base text-tinta aria-invalid:border-2 aria-invalid:border-alerta ${focusRing}`
+export const fieldClass = `h-11 ${fieldBase}`
+
+// Descrição com quebra de linha: cresce com o texto (field-sizing), de 2 a 12 linhas
+// (66 a 306px: linhas de 24px + 18px de borda e respiro), e passando disso rola por
+// dentro. Sem field-sizing no navegador, ficam as 2 linhas (rows) com rolagem interna
+export const textareaClass = `field-sizing-content min-h-16.5 max-h-76.5 w-full resize-none py-2 ${fieldBase}`
 
 // Botão primário: usa o marca-texto (um dos dois usos permitidos do amarelo)
 export const primaryButtonClass = `h-11 ${centered} gap-2 rounded-xl bg-marca-texto px-4 font-semibold text-sobre-marca hover:brightness-95 active:brightness-90 disabled:cursor-wait disabled:opacity-60 ${focusRing}`

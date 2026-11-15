@@ -39,14 +39,14 @@ async function fill(page, scope, label, value) {
   await page.evaluate((s, l, v) => {
     const lab = [...document.querySelector(s).querySelectorAll('label')]
       .find((x) => x.querySelector('span')?.textContent.trim() === l)
-    const input = lab.querySelector('input')
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, v)
+    const input = lab.querySelector('input, textarea')
+    Object.getOwnPropertyDescriptor(input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(input, v)
     input.dispatchEvent(new Event('input', { bubbles: true }))
   }, scope, label, value)
 }
 const readField = (page, scope, label) => page.evaluate((s, l) =>
   [...document.querySelector(s).querySelectorAll('label')]
-    .find((x) => x.querySelector('span')?.textContent.trim() === l)?.querySelector('input')?.value, scope, label)
+    .find((x) => x.querySelector('span')?.textContent.trim() === l)?.querySelector('input, textarea')?.value, scope, label)
 const clickText = (page, scope, text) => page.evaluate((s, t) =>
   [...document.querySelectorAll('button')].filter((b) => document.querySelector(s).contains(b) || (b.form && b.form === document.querySelector(s))).find((b) => b.textContent.trim().startsWith(t)).click(), scope, text)
 // Cartão do Histórico pela descrição: marca com data-card e devolve o seletor

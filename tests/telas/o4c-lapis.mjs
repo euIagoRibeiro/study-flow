@@ -155,7 +155,7 @@ try {
       if (el.tagName === 'LABEL' && el.closest('fieldset')) continue
       const select = el.querySelector?.('select')
       if (el.tagName === 'LABEL' && select) out.push([el.querySelector('span').textContent, select.selectedOptions[0]?.textContent ?? ''])
-      else if (el.tagName === 'LABEL' && el.querySelector('input')) out.push([el.querySelector('span').textContent, el.querySelector('input').value])
+      else if (el.tagName === 'LABEL' && el.querySelector('input, textarea')) out.push([el.querySelector('span').textContent, el.querySelector('input, textarea').value])
       if (el.tagName === 'FIELDSET') out.push([el.querySelector('legend').textContent, ''])
     }
     return out
@@ -181,7 +181,7 @@ try {
     await pause(250)
   }
   const typeIn = async (label, text) => {
-    const handle = await page.evaluateHandle((FORM, label) => [...document.querySelectorAll(`${FORM} label`)].find((x) => x.querySelector('span')?.textContent === label)?.querySelector('input') ?? null, FORM, label)
+    const handle = await page.evaluateHandle((FORM, label) => [...document.querySelectorAll(`${FORM} label`)].find((x) => x.querySelector('span')?.textContent === label)?.querySelector('input, textarea') ?? null, FORM, label)
     if (!(await handle.evaluate((el) => el !== null))) throw new Error(`campo ${label} não existe`)
     await handle.evaluate((el) => { el.scrollIntoView({ block: 'center' }); el.select() })
     await page.keyboard.press('Backspace')

@@ -84,11 +84,11 @@ try {
   })
   check('lápis do registro (Histórico): "Cancelar" na mesma linha, à esquerda do "Salvar"', pair?.sameRow && pair.cancelLeft, JSON.stringify(pair))
   await page.evaluate(() => {
-    const input = [...document.querySelectorAll('[data-t="reg"] label')].find((l) => l.textContent.includes('O que foi feito')).querySelector('input')
+    const input = [...document.querySelectorAll('[data-t="reg"] label')].find((l) => l.textContent.includes('O que foi feito')).querySelector('input, textarea')
     input.setAttribute('data-desc', '1')
   })
-  await page.click('input[data-desc="1"]', { clickCount: 3 })
-  await page.type('input[data-desc="1"]', 'NÃO PODE GRAVAR')
+  await page.click('[data-desc="1"]', { clickCount: 3 })
+  await page.type('[data-desc="1"]', 'NÃO PODE GRAVAR')
   await clickIn('[data-t="reg"]', 'Cancelar')
   // espera o bastante pra um pedido de gravar (se houvesse) chegar à API
   await pause(1000)

@@ -108,7 +108,10 @@ await markForm()
   await choose(page, form, 'Em Código', 'Pessoal')
   await choose(page, form, 'Em Código › Pessoal', 'ai-boundaries')
   await choose(page, form, 'Fase', 'Protótipo')
-  await page.type(`${form} input[type="text"]`, 'teste p4b registrar')
+  await page.evaluate((f) => [...document.querySelector(f).querySelectorAll('label')]
+    .find((l) => l.querySelector('span')?.textContent.trim() === 'O que foi feito (opcional)')
+    .querySelector('input, textarea').setAttribute('data-desc', '1'), form)
+  await page.type(`${form} [data-desc="1"]`, 'teste p4b registrar')
   await page.evaluate(() =>
     [...document.querySelectorAll('[data-form="exec"] button')].find((b) => b.textContent.trim() === 'Registrar').click())
   await new Promise((r) => setTimeout(r, 1500))

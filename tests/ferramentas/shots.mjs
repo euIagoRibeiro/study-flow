@@ -9,6 +9,7 @@
 // --sem-duracao, pro "Durou" do Finalizar e o aviso de sessão longa;
 // --sem-atalhos, pras seções "Obras em andamento" e "Recentes" do Executar (O5);
 // --sem-estimativa, pro campo da duração estimada (Registrar e lápis);
+// --sem-descricao, pro campo e o texto da descrição;
 // --sem-segundos, pros tempos do Histórico e o "antes:" do cronômetro
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -93,6 +94,20 @@ if (process.argv.includes('--sem-estimativa')) {
     const hide = () => document.querySelectorAll('label').forEach((l) => {
       if (l.querySelector('span')?.textContent.trim().startsWith('Duração estimada')) l.style.setProperty('display', 'none', 'important')
     })
+    new MutationObserver(hide).observe(document.body, { childList: true, subtree: true })
+    hide()
+  }))
+}
+// Com --sem-descricao, esconde o campo "O que foi feito" (rótulo e campo, que passou de input
+// a textarea) e o texto da descrição nos cartões: o resto tem que dar 0 pixels contra o "antes"
+if (process.argv.includes('--sem-descricao')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const hide = () => {
+      document.querySelectorAll('label').forEach((l) => {
+        if (l.querySelector('span')?.textContent.trim().startsWith('O que foi feito')) l.style.setProperty('display', 'none', 'important')
+      })
+      document.querySelectorAll('article p.text-conteudo').forEach((p) => p.style.setProperty('display', 'none', 'important'))
+    }
     new MutationObserver(hide).observe(document.body, { childList: true, subtree: true })
     hide()
   }))

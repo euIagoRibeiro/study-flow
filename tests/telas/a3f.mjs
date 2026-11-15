@@ -121,7 +121,7 @@ try {
   }
   const current = `${S} ol[aria-label="Exercícios do treino"] > li:has(ol[aria-label^="Séries"])`
   const fill = async (scope, label, value) => {
-    const h = await page.evaluateHandle((scope, label) => [...(document.querySelector(scope)?.querySelectorAll('label span') ?? [])].find((s) => s.textContent.trim() === label)?.closest('label').querySelector('input') ?? null, scope, label)
+    const h = await page.evaluateHandle((scope, label) => [...(document.querySelector(scope)?.querySelectorAll('label span') ?? [])].find((s) => s.textContent.trim() === label)?.closest('label').querySelector('input, textarea') ?? null, scope, label)
     const el = h.asElement()
     if (!el) throw new Error(`campo ${label} não achado`)
     // Centro da tela antes do clique: perto da borda, o topo fixo (107px no

@@ -24,7 +24,7 @@ import {
   type SelectionChoiceMap,
 } from '../selections'
 import { applyShortcut, type Shortcut } from '../shortcuts'
-import { fieldClass, secondaryButtonClass } from '../styles'
+import { fieldClass, secondaryButtonClass, textareaClass } from '../styles'
 import { phaseApplies } from '../phases'
 import { indexTags, pathToChoice, type TagIndex } from '../tags'
 import { isChoosablePath } from '../timerMemory'
@@ -441,11 +441,11 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
         <span className="text-sm text-tinta-suave">
           O que foi feito (opcional)
         </span>
-        <input
-          type="text"
+        <textarea
+          rows={2}
           value={description}
           onChange={(event) => changeDescription(event.target.value)}
-          className={fieldClass}
+          className={textareaClass}
         />
       </label>
       <label className="flex flex-col gap-1.5">

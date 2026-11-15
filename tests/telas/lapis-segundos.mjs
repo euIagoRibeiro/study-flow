@@ -72,8 +72,8 @@ try {
   }
   const setInput = (p, scope, label, value) => p.evaluate((scope, label, value) => {
     const root = document.querySelector(scope)
-    const input = [...root.querySelectorAll('label')].find((l) => l.querySelector('span')?.textContent.trim() === label).querySelector('input')
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value)
+    const input = [...root.querySelectorAll('label')].find((l) => l.querySelector('span')?.textContent.trim() === label).querySelector('input, textarea')
+    Object.getOwnPropertyDescriptor(input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(input, value)
     input.dispatchEvent(new Event('input', { bubbles: true }))
   }, scope, label, value)
   // Lápis do registro: abre, muda o campo e salva
@@ -93,7 +93,7 @@ try {
     await pause(200)
     await page.evaluate(`(${article})(${JSON.stringify(description)}).querySelector('button[aria-label^="Editar sessão"]').click()`)
     await pause(200)
-    await page.evaluate(`(() => { const a = (${article})(${JSON.stringify(description)}); const input = [...a.querySelectorAll('label')].find((l) => l.querySelector('span')?.textContent === ${JSON.stringify(label)}).querySelector('input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', { bubbles: true })); [...a.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Salvar').click() })()`)
+    await page.evaluate(`(() => { const a = (${article})(${JSON.stringify(description)}); const input = [...a.querySelectorAll('label')].find((l) => l.querySelector('span')?.textContent === ${JSON.stringify(label)}).querySelector('input, textarea'); Object.getOwnPropertyDescriptor(input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', { bubbles: true })); [...a.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Salvar').click() })()`)
     await pause(300)
     await page.waitForNetworkIdle()
   }
