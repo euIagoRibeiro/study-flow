@@ -78,6 +78,36 @@ try {
     await new Promise((r) => setTimeout(r, 200))
     await pencil()
   }
+  const measure = () => page.evaluate((EDIT) => {
+    const useful = document.documentElement.clientWidth
+    const form = document.querySelector(EDIT) ?? document.querySelector('main form')
+    const box = form.getBoundingClientRect()
+    const blocks = [...document.querySelectorAll('[data-selection-block]')]
+    // O que se vê: a legenda e a lista completa do menu são sr-only (1px, recortadas), fora do fluxo
+    const texts = blocks.flatMap((b) => [...b.querySelectorAll('span, legend')]).filter((x) => !x.classList.contains('sr-only'))
+    const rects = (el) => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      return [...range.getClientRects()]
+    }
+    const rows = blocks.flatMap((b) => [...b.querySelectorAll('fieldset label')])
+    const fields = blocks.flatMap((b) => [...b.querySelectorAll('select, fieldset, button[aria-expanded]')])
+    const controls = blocks.flatMap((b) => [...b.querySelectorAll('select, input, button[aria-expanded]')])
+    return {
+      longWarning: document.querySelector('main [data-long-warning]') !== null,
+      blocks: blocks.length,
+      scroll: document.documentElement.scrollWidth - useful,
+      textOut: Math.max(0, ...texts.flatMap(rects).map((r) => Math.max(r.right - box.right, box.left - r.left))),
+      fieldOut: Math.max(0, ...fields.map((f) => f.getBoundingClientRect().right - box.right)),
+      rows: rows.length,
+      lowest: rows.length ? Math.min(...rows.map((r) => r.getBoundingClientRect().height)) : 44,
+      margin: Math.min(...controls.map((c) => {
+        const r = c.getBoundingClientRect()
+        return Math.min(r.left, useful - r.right)
+      })),
+      overlap: rows.some((r, i) => i > 0 && r.getBoundingClientRect().top < rows[i - 1].getBoundingClientRect().bottom - 0.5),
+    }
+  }, EDIT)
   const forms = [
     ['Registrar', () => open(task.id), 'registrar'],
     ['rodando', () => open(RUNNING_TASK), 'painel-rodando'],
@@ -90,35 +120,25 @@ try {
     for (const width of WIDTHS) {
       await page.setViewport({ width, height: 800 })
       await enter()
-      const m = await page.evaluate((EDIT) => {
-        const useful = document.documentElement.clientWidth
-        const form = document.querySelector(EDIT) ?? document.querySelector('main form')
-        const box = form.getBoundingClientRect()
-        const blocks = [...document.querySelectorAll('[data-selection-block]')]
-        const texts = blocks.flatMap((b) => [...b.querySelectorAll('span, legend')])
-        const rects = (el) => {
-          const range = document.createRange()
-          range.selectNodeContents(el)
-          return [...range.getClientRects()]
-        }
-        const rows = blocks.flatMap((b) => [...b.querySelectorAll('fieldset label')])
-        const fields = blocks.flatMap((b) => [...b.querySelectorAll('select, fieldset')])
-        const controls = blocks.flatMap((b) => [...b.querySelectorAll('select, input')])
-        return {
-          longWarning: document.querySelector('main [data-long-warning]') !== null,
-          blocks: blocks.length,
-          scroll: document.documentElement.scrollWidth - useful,
-          textOut: Math.max(0, ...texts.flatMap(rects).map((r) => Math.max(r.right - box.right, box.left - r.left))),
-          fieldOut: Math.max(0, ...fields.map((f) => f.getBoundingClientRect().right - box.right)),
-          rows: rows.length,
-          lowest: rows.length ? Math.min(...rows.map((r) => r.getBoundingClientRect().height)) : 44,
-          margin: Math.min(...controls.map((c) => {
-            const r = c.getBoundingClientRect()
-            return Math.min(r.left, useful - r.right)
-          })),
-          overlap: rows.some((r, i) => i > 0 && r.getBoundingClientRect().top < rows[i - 1].getBoundingClientRect().bottom - 0.5),
-        }
-      }, EDIT)
+      // Menus fechados primeiro (o que a pessoa vê ao abrir o formulário); depois todos abertos,
+      // que é onde valem as 30 linhas de antes
+      if (state !== 'seed') {
+        const closed = await measure()
+        const closedTag = `${where}, ${state}, menus fechados ${width}px`
+        check(`${closedTag}: dois blocos`, closed.blocks === 2, `${closed.blocks}`)
+        check(`${closedTag}: sem rolagem lateral`, closed.scroll <= 0, `${closed.scroll}px`)
+        check(`${closedTag}: texto dentro do formulário`, closed.textOut <= 0.5, `${closed.textOut}px`)
+        check(`${closedTag}: campos dentro do formulário`, closed.fieldOut <= 0.5, `${closed.fieldOut}px`)
+        check(`${closedTag}: folga do foco ≥ 4px`, closed.margin >= 4, `${closed.margin}px`)
+      }
+      const toOpen = await page.evaluate(() => {
+        const closedTriggers = [...document.querySelectorAll('[data-selection-block] button[aria-expanded="false"]')]
+        closedTriggers.forEach((t) => t.click())
+        return closedTriggers.length
+      })
+      if (state !== 'seed') check(`${where}, ${state} ${width}px: há menus pra abrir (as de 3 ou mais opções)`, toOpen >= 1, `${toOpen}`)
+      await new Promise((r) => setTimeout(r, 150))
+      const m = await measure()
       const tag = `${where}, ${state} ${width}px`
       check(`${tag}: dois blocos`, m.blocks === 2, `${m.blocks}`)
       if (where === 'rodando') check(`${tag}: sem aviso de sessão longa (o mesmo estado a qualquer hora)`, !m.longWarning)

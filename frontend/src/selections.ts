@@ -110,6 +110,29 @@ export function keepActiveChoices(
 export const optionLabel = (option: SelectionOption) =>
   option.active ? option.name : `${option.name} (arquivada)`
 
+// Seleção múltipla com este número de opções (as mostradas: ativas e as mantidas do
+// registro) ou mais vira menu; com menos, ficam as caixinhas visíveis
+export const MENU_MIN_OPTIONS = 3
+// Resumo do menu fechado: até este número de escolhidas, os nomes; acima, "N escolhidas"
+export const SUMMARY_MAX_NAMES = 3
+
+// O que o menu fechado mostra. Sai da mesma lista (`valueOf`) que vai no envio, na ordem de
+// posição das opções (não na do clique). `list` é a lista completa, sempre
+export function selectionSummary(options: SelectionOption[], value: string[]) {
+  const names = options
+    .filter((option) => value.includes(option.id))
+    .sort((a, b) => a.position - b.position)
+    .map(optionLabel)
+  if (names.length === 0) return { text: 'Nenhuma', list: 'Nenhuma', count: 0 }
+  const list = names.join(', ')
+  return {
+    text:
+      names.length <= SUMMARY_MAX_NAMES ? list : `${names.length} escolhidas`,
+    list,
+    count: names.length,
+  }
+}
+
 // Os chips de um registro, na ordem dos formulários. O que a tela não conhece
 // (criado em outra aba) fica de fora; sem nenhuma opção conhecida, sem chip
 export function selectionChips(

@@ -119,12 +119,17 @@ try {
   // Rótulo → valor de todo campo do formulário, na ordem da tela
   const ui = () => page.evaluate(() => {
     const out = []
-    for (const el of document.querySelector('main form').querySelectorAll('label, fieldset')) {
+    for (const el of document.querySelector('main form').querySelectorAll('label, fieldset, [data-selection-menu]')) {
       const select = el.querySelector?.('select')
       if (el.tagName === 'LABEL' && select) out.push([el.querySelector('span').textContent, select.selectedOptions[0].textContent])
       if (el.tagName === 'LABEL' && el.closest('fieldset')) continue
       if (el.tagName === 'LABEL' && !select && el.querySelector('input')) out.push([el.querySelector('span').textContent, '(campo)'])
-      if (el.tagName === 'FIELDSET') out.push([el.querySelector('legend').textContent, [...el.querySelectorAll('input:checked')].map((i) => i.closest('label').textContent).join(',')])
+      // Um menu (3 ou mais opções): o nome e o resumo do gatilho, no formato de antes ("m1,m3"; vazio = "")
+      if (el.hasAttribute?.('data-selection-menu')) {
+        const summary = el.querySelector('button[aria-expanded]').firstElementChild.textContent
+        out.push([el.firstElementChild.textContent, summary === 'Nenhuma' ? '' : summary.replaceAll(', ', ',')])
+      }
+      if (el.tagName === 'FIELDSET' && !el.closest('[data-selection-menu]')) out.push([el.querySelector('legend').textContent, [...el.querySelectorAll('input:checked')].map((i) => i.closest('label').textContent).join(',')])
     }
     return out
   })
@@ -141,8 +146,18 @@ try {
     if (!done) throw new Error(`campo ${label} não achado`)
     await pause(250)
   }
-  const toggle = async (text) => {
-    await page.evaluate((text) => [...document.querySelectorAll('main form fieldset label')].find((l) => l.textContent === text).querySelector('input').click(), text)
+  // Abre o menu da seleção (se estiver fechado) e marca pelo texto: o caminho de quem usa. O menu
+  // que não existe faz o `find` falhar (nunca clica no vazio)
+  const openMenu = async (name) => {
+    await page.evaluate((name) => {
+      const trigger = [...document.querySelectorAll('main form [data-selection-menu]')].find((m) => m.firstElementChild.textContent === name).querySelector('button[aria-expanded]')
+      if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click()
+    }, name)
+    await pause(100)
+  }
+  const toggle = async (name, text) => {
+    await openMenu(name)
+    await page.evaluate((name, text) => [...[...document.querySelectorAll('main form [data-selection-menu]')].find((m) => m.firstElementChild.textContent === name).querySelectorAll('fieldset label')].find((l) => l.textContent === text).querySelector('input').click(), name, text)
     await pause(150)
   }
   const pickA = async () => { await setField('Contexto', R.name); await setField(`Em ${R.name}`, A.name) }
@@ -180,7 +195,11 @@ try {
   await check('subtag: mesma folha ganha da raiz', (await value('S raiz')) === 'r2', await value('S raiz'))
   await check('múltipla sugerida inteira', (await value('S multipla')) === 'm1,m3', await value('S multipla'))
   await check('global sugerida com caminho', (await value('Natureza')) === 'estudo', await value('Natureza'))
-  await check('opção arquivada não é oferecida', await page.evaluate(() => ![...document.querySelectorAll('main form fieldset label')].some((l) => l.textContent === 'm4')))
+  // Com o menu aberto: só as 3 ativas (m4, arquivada, fora). Com o menu fechado não há caixinha
+  // nenhuma, e a checagem de antes ("nenhuma é m4") passaria vazia
+  await openMenu('S multipla')
+  const offered = await page.evaluate(() => [...document.querySelectorAll('main form [data-selection-menu] fieldset label')].map((l) => l.textContent))
+  await check('opção arquivada não é oferecida', offered.join() === 'm1,m2,m3', offered.join())
 
   await setField(`Em ${R.name} › ${A.name}`, A1.name)
   v = await ui()
@@ -194,7 +213,8 @@ try {
   const order = ['Obra', 'Contexto', `Em ${R.name}`, `Em ${R.name} › ${A.name}`, 'Fase', 'S raiz', 'S multipla', 'S neto', 'Natureza', 'Testes (opcional)']
   await check('ordem da constante', order.every((n, i) => names.indexOf(n) > (i ? names.indexOf(order[i - 1]) : -1)), names.join(' | '))
 
-  // Acessibilidade
+  // Acessibilidade (com o menu aberto: fechado, não há fieldset nem caixinha pra conferir)
+  await openMenu('S multipla')
   const a11y = await page.evaluate(() => {
     const blocks = [...document.querySelectorAll('[data-selection-block]')]
     const selects = blocks.flatMap((b) => [...b.querySelectorAll('select')])
@@ -206,18 +226,19 @@ try {
       fieldsets: fieldsets.length,
       legends: fieldsets.filter((f) => f.firstElementChild?.tagName === 'LEGEND' && f.firstElementChild.textContent.trim() !== '').length,
       boxes: fieldsets.flatMap((f) => [...f.querySelectorAll('input[type=checkbox]')]).filter((i) => i.labels.length !== 1).length,
+      allBoxes: fieldsets.flatMap((f) => [...f.querySelectorAll('input[type=checkbox]')]).length,
     }
   })
   await check('dois blocos com o atributo de dados', a11y.blocks === 2, JSON.stringify(a11y))
   await check('todo select com label ligado', a11y.selects >= 3 && a11y.labelled === a11y.selects, JSON.stringify(a11y))
   await check('múltipla com fieldset e legend', a11y.fieldsets === 1 && a11y.legends === 1, JSON.stringify(a11y))
-  await check('toda caixa com label ligado', a11y.boxes === 0, JSON.stringify(a11y))
+  await check('toda caixa com label ligado (e há as 3 caixas pra conferir)', a11y.boxes === 0 && a11y.allBoxes === 3, JSON.stringify(a11y))
 
   // Múltipla acumula; Registrar grava só o que vale
   await fresh()
   await pickA()
-  await toggle('m2')
-  await toggle('m1')
+  await toggle('S multipla', 'm2')
+  await toggle('S multipla', 'm1')
   await check('múltipla acumula e desmarca', (await value('S multipla')) === 'm2,m3', await value('S multipla'))
   await setField('Natureza', 'pesquisa')
   await clickText('Registrar')
@@ -229,7 +250,7 @@ try {
   // Trocar e voltar o caminho
   await fresh()
   await pickA()
-  await toggle('m2')
+  await toggle('S multipla', 'm2')
   await setField(`Em ${R.name}`, B.name)
   v = await ui()
   await check('fora do caminho sai da tela', !v.some(([n]) => n === 'S multipla') && v.some(([n]) => n === 'S irma'), JSON.stringify(v))
@@ -256,7 +277,7 @@ try {
   let release = gate(A.id)
   await setField(`Em ${R.name}`, A.name)
   await setField('S raiz', 'r1')
-  await toggle('m2')
+  await toggle('S multipla', 'm2')
   release()
   await pause(400)
   await check('sugestão tardia não sobrescreve o tocado', (await value('S raiz')) === 'r1', await value('S raiz'))
@@ -297,7 +318,7 @@ try {
   await check('sem mexer: sem rascunho', (await draft()) === null, await draft())
   await pickA()
   await check('sugestão fora do rascunho', JSON.stringify(JSON.parse(await draft()).choices) === '{}', await draft())
-  await toggle('m2')
+  await toggle('S multipla', 'm2')
   await setField('S raiz', 'Nenhuma')
   const saved = JSON.parse(await draft())
   await check('rascunho guarda só o tocado', Object.keys(saved.choices).length === 2 && same(saved.choices[Ma.id], [Ma.o.m1, Ma.o.m3, Ma.o.m2]) && saved.choices[Sr.id].length === 0, JSON.stringify(saved.choices))
@@ -312,7 +333,7 @@ try {
 
   // Rascunho com opção que saiu: ignorada, a sugestão volta
   await pickA()
-  await toggle('m2')
+  await toggle('S multipla', 'm2')
   const stale = JSON.parse(await draft())
   stale.choices[Ma.id] = [Ma.o.m4]
   stale.choices[Sb.id] = ['00000000-0000-4000-8000-000000000000']
@@ -335,7 +356,7 @@ try {
 
   await fresh()
   await pickA()
-  await toggle('m2')
+  await toggle('S multipla', 'm2')
   await clickText('Iniciar cronômetro')
   await page.waitForFunction(() => !document.querySelector('main form button[type=submit]')?.textContent.includes('Registrar'))
   await pause(300)

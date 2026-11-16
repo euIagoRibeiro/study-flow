@@ -93,10 +93,15 @@ try {
   }
   const ui = () => page.evaluate(() => {
     const out = []
-    for (const el of document.querySelector('main form').querySelectorAll('label, fieldset')) {
+    for (const el of document.querySelector('main form').querySelectorAll('label, fieldset, [data-selection-menu]')) {
       const select = el.querySelector?.('select')
       if (el.tagName === 'LABEL' && select) out.push([el.querySelector('span').textContent, select.selectedOptions[0].textContent])
-      if (el.tagName === 'FIELDSET') out.push([el.querySelector('legend').textContent, [...el.querySelectorAll('input:checked')].map((i) => i.closest('label').textContent).join(',')])
+      // Um menu (3 ou mais opções): o nome e o resumo do gatilho, no formato de antes ("m1,m3"; vazio = "")
+      if (el.hasAttribute?.('data-selection-menu')) {
+        const summary = el.querySelector('button[aria-expanded]').firstElementChild.textContent
+        out.push([el.firstElementChild.textContent, summary === 'Nenhuma' ? '' : summary.replaceAll(', ', ',')])
+      }
+      if (el.tagName === 'FIELDSET' && !el.closest('[data-selection-menu]')) out.push([el.querySelector('legend').textContent, [...el.querySelectorAll('input:checked')].map((i) => i.closest('label').textContent).join(',')])
     }
     return out
   })
@@ -155,7 +160,7 @@ try {
   await check('gravado na tela', (await value('S raiz')) === 'r1', await value('S raiz'))
   await check('sugestão não passa por cima do gravado', (await value('S raiz')) !== 'r2')
   await check('o que falta vem sugerido', (await value('S a')) === 'a2' && (await value('S multipla')) === 'm1' && (await value('Natureza')) === 'estudo', JSON.stringify(await ui()))
-  const names = (await page.evaluate(() => [...document.querySelector('main form').querySelectorAll('label > span, fieldset > legend, label > div > span')].map((x) => x.textContent))).filter(Boolean)
+  const names = (await page.evaluate(() => [...document.querySelector('main form').querySelectorAll('label > span, fieldset > legend, label > div > span, [data-selection-menu] > span:first-child')].map((x) => x.textContent))).filter(Boolean)
   const order = ['Contexto', `Em ${R.name}`, 'S raiz', 'S a', 'S multipla', 'Natureza']
   await check('painel na ordem da constante', order.every((n, i) => names.indexOf(n) >= 0 && names.indexOf(n) > (i ? names.indexOf(order[i - 1]) : -1)), names.join(' | '))
 
@@ -188,7 +193,19 @@ try {
   id = (await open([Sr.o.r1])).id
   await fresh()
   for (const [n, v] of [['S raiz', 'Nenhuma'], ['S a', 'Nenhuma'], ['Natureza', 'Nenhuma']]) await setField(n, v)
-  await page.evaluate(() => [...document.querySelectorAll('main form fieldset input:checked')].forEach((i) => i.click()))
+  // Desmarca a múltipla pelo menu (aberto): fechado, não há caixinha, e o clique em "todas as
+  // marcadas" não acharia nenhuma, sem falhar. Exige que tenha desmarcado ao menos uma
+  await page.evaluate(() => {
+    const trigger = document.querySelector('main form [data-selection-menu] button[aria-expanded]')
+    if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click()
+  })
+  await pause(100)
+  const unchecked = await page.evaluate(() => {
+    const marked = [...document.querySelectorAll('main form [data-selection-menu] fieldset input:checked')]
+    marked.forEach((i) => i.click())
+    return marked.length
+  })
+  await check('Nenhuma: havia caixinha marcada pra desmarcar', unchecked >= 1, `${unchecked}`)
   await pause(200)
   await finish()
   s = await server(id)

@@ -113,10 +113,15 @@ try {
   }
   const ui = () => page.evaluate((FORM) => {
     const out = []
-    for (const el of document.querySelector(FORM).querySelectorAll('label, fieldset')) {
+    for (const el of document.querySelector(FORM).querySelectorAll('label, fieldset, [data-selection-menu]')) {
       const select = el.querySelector?.('select')
       if (el.tagName === 'LABEL' && select) out.push([el.querySelector('span').textContent, select.selectedOptions[0].textContent])
-      if (el.tagName === 'FIELDSET') out.push([el.querySelector('legend').textContent, [...el.querySelectorAll('input:checked')].map((i) => i.closest('label').textContent).join(',')])
+      // Um menu (3 ou mais opções): o nome e o resumo do gatilho, no formato de antes ("m1,m3"; vazio = "")
+      if (el.hasAttribute?.('data-selection-menu')) {
+        const summary = el.querySelector('button[aria-expanded]').firstElementChild.textContent
+        out.push([el.firstElementChild.textContent, summary === 'Nenhuma' ? '' : summary.replaceAll(', ', ',')])
+      }
+      if (el.tagName === 'FIELDSET' && !el.closest('[data-selection-menu]')) out.push([el.querySelector('legend').textContent, [...el.querySelectorAll('input:checked')].map((i) => i.closest('label').textContent).join(',')])
     }
     return out
   }, FORM)
@@ -137,8 +142,14 @@ try {
     if (!done) throw new Error(`campo ${label} não achado`)
     await pause(200)
   }
-  const toggle = async (text) => {
-    await page.evaluate((FORM, text) => [...document.querySelectorAll(`${FORM} fieldset label`)].find((l) => l.textContent === text).querySelector('input').click(), FORM, text)
+  // Abre o menu da seleção (se estiver fechado) e marca pelo texto: o caminho de quem usa
+  const toggle = async (name, text) => {
+    await page.evaluate((FORM, name) => {
+      const trigger = [...document.querySelectorAll(`${FORM} [data-selection-menu]`)].find((m) => m.firstElementChild.textContent === name).querySelector('button[aria-expanded]')
+      if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click()
+    }, FORM, name)
+    await pause(100)
+    await page.evaluate((FORM, name, text) => [...[...document.querySelectorAll(`${FORM} [data-selection-menu]`)].find((m) => m.firstElementChild.textContent === name).querySelectorAll('fieldset label')].find((l) => l.textContent === text).querySelector('input').click(), FORM, name, text)
     await pause(150)
   }
   const warning = () => page.evaluate((FORM) => document.querySelector(FORM).textContent.match(/Salvar com esse caminho vai remover: [^.]*\./)?.[0] ?? null, FORM)
@@ -167,7 +178,7 @@ try {
   await setField(`Em ${R.name}`, B.name)
   await setField(`Em ${R.name}`, A.name)
   await check('sem pedido de sugestão, nem trocando o caminho', suggestions.length === 0, suggestions.join())
-  const names = await page.evaluate((FORM) => [...document.querySelector(FORM).querySelectorAll('label > span, fieldset > legend, label > div > span')].map((x) => x.textContent), FORM)
+  const names = await page.evaluate((FORM) => [...document.querySelector(FORM).querySelectorAll('label > span, fieldset > legend, label > div > span, [data-selection-menu] > span:first-child')].map((x) => x.textContent), FORM)
   const order = ['Contexto', `Em ${R.name}`, 'S a', 'S multipla', 'Natureza', 'Testes (opcional)']
   await check('lápis na ordem da constante', order.every((x, i) => names.indexOf(x) >= 0 && names.indexOf(x) > (i ? names.indexOf(order[i - 1]) : -1)), names.join(' | '))
 
@@ -179,7 +190,7 @@ try {
   // Mexer: a lista inteira do que está na tela
   await fresh(r.description)
   await setField('S raiz', 'r2')
-  await toggle('m2')
+  await toggle('S multipla', 'm2')
   await save()
   await check('mexeu: o PUT leva a lista', same(puts.at(-1)?.selectionOptionIds ?? [], [Sr.o.r2, Sa.o.a1, Ma.o.m2]), JSON.stringify(puts.at(-1)))
   await check('mexeu: banco com a escolha nova', same(await chosen(r.id), [Sr.o.r2, Sa.o.a1, Ma.o.m2]))
@@ -188,7 +199,7 @@ try {
   await fresh(r.description)
   await setField('S raiz', 'Nenhuma')
   await setField('S a', 'Nenhuma')
-  await toggle('m2')
+  await toggle('S multipla', 'm2')
   await save()
   await check('"Nenhuma" manda [] e limpa', Array.isArray(puts.at(-1)?.selectionOptionIds) && puts.at(-1).selectionOptionIds.length === 0, JSON.stringify(puts.at(-1)))
   await check('"Nenhuma": banco sem escolhas', (await chosen(r.id)).length === 0)
@@ -258,7 +269,7 @@ try {
   await setField('S raiz', 'r1')
   await check('voltar ao gravado apaga o rascunho', (await draft(a.id)) === null, await draft(a.id))
   await setField('S raiz', 'Nenhuma')
-  await toggle('m1')
+  await toggle('S multipla', 'm1')
   await page.goto(`${APP}/`, { waitUntil: 'domcontentloaded' })
   await pause(200)
   await historico()

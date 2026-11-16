@@ -1,6 +1,7 @@
-import { optionLabel } from '../selections'
+import { MENU_MIN_OPTIONS, optionLabel } from '../selections'
 import { fieldClass } from '../styles'
 import type { Selection } from '../types'
+import SelectionMenu from './SelectionMenu'
 
 // Um grupo de seleções do formulário. Quem decide quais aparecem, e onde, é o
 // formulário; o valor vem do useSelectionChoices. Sempre empilhado: mora
@@ -23,6 +24,18 @@ function SelectionChoices(props: {
               option.active || props.keptOptionIds?.includes(option.id),
           )
           .sort((a, b) => a.position - b.position)
+        // 3 ou mais opções mostradas: menu; com 1 ou 2, as caixinhas de sempre
+        if (selection.multiple && options.length >= MENU_MIN_OPTIONS) {
+          return (
+            <SelectionMenu
+              key={selection.id}
+              name={selection.name}
+              options={options}
+              value={value}
+              onChange={(optionIds) => props.onChange(selection.id, optionIds)}
+            />
+          )
+        }
         return selection.multiple ? (
           <fieldset key={selection.id} className="flex flex-col">
             <legend className="mb-1.5 text-sm text-tinta-suave [overflow-wrap:anywhere]">
