@@ -45,3 +45,10 @@ export function editTimeEntry(
 ): Promise<TimeEntry> {
   return putTimeEntry(id, changes)
 }
+
+// Excluir sessão: a resposta traz as que sobraram do registro
+export function deleteTimeEntry(
+  id: string,
+): Promise<{ taskExecutionId: string; timeEntries: TimeEntry[] }> {
+  return request(`/time-entries/${id}`, { method: 'DELETE' })
+}

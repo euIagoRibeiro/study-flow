@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { ApiError } from '../api/client'
 import {
   formatDayLabel,
   formatSeconds,
@@ -25,7 +26,8 @@ import { formatSets } from '../workouts'
 import { linkHost } from '../works'
 import CompactIconButton from './CompactIconButton'
 import ExecutionEditForm from './ExecutionEditForm'
-import { ChevronDownIcon, PencilIcon } from './icons'
+import FormError from './FormError'
+import { ChevronDownIcon, PencilIcon, TrashIcon } from './icons'
 import SelectionChips from './SelectionChips'
 import TimeEntryEditForm from './TimeEntryEditForm'
 
@@ -42,6 +44,8 @@ function entryMs(entry: TimeEntry, execution: CompletedExecution) {
   return new Date(end).getTime() - new Date(entry.startedAt).getTime()
 }
 
+const SOLE_ENTRY = 'Esta é a única sessão do registro.'
+
 function ExecutionHistory(props: {
   executions: CompletedExecution[]
   timeEntries: TimeEntry[]
@@ -55,6 +59,7 @@ function ExecutionHistory(props: {
     entryId: string,
     changes: { startedAt: string; endedAt: string },
   ) => Promise<void>
+  onDeleteTimeEntry: (entryId: string) => Promise<void>
 }) {
   // Qual execução está em edição (descrição/data) — sem relação com qual
   // sessão de tempo está em edição, são coisas independentes
@@ -84,6 +89,50 @@ function ExecutionHistory(props: {
     })
   }
   const toggleSessions = (id: string) => toggle(setOpenSessions, id)
+  // Excluir sessão: a que está a caminho (botão desligado) e o erro de cada linha
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null)
+  const [entryErrors, setEntryErrors] = useState<Record<string, string>>({})
+  const setEntryError = (entryId: string, message: string | null) =>
+    setEntryErrors((current) => {
+      const next = { ...current }
+      if (message === null) delete next[entryId]
+      else next[entryId] = message
+      return next
+    })
+  async function deleteEntry(
+    execution: CompletedExecution,
+    entries: TimeEntry[],
+    entry: TimeEntry,
+    label: string,
+  ) {
+    if (deletingEntryId !== null) return
+    // A única sessão do registro não se exclui: a frase, sem confirmação
+    if (entries.length === 1) {
+      setEntryError(entry.id, SOLE_ENTRY)
+      return
+    }
+    if (
+      !window.confirm(`Excluir a sessão das ${label}? Não dá pra desfazer.`)
+    ) {
+      return
+    }
+    setEntryError(entry.id, null)
+    setDeletingEntryId(entry.id)
+    try {
+      await props.onDeleteTimeEntry(entry.id)
+      // A linha some: o foco volta ao botão "N sessões" do cartão
+      pencils.current.get(`sessoes:${execution.id}`)?.focus()
+    } catch (err) {
+      setEntryError(
+        entry.id,
+        err instanceof ApiError && [400, 404, 409].includes(err.status)
+          ? err.message
+          : 'Não foi possível excluir a sessão. Tente de novo.',
+      )
+    } finally {
+      setDeletingEntryId(null)
+    }
+  }
   // Nome de hoje (renomear é dinâmico, como as tags); arquivado sem marca:
   // o registro é do passado
   const exerciseName = (id: string) =>
@@ -252,6 +301,7 @@ function ExecutionHistory(props: {
             {entries.length > 0 && (
               <button
                 type="button"
+                ref={pencilRef(`sessoes:${execution.id}`)}
                 onClick={() => toggleSessions(execution.id)}
                 aria-expanded={sessionsOpen}
                 className={textButtonClass}
@@ -337,30 +387,52 @@ function ExecutionHistory(props: {
               const editingEntry = editingEntryId === entry.id
               return (
                 <li key={entry.id}>
-                  <div className="flex items-center justify-between font-dados text-meta text-tinta-suave tabular-nums">
-                    <span>
+                  <div className="flex items-center justify-between gap-1 font-dados text-meta text-tinta-suave tabular-nums">
+                    <span className="min-w-0">
                       {start}–{end} ·{' '}
                       {formatSeconds(sessionSeconds(entryMs(entry, execution)))}
                       {entry.estimated && ' · estimada'}
                     </span>
-                    {/* Estimada: sem lápis, ajusta-se pelo registro (a âncora) */}
+                    {/* Estimada: sem lápis nem lixeira, ajusta-se pelo registro (a âncora) */}
                     {!entry.estimated && (
-                      <CompactIconButton
-                        buttonRef={pencilRef(`sessao:${entry.id}`)}
-                        onClick={() =>
-                          setEditingEntryId(editingEntry ? null : entry.id)
-                        }
-                        expanded={editingEntry}
-                        label={`${editingEntry ? 'Cancelar edição da' : 'Editar'} sessão das ${start}`}
-                        title={
-                          editingEntry ? 'Cancelar edição' : 'Editar sessão'
-                        }
-                        className="-mr-2"
-                      >
-                        <PencilIcon />
-                      </CompactIconButton>
+                      <div className="flex shrink-0 items-center">
+                        <CompactIconButton
+                          buttonRef={pencilRef(`sessao:${entry.id}`)}
+                          onClick={() =>
+                            setEditingEntryId(editingEntry ? null : entry.id)
+                          }
+                          expanded={editingEntry}
+                          label={`${editingEntry ? 'Cancelar edição da' : 'Editar'} sessão das ${start}`}
+                          title={
+                            editingEntry ? 'Cancelar edição' : 'Editar sessão'
+                          }
+                        >
+                          <PencilIcon />
+                        </CompactIconButton>
+                        <CompactIconButton
+                          onClick={() =>
+                            deleteEntry(
+                              execution,
+                              entries,
+                              entry,
+                              `${start} (${formatSeconds(sessionSeconds(entryMs(entry, execution)))})`,
+                            )
+                          }
+                          disabled={deletingEntryId === entry.id}
+                          label={`Excluir sessão das ${start}`}
+                          title="Excluir sessão"
+                          className="-mr-2"
+                        >
+                          <TrashIcon />
+                        </CompactIconButton>
+                      </div>
                     )}
                   </div>
+                  {entryErrors[entry.id] && (
+                    <div className="pb-1.5 [overflow-wrap:anywhere]">
+                      <FormError>{entryErrors[entry.id]}</FormError>
+                    </div>
+                  )}
                   {editingEntry && (
                     <TimeEntryEditForm
                       entry={entry}

@@ -141,3 +141,76 @@ timeEntriesRouter.put('/:id', async (req, res) => {
     throw err
   }
 })
+
+const NOT_FOUND = 'Sessão não encontrada'
+const SOLE_ENTRY = 'Esta é a única sessão do registro.'
+
+// Excluir sessão. Devolve as que sobraram do registro (a tela troca as dela). Recusa estimada
+// (a duração se ajusta no registro), rodando e a única do registro. Trava o registro antes da
+// sessão (a ordem do Finalizar), em FOR NO KEY UPDATE pra não barrar a FK do Retomar; a sessão
+// é relida já travada, então um Pausar em andamento termina antes de a regra olhar o ended_at
+timeEntriesRouter.delete('/:id', async (req, res) => {
+  if (!isUuid(req.params.id)) {
+    return res.status(404).json({ error: NOT_FOUND })
+  }
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const owner = await client.query(
+      'SELECT task_execution_id AS "executionId" FROM time_entries WHERE id = $1',
+      [req.params.id],
+    )
+    if (owner.rowCount === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: NOT_FOUND })
+    }
+    const { executionId } = owner.rows[0]
+    await client.query(
+      'SELECT id FROM task_executions WHERE id = $1 FOR NO KEY UPDATE',
+      [executionId],
+    )
+    const entry = await client.query(
+      'SELECT ended_at AS "endedAt", estimated FROM time_entries WHERE id = $1 FOR UPDATE',
+      [req.params.id],
+    )
+    if (entry.rowCount === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: NOT_FOUND })
+    }
+    if (entry.rows[0].estimated) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({
+        error: 'Sessão estimada: ajuste a duração no registro',
+      })
+    }
+    if (entry.rows[0].endedAt === null) {
+      await client.query('ROLLBACK')
+      return res
+        .status(409)
+        .json({ error: 'Sessão rodando: pause antes de excluir.' })
+    }
+    const count = await client.query(
+      'SELECT count(*)::int AS n FROM time_entries WHERE task_execution_id = $1',
+      [executionId],
+    )
+    if (count.rows[0].n <= 1) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({ error: SOLE_ENTRY })
+    }
+    await client.query('DELETE FROM time_entries WHERE id = $1', [
+      req.params.id,
+    ])
+    const left = await client.query(
+      `SELECT ${COLUMNS} FROM time_entries
+       WHERE task_execution_id = $1 ORDER BY started_at, id`,
+      [executionId],
+    )
+    await client.query('COMMIT')
+    res.json({ taskExecutionId: executionId, timeEntries: left.rows })
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw err
+  } finally {
+    client.release()
+  }
+})

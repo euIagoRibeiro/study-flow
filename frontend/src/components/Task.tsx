@@ -75,6 +75,7 @@ function Task(props: {
     entryId: string,
     changes: { startedAt: string; endedAt: string },
   ) => Promise<void>
+  onDeleteTimeEntry: (entryId: string) => Promise<void>
 }) {
   const { id, title, frequency, active } = props.task
   const { openForm, onToggle } = props
@@ -248,6 +249,7 @@ function Task(props: {
               workPicker={props.workPicker}
               onEdit={props.onEditExecution}
               onEditTimeEntry={props.onEditTimeEntry}
+              onDeleteTimeEntry={props.onDeleteTimeEntry}
             />
             {/* Fecha no fim também: num histórico longo, o ⋯ fica lá em cima */}
             <button

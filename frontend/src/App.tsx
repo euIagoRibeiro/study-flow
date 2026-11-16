@@ -392,6 +392,17 @@ function App(props: { onLogout: () => Promise<void> }) {
     replaceTimeEntry(await timeEntriesApi.editTimeEntry(id, changes))
   }
 
+  // O erro sobe pro ExecutionHistory, que mostra a mensagem na linha da sessão. A resposta traz as
+  // sessões que sobraram do registro: as dele são trocadas pelas dela
+  async function deleteTimeEntry(id: string) {
+    const { taskExecutionId, timeEntries: left } =
+      await timeEntriesApi.deleteTimeEntry(id)
+    setTimeEntries((current) => [
+      ...current.filter((entry) => entry.taskExecutionId !== taskExecutionId),
+      ...left,
+    ])
+  }
+
   // Mesmo caminho do addTask: o erro sobe pro TaskForm de edição
   async function editTask(id: string, changes: NewTask) {
     replaceTask(await tasksApi.editTask(id, changes))
@@ -733,6 +744,7 @@ function App(props: { onLogout: () => Promise<void> }) {
               onReactivate={reactivateTask}
               onEditExecution={editExecution}
               onEditTimeEntry={editTimeEntry}
+              onDeleteTimeEntry={deleteTimeEntry}
             />
           }
         />
@@ -774,6 +786,7 @@ function App(props: { onLogout: () => Promise<void> }) {
               workPicker={workPicker}
               onEditExecution={editExecution}
               onEditTimeEntry={editTimeEntry}
+              onDeleteTimeEntry={deleteTimeEntry}
             />
           }
         />

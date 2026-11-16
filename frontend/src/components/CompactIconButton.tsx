@@ -12,6 +12,7 @@ function CompactIconButton({
   title: string
   expanded?: boolean
   onClick: () => void
+  disabled?: boolean
   className?: string
   children: ReactNode
   // Pra devolver o foco a ele (ex.: o Cancelar do formulário que ele abriu)
@@ -22,10 +23,11 @@ function CompactIconButton({
       ref={buttonRef}
       type="button"
       onClick={props.onClick}
+      disabled={props.disabled}
       aria-expanded={props.expanded}
       aria-label={props.label}
       title={props.title}
-      className={`group flex h-11 w-11 shrink-0 items-center justify-center text-tinta-suave outline-none ${props.className ?? ''}`}
+      className={`group flex h-11 w-11 shrink-0 items-center justify-center text-tinta-suave outline-none disabled:cursor-wait disabled:opacity-50 ${props.className ?? ''}`}
     >
       <span className="flex h-8 w-8 items-center justify-center rounded-full group-hover:bg-tinta/[0.07] group-hover:text-tinta group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-tinta group-aria-expanded:bg-tinta/[0.07] group-aria-expanded:text-tinta">
         {props.children}

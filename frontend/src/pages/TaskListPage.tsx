@@ -49,6 +49,7 @@ function TaskListPage(props: {
     entryId: string,
     changes: { startedAt: string; endedAt: string },
   ) => Promise<void>
+  onDeleteTimeEntry: (entryId: string) => Promise<void>
 }) {
   const [showArchived, setShowArchived] = useState(false)
   // Criar é raro, ver a lista é o uso de todo dia: o formulário fica recolhido
@@ -222,6 +223,7 @@ function TaskListPage(props: {
             onReactivate={props.onReactivate}
             onEditExecution={props.onEditExecution}
             onEditTimeEntry={props.onEditTimeEntry}
+            onDeleteTimeEntry={props.onDeleteTimeEntry}
           />
         </>
       )}

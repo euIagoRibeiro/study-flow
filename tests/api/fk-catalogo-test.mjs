@@ -65,6 +65,8 @@ const ROUTES = {
   works: ['works.js', {
     task_executions_work: 'task_executions_work',
   }],
+  // Excluir sessão: nenhuma tabela aponta pra time_entries, então não há FK a traduzir
+  time_entries: ['timeEntries.js', {}],
 }
 const SEM_TRADUCAO = {
   selection_options_selection: 'POST /selection-options trava a seleção antes de inserir: faz fila com o DELETE',
@@ -85,7 +87,7 @@ try {
   const deletes = readdirSync(join(TESTS, '..', 'backend', 'src', 'routes'))
     .flatMap((f) => [...readFileSync(join(TESTS, '..', 'backend', 'src', 'routes', f), 'utf8').matchAll(/(\w+)Router\.delete\(/g)].map((m) => m[1]))
     .sort()
-  const expected = ['exercises', 'measureKinds', 'measures', 'selectionOptions', 'selections', 'tags', 'works']
+  const expected = ['exercises', 'measureKinds', 'measures', 'selectionOptions', 'selections', 'tags', 'timeEntries', 'works']
   check('rotas DELETE do backend = as da lista', deletes.join() === expected.join(), deletes.join())
 
   for (const [table, [file, fks]] of Object.entries(ROUTES)) {

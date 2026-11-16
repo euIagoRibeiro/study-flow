@@ -48,6 +48,7 @@ function HistoricoPage(props: {
     entryId: string,
     changes: { startedAt: string; endedAt: string },
   ) => Promise<void>
+  onDeleteTimeEntry: (entryId: string) => Promise<void>
 }) {
   const [period, setPeriod] = useState<PeriodFilter>('all')
   const [frequency, setFrequency] = useState<FrequencyFilter>('all')
@@ -86,6 +87,7 @@ function HistoricoPage(props: {
           workPicker={props.workPicker}
           onEdit={props.onEditExecution}
           onEditTimeEntry={props.onEditTimeEntry}
+          onDeleteTimeEntry={props.onDeleteTimeEntry}
         />
       )}
     </div>

@@ -33,6 +33,7 @@ function Tasks(props: {
     entryId: string,
     changes: { startedAt: string; endedAt: string },
   ) => Promise<void>
+  onDeleteTimeEntry: (entryId: string) => Promise<void>
 }) {
   // Um valor só pra lista inteira, não por linha (senão duas linhas abrem juntas)
   const [openTask, setOpenTask] = useState<{
@@ -70,6 +71,7 @@ function Tasks(props: {
           onReactivate={props.onReactivate}
           onEditExecution={props.onEditExecution}
           onEditTimeEntry={props.onEditTimeEntry}
+          onDeleteTimeEntry={props.onDeleteTimeEntry}
         />
       ))}
     </ul>

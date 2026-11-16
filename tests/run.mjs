@@ -22,7 +22,7 @@ const groups = {
     'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs', 'seed-obras.mjs', 'tempo-test.mjs', 'host-test.mjs',
     'estimativa-segundos-test.mjs', 'auth-test.mjs', 'rotas-fechadas-test.mjs',
     'protecoes-test.mjs', 'db-ssl-test.mjs', 'cache-test.mjs', 'vercel-config-test.mjs',
-    'run-uso-test.mjs'],
+    'run-uso-test.mjs', 'sessao-excluir-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
@@ -32,12 +32,12 @@ const groups = {
     's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs', 's5-lapis.mjs', 'selecao-menu.mjs', 'selecao-resumo-envio.mjs', 's6-chips.mjs', 'o3-obras.mjs',
     'o4a-registrar.mjs', 'o4b-painel.mjs', 'o4c-lapis.mjs', 'o4d-chips.mjs', 'tempo-painel.mjs', 'o5-executar.mjs', 'lapis-segundos.mjs',
     'estimativa-segundos.mjs', 'treino-ordem.mjs', 'mesma-origem.mjs', 'entrada.mjs', 'historico-segundos.mjs',
-    'descricao-quebra.mjs',
+    'descricao-quebra.mjs', 'sessao-excluir.mjs',
   ],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
-    'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs', 's5-layout.mjs', 'selecao-menu-layout.mjs', 's6-layout.mjs',
+    'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs', 's5-layout.mjs', 'selecao-menu-layout.mjs', 'sessao-excluir-layout.mjs', 's6-layout.mjs',
     'o3-layout.mjs', 'o4a-layout.mjs', 'o4b-layout.mjs', 'o4c-layout.mjs', 'o4d-layout.mjs', 'tempo-layout.mjs', 'o5-layout.mjs',
     'estimativa-layout.mjs', 'entrada.mjs', 'descricao-layout.mjs',
   ],
