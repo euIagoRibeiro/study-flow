@@ -304,3 +304,60 @@ dashboardRouter.get('/tempo-por-tags', async (req, res) => {
   )
   res.json(result.rows[0])
 })
+
+// Medidas (MA1): quantidades gravadas nos registros. A data é a do REGISTRO
+// (completed_at em [de, ate); aberto não entra), não a das sessões. A medida é a
+// GRAVADA no registro (execution_measures.measure_id), nunca a atual da tag. Medidas e
+// tipos agrupam por lower(btrim(nome)): nomes diferentes não se somam, e o mesmo nome em
+// raízes diferentes vira um bloco só. O nome mostrado é o do registro mais recente do
+// grupo (completed_at desc, id desc). Uma linha por registro, sem join com tags: não há
+// dupla contagem por nível. `kinds` só existe se algum valor do grupo tem tipo; aí os
+// sem tipo são uma linha (key/name nulos) e a soma das linhas fecha com o total.
+// Prototipada em tests/banco/medidas-cases.sql, com a conta à mão
+dashboardRouter.get('/medidas', async (req, res) => {
+  const period = await readPeriod(req, res)
+  if (!period) return
+  const result = await pool.query(
+    `WITH v AS (
+       SELECT e.id AS execucao, e.completed_at,
+              lower(btrim(m.name)) AS mkey, btrim(m.name) AS mname,
+              btrim(m.singular) AS msing,
+              lower(btrim(k.name)) AS kkey, btrim(k.name) AS kname, val.quantity
+       FROM execution_measure_values val
+       JOIN task_executions e ON e.id = val.task_execution_id
+       JOIN measures m ON m.id = val.measure_id
+       LEFT JOIN measure_kinds k ON k.id = val.kind_id
+       WHERE e.completed_at >= $1::timestamptz AND e.completed_at < $2::timestamptz
+     ),
+     por_tipo AS (
+       SELECT mkey, kkey,
+              (array_agg(kname ORDER BY completed_at DESC, execucao DESC))[1] AS name,
+              round(sum(quantity), 2)::float8 AS quantity,
+              count(DISTINCT execucao)::int AS executions
+       FROM v GROUP BY mkey, kkey
+     ),
+     por_medida AS (
+       SELECT mkey,
+              (array_agg(mname ORDER BY completed_at DESC, execucao DESC))[1] AS name,
+              (array_agg(msing ORDER BY completed_at DESC, execucao DESC))[1] AS singular,
+              round(sum(quantity), 2)::float8 AS total,
+              count(DISTINCT execucao)::int AS executions
+       FROM v GROUP BY mkey
+     )
+     SELECT pm.mkey AS key, pm.name, pm.singular, pm.total, pm.executions,
+            COALESCE((
+              SELECT json_agg(json_build_object('key', pt.kkey, 'name', pt.name,
+                                                'quantity', pt.quantity,
+                                                'executions', pt.executions)
+                              ORDER BY pt.kkey IS NULL, pt.quantity DESC, pt.kkey)
+              FROM por_tipo pt
+              WHERE pt.mkey = pm.mkey
+                AND EXISTS (SELECT 1 FROM por_tipo x
+                            WHERE x.mkey = pm.mkey AND x.kkey IS NOT NULL)
+            ), '[]'::json) AS kinds
+     FROM por_medida pm
+     ORDER BY pm.total DESC, pm.mkey`,
+    [period.de, period.ate],
+  )
+  res.json({ items: result.rows })
+})
