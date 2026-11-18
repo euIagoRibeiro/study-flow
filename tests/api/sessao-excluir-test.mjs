@@ -3,8 +3,8 @@
 // (rodando; única sessão do registro). O "Quando" do registro NÃO muda; o Painel lê na hora. A
 // concorrência é provada com travas seguradas por esta bateria e conferidas em pg_stat_activity:
 // duas exclusões ao mesmo tempo (só uma passa), exclusão contra um Pausar e contra um Finalizar em
-// andamento (esperam, depois decidem), e o Retomar (POST) NÃO espera a exclusão (FOR NO KEY UPDATE,
-// não FOR UPDATE: a FK do POST não é barrada). Dados próprios (prefixo teste-sessao), em março de
+// andamento (esperam, depois decidem), e o Retomar (POST) ESPERA a exclusão em andamento (FOR NO KEY
+// UPDATE no registro conflita com o FOR SHARE do Retomar; ver sessao-corrida-test). Dados próprios (prefixo teste-sessao), em março de
 // 2025 (o seed nunca cai lá), apagados no fim; pausa a sessão do seed e devolve a linha exata.
 // Uso (raiz do repo): node --env-file=backend/.env tests/api/sessao-excluir-test.mjs
 import pg from 'pg'
@@ -179,9 +179,10 @@ try {
     r = await behind
     check('C3: depois dele, 200', r.status === 200, detail(r))
 
-    // C4: o Retomar (POST da sessão) NÃO espera a exclusão da ROTA em andamento: ela trava o registro
-    // em FOR NO KEY UPDATE, que não barra a FK do POST (um FOR UPDATE barraria). A exclusão é segurada
-    // de verdade: esta bateria trava a linha da sessão, a rota pega a trava do registro e espera ali
+    // C4: o Retomar (POST da sessão) ESPERA a exclusão da rota em andamento: ela trava o registro em
+    // FOR NO KEY UPDATE, que conflita com o FOR SHARE do Retomar (a espera é o que impede o Retomar de
+    // criar sessão num registro que um Finalizar está fechando). A exclusão é segurada de verdade: esta
+    // bateria trava a linha da sessão, a rota pega a trava do registro e espera ali
     const r10 = await record(null)
     const held = await add(r10, day(6), day(6, 5))
     await add(r10, day(6, 10), day(6, 15))
@@ -189,14 +190,15 @@ try {
     await lockClient.query('SELECT id FROM time_entries WHERE id = $1 FOR UPDATE', [held])
     const slow = del(held)
     check('C4: a exclusão fica esperando a linha da sessão (já com o registro travado)', await waitFor(1), `${await waiting()} esperando`)
-    const started = Date.now()
     const resume = api('POST', '/time-entries', { taskExecutionId: r10, startedAt: new Date(Date.now() - 60_000).toISOString() })
-    const resumed = await Promise.race([resume, pause(4000).then(() => 'preso')])
-    check('C4: o Retomar passa na hora, sem esperar a exclusão em andamento', resumed !== 'preso' && resumed.status === 201 && Date.now() - started < 3000, resumed === 'preso' ? 'preso' : detail(resumed))
+    check('C4: o Retomar espera a exclusão em andamento (duas esperando)', await waitFor(2), `${await waiting()} esperando`)
+    const early = await Promise.race([resume, pause(1000).then(() => 'esperando')])
+    check('C4: depois de 1 s o Retomar continua sem resposta', early === 'esperando', early === 'esperando' ? '' : detail(early))
     await lockClient.query('ROLLBACK')
     const finished = await slow
-    await resume
-    check('C4: solta a linha, a exclusão termina (200) e a sessão nova do Retomar ficou', finished.status === 200 && (await sessions(r10)).length === 2 && (await sessions(r10)).some((x) => x.ended_at === null), detail(finished))
+    const resumed = await resume
+    check('C4: solta a linha, a exclusão termina (200) e o Retomar cria a sessão (201)', finished.status === 200 && resumed.status === 201, `${detail(finished)} | ${detail(resumed)}`)
+    check('C4: ficaram a outra sessão e a nova, rodando', (await sessions(r10)).length === 2 && (await sessions(r10)).filter((x) => x.ended_at === null).length === 1)
   } finally {
     await lockClient.query('ROLLBACK').catch(() => {})
     lockClient.release()

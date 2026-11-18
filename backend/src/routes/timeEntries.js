@@ -49,7 +49,8 @@ timeEntriesRouter.get('/', async (req, res) => {
   res.json(result.rows)
 })
 
-// Sessão nova sempre nasce rodando, e só em execução aberta
+// Sessão nova sempre nasce rodando, e só em execução aberta. O FOR SHARE faz o Retomar esperar um
+// Finalizar em andamento (a FK sozinha só pega FOR KEY SHARE, que não conflita com o UPDATE dele)
 timeEntriesRouter.post('/', async (req, res) => {
   const { error, data: entry } = validate(newTimeEntrySchema, req.body)
   if (error) return res.status(400).json({ error })
@@ -63,6 +64,7 @@ timeEntriesRouter.post('/', async (req, res) => {
        SELECT id, $2
        FROM task_executions
        WHERE id = $1 AND completed_at IS NULL
+       FOR SHARE
        RETURNING ${COLUMNS}`,
       [entry.taskExecutionId, entry.startedAt],
     )
