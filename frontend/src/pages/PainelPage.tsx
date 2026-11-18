@@ -9,6 +9,7 @@ import {
 import BarChart from '../components/BarChart'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
 import { ChevronDownIcon } from '../components/icons'
+import MeasuresSection from '../components/MeasuresSection'
 import PieChart from '../components/PieChart'
 import TagCompare from '../components/TagCompare'
 import TimeTable from '../components/TimeTable'
@@ -79,7 +80,7 @@ type Detail = {
 const NOTHING = { totalSeconds: 0, items: [] }
 
 // Painel: o seletor de período fica no topo, compartilhado; "Tempo" é a
-// primeira seção (medidas e treino entram depois como seções irmãs)
+// primeira seção e "Medidas" a seguinte (o treino entra depois como seção irmã)
 function PainelPage(props: { tags: Tag[] }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const today = new Date()
@@ -421,6 +422,8 @@ function PainelPage(props: { tags: Tag[] }) {
           </>
         )}
       </section>
+
+      <MeasuresSection period={period} zone={zone} />
 
       <TagCompare
         tags={props.tags}

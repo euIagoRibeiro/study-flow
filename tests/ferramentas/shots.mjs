@@ -10,7 +10,9 @@
 // --sem-atalhos, pras seções "Obras em andamento" e "Recentes" do Executar (O5);
 // --sem-estimativa, pro campo da duração estimada (Registrar e lápis);
 // --sem-descricao, pro campo e o texto da descrição;
-// --sem-segundos, pros tempos do Histórico e o "antes:" do cronômetro
+// --sem-segundos, pros tempos do Histórico e o "antes:" do cronômetro;
+// --sem-medidas, pra seção "Medidas" do Painel (MA4): as outras telas têm que dar 0 pixels, e no
+// Painel só muda a partir da seção (o "antes" é a mesma árvore com a seção escondida, sem stash)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { APP, CHROME, OUT as here } from '../config.mjs'
@@ -33,6 +35,7 @@ const pages = [
   ['timer-rodando', '/executar?tarefa=5eed0000-0000-4000-8000-000000000002'],
   ['timer-pausado', '/executar?tarefa=5eed0000-0000-4000-8000-000000000004'],
   ['executar-exfis', '/executar?tarefa=5eed0000-0000-4000-8000-000000000006'],
+  ['painel', '/painel'],
 ]
 const browser = await launch({
   executablePath: CHROME,
@@ -96,6 +99,14 @@ if (process.argv.includes('--sem-estimativa')) {
     })
     new MutationObserver(hide).observe(document.body, { childList: true, subtree: true })
     hide()
+  }))
+}
+// Com --sem-medidas, esconde a seção "Medidas" do Painel (MA4)
+if (process.argv.includes('--sem-medidas')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = 'section[aria-label="Medidas"] { display: none !important; }'
+    document.head.append(style)
   }))
 }
 // Com --sem-descricao, esconde o campo "O que foi feito" (rótulo e campo, que passou de input

@@ -1,4 +1,4 @@
-import type { Phase, TimeByContext } from '../types'
+import type { MeasureTotal, Phase, TimeByContext } from '../types'
 import { request } from './client'
 
 // O período vai como instantes (a tela calcula as bordas no fuso dela) e o
@@ -75,4 +75,13 @@ export function getTimeByTags(
   return request(
     `/dashboard/tempo-por-tags?${query(de, ate, fuso, { tags: tags.join(',') })}`,
   )
+}
+
+// Quantidades das medidas dos registros concluídos no período, uma entrada por medida
+export function getMeasureTotals(
+  de: Date,
+  ate: Date,
+  fuso: string,
+): Promise<{ items: MeasureTotal[] }> {
+  return request(`/dashboard/medidas?${query(de, ate, fuso)}`)
 }

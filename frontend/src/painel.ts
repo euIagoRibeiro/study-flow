@@ -4,6 +4,7 @@
 // a tela. Datas aqui são sempre Date LOCAIS à meia-noite
 
 import { formatDuration } from './dates'
+import type { MeasureTotal } from './types'
 
 export type PeriodKind = 'dia' | 'semana' | 'mes' | 'ano'
 const KINDS: PeriodKind[] = ['dia', 'semana', 'mes', 'ano']
@@ -284,6 +285,22 @@ export function categoryAt(index: number) {
 export function percent(part: number, total: number): string {
   const value = (part / total) * 100
   return value > 0 && value < 1 ? '<1%' : `${Math.round(value)}%`
+}
+
+// Linhas da tabela de uma medida: uma por tipo, com o % do total (o do Tempo, pode somar 99 ou
+// 101). Sem linhas de tipo, a medida só tem o total e não ganha tabela
+export function measureRows(item: MeasureTotal) {
+  return item.kinds.map((kind) => ({
+    key: kind.key ?? 'sem-tipo',
+    name: kind.name ?? '(sem tipo)',
+    quantity: kind.quantity,
+    share: percent(kind.quantity, item.total),
+  }))
+}
+
+// "1 registro", "3 registros"
+export function recordsLabel(count: number): string {
+  return `${count} ${count === 1 ? 'registro' : 'registros'}`
 }
 
 // Fatias da pizza: as 5 maiores com cor; o resto vira "outros". O % só nas

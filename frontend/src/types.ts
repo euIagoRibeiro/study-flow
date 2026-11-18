@@ -280,6 +280,22 @@ export type ExecutionChanges = {
 
 export type LoadStatus = 'loading' | 'error' | 'ready'
 
+// Painel, medidas: totais por medida e por tipo, pela data do registro. `kinds` só traz
+// linhas se algum valor tem tipo; os sem tipo são a linha de key e name nulos
+export type MeasureTotal = {
+  key: string
+  name: string
+  singular: string
+  total: number
+  executions: number
+  kinds: {
+    key: string | null
+    name: string | null
+    quantity: number
+    executions: number
+  }[]
+}
+
 // Painel (Dashboard v1): tempo dedicado num período, por contexto. Segundos
 // inteiros; tagId null = "(sem tag)"
 export type TimeByContext = {
