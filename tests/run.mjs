@@ -175,7 +175,15 @@ for (const group of chosen) {
     console.log(`${passed ? 'OK    ' : 'FALHOU'} ${name.padEnd(26)} ${total || '(sem resumo)'}  ${seconds}s`)
     if (!passed) {
       console.log(`         memória livre antes da bateria: ${freeGb} GB`)
-      console.log(output.split('\n').filter((l) => /FALH|Error|erro/i.test(l)).slice(0, 8).map((l) => `         ${l}`).join('\n'))
+      // O bloco "DIAGNÓSTICO …" (tests/diagnostico.mjs) inteiro: o cabeçalho e as linhas recuadas que o seguem
+      const lines = output.split('\n')
+      const start = lines.findIndex((l) => l.startsWith('DIAGNÓSTICO'))
+      let end = start
+      while (start >= 0 && end + 1 < lines.length && /^ {2}\S/.test(lines[end + 1])) end++
+      const diagnostic = start >= 0 ? lines.slice(start, end + 1) : []
+      const rest = lines.filter((l, i) => !(i >= start && i <= end && start >= 0))
+      console.log(rest.filter((l) => /FALH|Error|erro/i.test(l)).slice(0, 8).map((l) => `         ${l}`).join('\n'))
+      if (diagnostic.length > 0) console.log(diagnostic.map((l) => `         ${l}`).join('\n'))
     }
     results.push({ name: `${group}/${name}`, passed })
   }
