@@ -18,7 +18,7 @@ const BACKEND = process.env.BACKEND_DIR ?? REAL
 const DIRECT = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3333'
 // Pares método + caminho nos roteiros de dados: rota nova muda este número de
 // propósito (e confere que ela entrou fechada)
-const EXPECTED_ROUTES = 44
+const EXPECTED_ROUTES = 45
 const PUBLIC = ['get /health', 'post /login', 'post /logout']
 const results = []
 const check = (name, ok, detail = '') => {

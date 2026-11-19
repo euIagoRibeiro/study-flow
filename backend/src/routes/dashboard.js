@@ -305,21 +305,20 @@ dashboardRouter.get('/tempo-por-tags', async (req, res) => {
   res.json(result.rows[0])
 })
 
-// Medidas (MA1): quantidades gravadas nos registros. A data é a do REGISTRO
-// (completed_at em [de, ate); aberto não entra), não a das sessões. A medida é a
-// GRAVADA no registro (execution_measures.measure_id), nunca a atual da tag. Medidas e
-// tipos agrupam por lower(btrim(nome)): nomes diferentes não se somam, e o mesmo nome em
-// raízes diferentes vira um bloco só. O nome mostrado é o do registro mais recente do
-// grupo (completed_at desc, id desc). Uma linha por registro, sem join com tags: não há
-// dupla contagem por nível. `kinds` só existe se algum valor do grupo tem tipo; aí os
-// sem tipo são uma linha (key/name nulos) e a soma das linhas fecha com o total.
-// Prototipada em tests/banco/medidas-cases.sql, com a conta à mão
-dashboardRouter.get('/medidas', async (req, res) => {
-  const period = await readPeriod(req, res)
-  if (!period) return
-  const result = await pool.query(
-    `WITH v AS (
-       SELECT e.id AS execucao, e.completed_at,
+// Medidas: quantidades gravadas nos registros. A data é a do REGISTRO (completed_at em
+// [de, ate); aberto não entra), não a das sessões. A medida é a GRAVADA no registro
+// (execution_measures.measure_id), nunca a atual da tag. Medidas e tipos agrupam por
+// lower(btrim(nome)) dentro de cada grupo: nomes diferentes não se somam, e o mesmo nome em
+// raízes diferentes vira um bloco só quando o grupo é o período inteiro. O nome mostrado é o
+// do registro mais recente do grupo (completed_at desc, id desc). `kinds` só existe se algum
+// valor do grupo tem tipo; aí os sem tipo são uma linha (key/name nulos) e a soma das linhas
+// fecha com o total. Uma linha por registro e valor, sem join com tags.
+// `group` é a expressão SQL do grupo, sobre o registro `e` ($1 = de, $2 = ate): a mesma conta
+// serve ao período inteiro (nenhum grupo), por contexto (e.root_tag_id)… Prototipada em
+// tests/banco/medidas-cases.sql e tests/banco/medidas-contexto-cases.sql, com a conta à mão
+function measureTotalsSql(group) {
+  return `WITH v AS (
+       SELECT e.id AS execucao, e.completed_at, ${group} AS grupo,
               lower(btrim(m.name)) AS mkey, btrim(m.name) AS mname,
               btrim(m.singular) AS msing,
               lower(btrim(k.name)) AS kkey, btrim(k.name) AS kname, val.quantity
@@ -330,34 +329,63 @@ dashboardRouter.get('/medidas', async (req, res) => {
        WHERE e.completed_at >= $1::timestamptz AND e.completed_at < $2::timestamptz
      ),
      por_tipo AS (
-       SELECT mkey, kkey,
+       SELECT grupo, mkey, kkey,
               (array_agg(kname ORDER BY completed_at DESC, execucao DESC))[1] AS name,
               round(sum(quantity), 2)::float8 AS quantity,
               count(DISTINCT execucao)::int AS executions
-       FROM v GROUP BY mkey, kkey
+       FROM v GROUP BY grupo, mkey, kkey
      ),
      por_medida AS (
-       SELECT mkey,
+       SELECT grupo, mkey,
               (array_agg(mname ORDER BY completed_at DESC, execucao DESC))[1] AS name,
               (array_agg(msing ORDER BY completed_at DESC, execucao DESC))[1] AS singular,
               round(sum(quantity), 2)::float8 AS total,
               count(DISTINCT execucao)::int AS executions
-       FROM v GROUP BY mkey
+       FROM v GROUP BY grupo, mkey
      )
-     SELECT pm.mkey AS key, pm.name, pm.singular, pm.total, pm.executions,
+     SELECT pm.grupo AS "tagId", pm.mkey AS key, pm.name, pm.singular, pm.total, pm.executions,
             COALESCE((
               SELECT json_agg(json_build_object('key', pt.kkey, 'name', pt.name,
                                                 'quantity', pt.quantity,
                                                 'executions', pt.executions)
                               ORDER BY pt.kkey IS NULL, pt.quantity DESC, pt.kkey)
               FROM por_tipo pt
-              WHERE pt.mkey = pm.mkey
+              WHERE pt.grupo IS NOT DISTINCT FROM pm.grupo AND pt.mkey = pm.mkey
                 AND EXISTS (SELECT 1 FROM por_tipo x
-                            WHERE x.mkey = pm.mkey AND x.kkey IS NOT NULL)
+                            WHERE x.grupo IS NOT DISTINCT FROM pm.grupo
+                              AND x.mkey = pm.mkey AND x.kkey IS NOT NULL)
             ), '[]'::json) AS kinds
      FROM por_medida pm
-     ORDER BY pm.total DESC, pm.mkey`,
-    [period.de, period.ate],
-  )
-  res.json({ items: result.rows })
+     ORDER BY pm.grupo NULLS LAST, pm.total DESC, pm.mkey`
+}
+
+// Período inteiro: uma entrada por medida
+dashboardRouter.get('/medidas', async (req, res) => {
+  const period = await readPeriod(req, res)
+  if (!period) return
+  const result = await pool.query(measureTotalsSql('NULL::uuid'), [
+    period.de,
+    period.ate,
+  ])
+  res.json({ items: result.rows.map(({ tagId, ...measure }) => measure) })
+})
+
+// Por contexto (raiz do registro), como tempo-por-contexto: EXATO (um registro tem uma raiz
+// só). Toda medida tem raiz (execution_measures.root_tag_id é NOT NULL), então não há balde
+// "(sem tag)". Contexto sem medida no período não aparece. Itens por tagId, medidas por total
+dashboardRouter.get('/medidas-por-contexto', async (req, res) => {
+  const period = await readPeriod(req, res)
+  if (!period) return
+  const result = await pool.query(measureTotalsSql('e.root_tag_id'), [
+    period.de,
+    period.ate,
+  ])
+  const byTag = new Map()
+  for (const { tagId, ...measure } of result.rows) {
+    if (!byTag.has(tagId)) byTag.set(tagId, [])
+    byTag.get(tagId).push(measure)
+  }
+  res.json({
+    items: [...byTag].map(([tagId, measures]) => ({ tagId, measures })),
+  })
 })

@@ -15,14 +15,14 @@ import { sessionCookie } from './sessao.mjs'
 // (a3e1 com o navegador em inglês; minutes-fix e m5-forms já rodam os dois)
 const groups = {
   banco: ['phase-cases.sql', 'a1-cases.sql', 'm1-cases.sql', 'a3-cases.sql', 'dashboard-cases.sql', 'tags-cases.sql',
-    'selecoes-cases.sql', 'obras-cases.sql', 'medidas-cases.sql', 'papeis-cases.sql',
+    'selecoes-cases.sql', 'obras-cases.sql', 'medidas-cases.sql', 'medidas-contexto-cases.sql', 'papeis-cases.sql',
     'seed-dashboard.sql', 'seed-selecoes.sql', 'seed-obras.sql'],
   api: ['p2-test.mjs', 'a1b-test.mjs', 'm2-test.mjs', 'a3b-test.mjs', 'dashboard-test.mjs', 's2a-test.mjs',
     's2b-test.mjs', 's2c-test.mjs', 'seed-selecoes.mjs', 'tag-corrida-test.mjs', 'o2a-test.mjs', 'o2b-test.mjs',
     'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs', 'seed-obras.mjs', 'tempo-test.mjs', 'host-test.mjs',
     'estimativa-segundos-test.mjs', 'auth-test.mjs', 'rotas-fechadas-test.mjs',
     'protecoes-test.mjs', 'db-ssl-test.mjs', 'cache-test.mjs', 'vercel-config-test.mjs',
-    'run-uso-test.mjs', 'sessao-excluir-test.mjs', 'sessao-corrida-test.mjs', 'medidas-painel-test.mjs'],
+    'run-uso-test.mjs', 'sessao-excluir-test.mjs', 'sessao-corrida-test.mjs', 'medidas-painel-test.mjs', 'medidas-contexto-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
