@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import ExecutionForm from '../components/ExecutionForm'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
+import StartWarning from '../components/StartWarning'
 import TaskForm from '../components/TaskForm'
 import TimerPanel from '../components/TimerPanel'
 import UndoNotice from '../components/UndoNotice'
@@ -119,6 +120,24 @@ function ExecutePage(props: {
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
+  // Uma partida por vez: dois toques no mesmo instante passam pelo estado `starting`, a ref decide
+  const startGuard = useRef(false)
+  // Os campos do formulário de baixo que o Iniciar não leva (Quando, Duração estimada, Medida), como
+  // o formulário os tem AGORA (callback no commit; nada de sessão do navegador). Marcados com a
+  // tarefa: os de outra tarefa não valem
+  const manualRef = useRef<{ taskId: string; fields: string[] } | null>(null)
+  const [manual, setManual] = useState<{
+    taskId: string
+    fields: string[]
+  } | null>(null)
+  // O aviso aberto (guarda a tarefa em que abriu: trocar de tarefa o fecha) e o botão Iniciar, pra
+  // devolver o foco quando o aviso volta
+  const [warningTask, setWarningTask] = useState<string | null>(null)
+  const startButton = useRef<HTMLButtonElement>(null)
+  const [backCount, setBackCount] = useState(0)
+  useEffect(() => {
+    if (backCount > 0) startButton.current?.focus()
+  }, [backCount])
   // O formulário de baixo, se foi mexido: o "Iniciar cronômetro" leva o
   // caminho e a descrição dele (antes, descartava tudo em silêncio). Marcado
   // com a tarefa: o de outra tarefa nunca vai junto
@@ -215,20 +234,51 @@ function ExecutePage(props: {
   }
 
   async function handleStart() {
-    if (selectedTask === undefined) return
+    if (selectedTask === undefined || startGuard.current) return
+    startGuard.current = true
     setStarting(true)
-    const started = await props.onStartTimer(
-      selectedTask.id,
-      draft?.taskId === selectedTask.id ? draft.value : undefined,
-    )
-    setStarting(false)
-    // Foi pro registro: o formulário de baixo volta limpo depois de
-    // finalizar, então o rascunho não pode ir de novo no próximo Iniciar, nem
-    // reaparecer como "Rascunho recuperado" (o conteúdo já foi usado)
-    if (started) {
-      setDraft(null)
-      clearDraft(draftKeys.registrar(selectedTask.id))
+    try {
+      const started = await props.onStartTimer(
+        selectedTask.id,
+        draft?.taskId === selectedTask.id ? draft.value : undefined,
+      )
+      // Foi pro registro: o formulário de baixo volta limpo depois de
+      // finalizar, então o rascunho não pode ir de novo no próximo Iniciar, nem
+      // reaparecer como "Rascunho recuperado" (o conteúdo já foi usado)
+      if (started) {
+        setDraft(null)
+        clearDraft(draftKeys.registrar(selectedTask.id))
+      }
+    } finally {
+      startGuard.current = false
+      setStarting(false)
     }
+  }
+
+  // O toque no Iniciar: com campos que ele não leva preenchidos, avisa em vez de descartar em silêncio
+  function requestStart() {
+    const current = manualRef.current
+    const lost =
+      current !== null && current.taskId === selectedTask?.id
+        ? current.fields
+        : []
+    if (selectedTask !== undefined && lost.length > 0) {
+      setWarningTask(selectedTask.id)
+      return
+    }
+    void handleStart()
+  }
+
+  async function startAnyway() {
+    // Um segundo toque com a partida em andamento não faz nada (nem fecha o aviso)
+    if (startGuard.current) return
+    await handleStart()
+    setWarningTask(null)
+  }
+
+  function backFromWarning() {
+    setWarningTask(null)
+    setBackCount((n) => n + 1)
   }
 
   // Capturado antes do await: depois dele, a execução já está finalizada
@@ -582,6 +632,16 @@ function ExecutePage(props: {
           )?.taskId,
       )
     : undefined
+  // Os campos que o Iniciar não leva, como o formulário da tarefa aberta os tem agora
+  const manualFields =
+    manual !== null && manual.taskId === selectedTask?.id ? manual.fields : []
+  // O aviso fecha quando os campos ficam vazios e ao trocar de tarefa (no render da troca os campos
+  // ainda são os da tarefa anterior, logo "vazios" pra esta), e não reabre sozinho depois: só um novo
+  // toque no Iniciar o abre. Ajuste de estado no render, sem efeito
+  if (warningTask !== null && manualFields.length === 0) {
+    setWarningTask(null)
+  }
+  const warningOpen = warningTask === selectedTask?.id
 
   return (
     <div className="flex flex-col gap-5">
@@ -673,10 +733,19 @@ function ExecutePage(props: {
                 </button>
               )}
             </div>
+          ) : warningOpen ? (
+            <StartWarning
+              fields={manualFields}
+              formId={`registrar-${selectedTask.id}`}
+              starting={starting}
+              onStart={startAnyway}
+              onBack={backFromWarning}
+            />
           ) : (
             <button
+              ref={startButton}
               type="button"
-              onClick={handleStart}
+              onClick={requestStart}
               disabled={starting}
               className={`h-13 w-full text-base ${primaryButtonClass}`}
             >
@@ -703,6 +772,10 @@ function ExecutePage(props: {
             onDraftChange={(value) =>
               setDraft(value ? { taskId: selectedTask.id, value } : null)
             }
+            onManualChange={(fields) => {
+              manualRef.current = { taskId: selectedTask.id, fields }
+              setManual({ taskId: selectedTask.id, fields })
+            }}
           />
         </>
       )}

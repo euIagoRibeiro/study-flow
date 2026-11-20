@@ -35,13 +35,13 @@ const groups = {
     'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs', 'medidas-linhas.mjs', 'cronometro-trava.mjs',
   ],
   // Funções puras do frontend (módulos sem imports): sem banco, API, seed nem navegador
-  unidade: ['medidas-texto.mjs', 'timer-erros.mjs'],
+  unidade: ['medidas-texto.mjs', 'timer-erros.mjs', 'manual-campos.mjs'],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
     'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs', 's5-layout.mjs', 'selecao-menu-layout.mjs', 'sessao-excluir-layout.mjs', 's6-layout.mjs',
     'o3-layout.mjs', 'o4a-layout.mjs', 'o4b-layout.mjs', 'o4c-layout.mjs', 'o4d-layout.mjs', 'tempo-layout.mjs', 'o5-layout.mjs',
-    'estimativa-layout.mjs', 'entrada.mjs', 'descricao-layout.mjs', 'medidas-layout.mjs', 'medidas-linhas-layout.mjs',
+    'estimativa-layout.mjs', 'entrada.mjs', 'descricao-layout.mjs', 'medidas-layout.mjs', 'medidas-linhas-layout.mjs', 'cronometro-aviso-layout.mjs',
   ],
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'

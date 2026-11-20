@@ -3,8 +3,10 @@
 // registro vazio e descartava tudo em silêncio (com Exercícios › Treino
 // escolhida embaixo, o painel abria só com o contexto e sem Treino). Sem
 // mexer no formulário, igual a antes. "Quando", estimativa e medida não vão
-// (decidido: são do registro manual). Tarefa de teste própria, apagada no
-// finally com tudo o que criou.
+// (decidido: são do registro manual) e por isso o Iniciar AVISA quando eles estão preenchidos (commit 2c):
+// bloco no lugar do botão, sem POST, com "Registrar", "Iniciar mesmo assim" e "Voltar". O aviso lê o estado
+// do formulário no clique (também com a sessão do navegador bloqueada). Tarefas de teste próprias, apagadas
+// no finally com tudo o que criou.
 import pg from 'pg'
 import { API, APP, CHROME } from '../config.mjs'
 import { launch } from '../sessao.mjs'
@@ -25,6 +27,8 @@ const TITLE = 'Teste B1 iniciar cronômetro'
 const paused = (await pool.query('UPDATE time_entries SET ended_at = now() WHERE ended_at IS NULL RETURNING id')).rows.map((r) => r.id)
 await pool.query('DELETE FROM tasks WHERE title = $1 AND id NOT IN (SELECT task_id FROM task_executions)', [TITLE])
 const taskId = (await pool.query("INSERT INTO tasks (title, frequency) VALUES ($1, 'none') RETURNING id", [TITLE])).rows[0].id
+await pool.query('DELETE FROM tasks WHERE title = $1 AND id NOT IN (SELECT task_id FROM task_executions)', [`${TITLE} B`])
+const taskId2 = (await pool.query("INSERT INTO tasks (title, frequency) VALUES ($1, 'none') RETURNING id", [`${TITLE} B`])).rows[0].id
 
 async function clearExecutions() {
   const ids = (await pool.query('SELECT id FROM task_executions WHERE task_id = $1', [taskId])).rows.map((r) => r.id)
@@ -44,8 +48,13 @@ try {
   page.setDefaultTimeout(10000)
   await page.setViewport({ width: 390, height: 900 })
   let refuse = false
+  let holdStart = 0
+  const posts = { exec: 0, entry: 0 }
   await page.setRequestInterception(true)
   page.on('request', (req) => {
+    if (req.method() === 'POST' && req.url() === `${API}/executions`) posts.exec++
+    if (req.method() === 'POST' && req.url() === `${API}/time-entries`) posts.entry++
+    if (holdStart > 0 && req.method() === 'POST' && req.url() === `${API}/executions`) return setTimeout(() => req.continue(), holdStart)
     if (refuse && req.method() === 'POST' && req.url() === `${API}/executions`) {
       return req.respond({ status: 400, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: '{"error":"A tag Teste está arquivada"}' })
     }
@@ -84,6 +93,34 @@ try {
     await pause(800)
   }
 
+  // ---- o aviso do Iniciar
+  const click = (label) => page.evaluate((l) => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === l).click(), label)
+  const setValue = (labelStart, value) => page.evaluate((l, v) => {
+    const el = [...document.querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim().startsWith(l)).querySelector('input, textarea')
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, v)
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  }, labelStart, value)
+  const estimateValue = () => page.evaluate(() => [...document.querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim().startsWith('Duração estimada'))?.querySelector('input')?.value ?? null)
+  const notice = () => page.evaluate(() => {
+    const h = [...document.querySelectorAll('h3')].find((x) => x.textContent.trim() === 'Isto não vai para o cronômetro')
+    if (!h) return null
+    const box = h.closest('[role="alert"]')
+    const primary = [...document.querySelectorAll('main button')].filter((b) => b.className.includes('bg-marca-texto'))
+    return {
+      role: box?.getAttribute('role') ?? null,
+      text: box.querySelector('p').textContent.replace(/\s+/g, ' ').trim(),
+      buttons: [...box.querySelectorAll('button')].map((b) => b.textContent.trim()),
+      focusedTitle: document.activeElement === h,
+      primaryCount: primary.length,
+      primaryText: primary.map((b) => b.textContent.trim()).join('|'),
+      primaryInside: primary.every((b) => box.contains(b)),
+      startVisible: [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Iniciar cronômetro'),
+    }
+  })
+  const active = () => page.evaluate(() => { const a = document.activeElement; return a ? (a.tagName === 'BUTTON' ? a.textContent.trim() : a.tagName) : null })
+  const noNewRows = async () => (await saved()).length === 0 && (await pool.query('SELECT count(*)::int AS n FROM time_entries te JOIN task_executions e ON e.id = te.task_execution_id WHERE e.task_id = $1', [taskId])).rows[0].n === 0
+  const BODY = 'Você preencheu Duração estimada. Esses campos só valem no Registrar; no cronômetro seriam descartados.'
+
   // ---- 1. caminho com treino + descrição
   await page.goto(url, { waitUntil: 'networkidle0' })
   await type('O que foi feito (opcional)', 'Costas e bíceps hoje')
@@ -116,15 +153,200 @@ try {
   check('sem mexer embaixo: painel como antes ("Sem tag"), registro sem tag nem descrição', p.open && f['Contexto'] === 'Sem tag' && db.length === 1 && db[0].raiz === null && db[0].description === null, JSON.stringify({ f, db }))
   await clearExecutions()
 
-  // ---- 4. "Quando" e estimativa não vão (são do registro manual)
+  // ---- 4. "Quando", estimativa e medida só valem no Registrar: o Iniciar AVISA (e não manda nada)
+  // 4a. digita a estimativa e toca no Iniciar NA HORA (sem pausa): o aviso lê o estado, não a sessão
   await page.goto(url, { waitUntil: 'networkidle0' })
   await type('Duração estimada (opcional)', '30')
   await choose('Contexto', 'Exercícios')
-  await start()
+  posts.exec = 0; posts.entry = 0
+  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Iniciar cronômetro').click())
+  await pause(300)
+  let n = await notice()
+  check('estimativa digitada + Iniciar: aparece o aviso, com role="alert" e o texto aprovado', n !== null && n.role === 'alert' && n.text === BODY, JSON.stringify(n))
+  check('o aviso tem os 3 botões, na ordem: Registrar, Iniciar mesmo assim, Voltar', n && n.buttons.join('|') === 'Registrar|Iniciar mesmo assim|Voltar', JSON.stringify(n?.buttons))
+  check('o foco vai pro título do aviso', n?.focusedTitle === true, JSON.stringify(n))
+  check('o botão Iniciar sai do lugar (o aviso ocupa o lugar dele)', n?.startVisible === false)
+  check('UM só botão principal na tela: o "Registrar" do aviso (o do pé do formulário é secundário)', n?.primaryCount === 1 && n.primaryText === 'Registrar' && n.primaryInside === true, `${n?.primaryCount} ${n?.primaryText}`)
+  check('nada foi enviado: nenhum POST de registro nem de sessão, nada no banco', posts.exec === 0 && posts.entry === 0 && (await noNewRows()), `${posts.exec} ${posts.entry}`)
+
+  // 4b. Escape = Voltar: fecha, devolve o foco ao Iniciar e mantém o que foi digitado
+  await page.keyboard.press('Escape')
+  await pause(200)
+  n = await notice()
+  check('Escape fecha o aviso, o Iniciar volta com o foco e a estimativa continua no formulário', n === null && (await active()) === 'Iniciar cronômetro' && (await estimateValue()) === '30', `${JSON.stringify(n)} ${await active()} ${await estimateValue()}`)
+
+  // 4c. Voltar (botão): mesmo resultado
+  await click('Iniciar cronômetro')
+  await pause(200)
+  await click('Voltar')
+  await pause(200)
+  n = await notice()
+  check('"Voltar" fecha o aviso, devolve o foco ao Iniciar e mantém a estimativa', n === null && (await active()) === 'Iniciar cronômetro' && (await estimateValue()) === '30' && posts.exec === 0, `${JSON.stringify(n)} ${await active()}`)
+
+  // 4d. campos esvaziados com o aviso aberto: ele fecha sozinho
+  await click('Iniciar cronômetro')
+  await pause(200)
+  await setValue('Duração estimada', '')
+  await pause(300)
+  n = await notice()
+  check('esvaziar o campo com o aviso aberto fecha o aviso (o Iniciar volta)', n === null && (await page.evaluate(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Iniciar cronômetro'))), JSON.stringify(n))
+
+  // 4e. "Quando", estimativa e medida: o texto lista só os preenchidos, na ordem do formulário
+  await choose('Contexto', 'Idiomas')
+  const whenOrig = await page.evaluate(() => [...document.querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim() === 'Quando').querySelector('input').value)
+  await setValue('Quando', '2020-01-02T10:00')
+  await setValue('Duração estimada', '15')
+  await page.evaluate(() => {
+    const l = [...document.querySelectorAll('label')].find((x) => /exerc/i.test(x.querySelector('span')?.textContent ?? '') && x.querySelector('input'))
+    const el = l.querySelector('input')
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, '3')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await pause(200)
+  await click('Iniciar cronômetro')
+  await pause(200)
+  n = await notice()
+  check('três campos: "Quando, Duração estimada e Medida"', n?.text === 'Você preencheu Quando, Duração estimada e Medida. Esses campos só valem no Registrar; no cronômetro seriam descartados.', n?.text)
+  await setValue('Quando', whenOrig)
+  await pause(100)
+  await click('Voltar')
+  await pause(150)
+
+  // 4f. só a medida, só o Quando: cada um dispara sozinho
+  await setValue('Duração estimada', '')
+  await pause(150)
+  await click('Iniciar cronômetro')
+  await pause(200)
+  n = await notice()
+  check('só a medida preenchida: "Você preencheu Medida."', n?.text.startsWith('Você preencheu Medida. '), n?.text)
+  await click('Voltar')
+  await pause(150)
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await page.evaluate(() => sessionStorage.clear())
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await setValue('Quando', '2020-01-02T10:00')
+  await pause(150)
+  await click('Iniciar cronômetro')
+  await pause(200)
+  n = await notice()
+  check('só o "Quando" mexido: "Você preencheu Quando."', n?.text.startsWith('Você preencheu Quando. '), n?.text)
+  await click('Voltar')
+  await pause(150)
+
+  // 4g. trocar de tarefa (sem recarregar) fecha o aviso, e ele não reabre ao voltar. A OUTRA tarefa também
+  // tem campo preenchido (rascunho dela), pra o aviso da primeira não ser confundido com o dela
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await page.evaluate(() => sessionStorage.clear())
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  const swap = (id) => page.evaluate((target) => { history.pushState({}, '', `/executar?tarefa=${target}`); window.dispatchEvent(new PopStateEvent('popstate')) }, id)
+  await swap(taskId2)
+  await pause(500)
+  await type('Duração estimada (opcional)', '20')
+  await pause(300)
+  await swap(taskId)
+  await pause(500)
+  await type('Duração estimada (opcional)', '30')
+  await click('Iniciar cronômetro')
+  await pause(200)
+  check('o aviso abriu na primeira tarefa', (await notice()) !== null)
+  await swap(taskId2)
+  await pause(500)
+  check('trocar de tarefa fecha o aviso (a outra tarefa, com a estimativa dela, não o herda)', (await notice()) === null)
+  await swap(taskId)
+  await pause(500)
+  check('voltar à tarefa NÃO reabre o aviso sozinho (o Iniciar está lá)', (await notice()) === null && (await page.evaluate(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Iniciar cronômetro'))))
+  // o rascunho recuperado tem a estimativa: tocar no Iniciar avisa de novo
+  await click('Iniciar cronômetro')
+  await pause(200)
+  n = await notice()
+  check('rascunho recuperado com a estimativa: o Iniciar avisa também', n?.text === BODY, n?.text)
+  await click('Voltar')
+  await pause(150)
+
+  // 4h. "Iniciar mesmo assim": faz o que o caso 4 antigo afirmava (o caminho vai, a estimativa não vira sessão)
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await page.evaluate(() => sessionStorage.clear())
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await type('Duração estimada (opcional)', '30')
+  await choose('Contexto', 'Exercícios')
+  posts.exec = 0
+  await click('Iniciar cronômetro')
+  await pause(300)
+  await click('Iniciar mesmo assim')
+  await pause(900)
   db = await saved()
-  const est = (await pool.query('SELECT count(*)::int AS n FROM time_entries t JOIN task_executions e ON e.id = t.task_execution_id WHERE e.task_id = $1 AND t.estimated', [taskId])).rows[0].n
-  check('estimativa digitada embaixo não vira sessão estimada; o caminho vai', db.length === 1 && db[0].raiz === 'Exercícios' && est === 0 && db[0].rodando === 1, JSON.stringify({ db, est }))
+  let est = (await pool.query('SELECT count(*)::int AS n FROM time_entries t JOIN task_executions e ON e.id = t.task_execution_id WHERE e.task_id = $1 AND t.estimated', [taskId])).rows[0].n
+  check('"Iniciar mesmo assim": o caminho vai, a estimativa não vira sessão estimada, uma sessão rodando', db.length === 1 && db[0].raiz === 'Exercícios' && est === 0 && db[0].rodando === 1 && posts.exec === 1, JSON.stringify({ db, est, posts }))
   await clearExecutions()
+
+  // 4i. "Registrar" do aviso: grava o registro (concluído, com a sessão estimada e o caminho) e volta à lista
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await page.evaluate(() => sessionStorage.clear())
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await type('Duração estimada (opcional)', '30')
+  await choose('Contexto', 'Exercícios')
+  await click('Iniciar cronômetro')
+  await pause(300)
+  await page.evaluate(() => [...document.querySelectorAll('h3')].find((x) => x.textContent.trim() === 'Isto não vai para o cronômetro').closest('[role="alert"]').querySelector('button[type="submit"]').click())
+  await pause(1200)
+  const done = (await pool.query(`SELECT r.name AS raiz, (SELECT count(*)::int FROM time_entries t WHERE t.task_execution_id = e.id AND t.estimated) AS estimadas,
+      (SELECT count(*)::int FROM time_entries t WHERE t.task_execution_id = e.id AND t.ended_at IS NULL) AS rodando
+    FROM task_executions e LEFT JOIN tags r ON r.id = e.root_tag_id WHERE e.task_id = $1 AND e.completed_at IS NOT NULL`, [taskId])).rows
+  check('"Registrar" do aviso: registro concluído com a sessão estimada e o caminho; nada rodando; volta à lista', done.length === 1 && done[0].raiz === 'Exercícios' && done[0].estimadas === 1 && done[0].rodando === 0 && (await page.evaluate(() => location.pathname)) === '/', JSON.stringify({ done, path: await page.evaluate(() => location.pathname) }))
+  await clearExecutions()
+
+  // 4j. dois toques no "Iniciar mesmo assim" com a resposta segurada: UM pedido; o botão fica aria-disabled e o foco nele
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await page.evaluate(() => sessionStorage.clear())
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await type('Duração estimada (opcional)', '30')
+  await choose('Contexto', 'Exercícios')
+  await click('Iniciar cronômetro')
+  await pause(300)
+  holdStart = 900
+  posts.exec = 0
+  await page.evaluate(() => { const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === 'Iniciar mesmo assim'); b.focus(); b.click(); b.click() })
+  await pause(250)
+  const flight = await page.evaluate(() => { const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === 'Iniciar mesmo assim'); return b ? { aria: b.getAttribute('aria-disabled'), disabledAttr: b.hasAttribute('disabled'), focused: document.activeElement === b } : null })
+  check('em voo: o "Iniciar mesmo assim" fica aria-disabled="true", sem disabled, e mantém o foco', flight?.aria === 'true' && flight.disabledAttr === false && flight.focused === true, JSON.stringify(flight))
+  await pause(1200)
+  holdStart = 0
+  check('dois toques no "Iniciar mesmo assim": UM pedido de registro', posts.exec === 1, `${posts.exec}`)
+  await clearExecutions()
+
+  // 4l. sem campos perdidos, dois toques no Iniciar no mesmo instante: UM pedido (a guarda por ref do handleStart)
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  await page.evaluate(() => sessionStorage.clear())
+  await page.goto(url, { waitUntil: 'networkidle0' })
+  holdStart = 900
+  posts.exec = 0
+  await page.evaluate(() => { const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === 'Iniciar cronômetro'); b.click(); b.click() })
+  await pause(1500)
+  holdStart = 0
+  check('dois toques no Iniciar (sem campos perdidos) no mesmo instante: UM pedido de registro', posts.exec === 1 && (await saved()).length === 1, `${posts.exec}`)
+  await clearExecutions()
+
+  // 4k. com a sessão do navegador BLOQUEADA o aviso funciona igual (lê o estado, não o rascunho)
+  const blocked = await browser.newPage()
+  await blocked.setViewport({ width: 390, height: 900 })
+  await blocked.evaluateOnNewDocument(() => {
+    const boom = () => { throw new DOMException('bloqueado', 'SecurityError') }
+    Storage.prototype.getItem = boom
+    Storage.prototype.setItem = boom
+    Storage.prototype.removeItem = boom
+  })
+  await blocked.goto(url, { waitUntil: 'networkidle0' })
+  await blocked.evaluate(() => {
+    const l = [...document.querySelectorAll('label')].find((x) => x.querySelector('span')?.textContent.trim().startsWith('Duração estimada'))
+    const el = l.querySelector('input')
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, '30')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    ;[...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Iniciar cronômetro').click()
+  })
+  await pause(400)
+  const blockedNotice = await blocked.evaluate(() => [...document.querySelectorAll('h3')].some((x) => x.textContent.trim() === 'Isto não vai para o cronômetro'))
+  check('sessão do navegador bloqueada: o aviso aparece mesmo assim, e nada foi gravado', blockedNotice && (await noNewRows()), String(blockedNotice))
+  await blocked.close()
 
   // ---- 5. servidor recusa: a mensagem dele aparece, nada fica aberto
   refuse = true
@@ -139,11 +361,11 @@ try {
 } finally {
   await browser.close()
   await clearExecutions()
-  await pool.query('DELETE FROM tasks WHERE id = $1', [taskId])
+  await pool.query('DELETE FROM tasks WHERE id = ANY($1::uuid[])', [[taskId, taskId2]])
   await pool.query('UPDATE time_entries SET ended_at = NULL WHERE id = ANY ($1::uuid[])', [paused])
   const back = (await pool.query('SELECT count(*)::int AS n FROM time_entries WHERE ended_at IS NULL AND id = ANY ($1::uuid[])', [paused])).rows[0].n
   check(`sessão rodando do seed devolvida (${paused.length})`, back === paused.length, `${back} de ${paused.length}`)
-  const left = (await pool.query('SELECT (SELECT count(*) FROM tasks WHERE title = $1) + (SELECT count(*) FROM task_executions WHERE task_id = $2) AS n', [TITLE, taskId])).rows[0].n
+  const left = (await pool.query('SELECT (SELECT count(*) FROM tasks WHERE title IN ($1, $3)) + (SELECT count(*) FROM task_executions WHERE task_id = $2) AS n', [TITLE, taskId, `${TITLE} B`])).rows[0].n
   check('limpeza: tarefa e registros de teste apagados', Number(left) === 0, String(left))
   await pool.end()
   const ok = results.filter(Boolean).length

@@ -1,6 +1,7 @@
 import {
   Fragment,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -17,6 +18,7 @@ import {
   readDraft,
   useDraftSync,
 } from '../formDrafts'
+import { MANUAL_FIELDS } from '../manualFields'
 import type { MeasureTexts } from '../measures'
 import {
   FORM_FIELD_ORDER,
@@ -85,6 +87,10 @@ type FormProps = {
   // ou no link: o "Iniciar cronômetro" (fora do formulário) leva o que
   // estiver aqui; null = nada (o rascunho foi descartado)
   onDraftChange?: (draft: StartDraft | null) => void
+  // Os campos preenchidos que o "Iniciar cronômetro" NÃO leva (Quando, Duração estimada, Medida), a
+  // cada mudança e ao montar (rascunho recuperado inclusive): o aviso do Iniciar lê daqui o que a
+  // tela tem AGORA, sem passar pela sessão do navegador
+  onManualChange?: (fields: string[]) => void
 }
 
 // O que fica guardado do Registrar: o "Quando" só se foi mexido (sem mexer,
@@ -272,6 +278,21 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       linkUrl: value.link.trim() || null,
     })
   }
+  // O que só vale no Registrar e foi preenchido. Avisado no commit (useLayoutEffect: antes de qualquer
+  // clique seguinte), pelo estado, nunca pelo rascunho gravado
+  const manual = [
+    when !== openedAt && MANUAL_FIELDS.when,
+    minutes.trim() !== '' && MANUAL_FIELDS.estimate,
+    Object.keys(filledTexts(measure.texts)).length > 0 && MANUAL_FIELDS.measure,
+  ].filter((field) => field !== false)
+  const manualKey = manual.join('|')
+  useLayoutEffect(() => {
+    props.onManualChange?.(manualKey === '' ? [] : manualKey.split('|'))
+    // só quando a lista muda: a função da página é nova a cada render (e a tarefa de outro formulário
+    // é ignorada pela página, que marca os campos com a tarefa)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualKey])
+
   const optionIds = choices.optionIds.join()
   useEffect(() => {
     if (reported.current) report()
@@ -435,7 +456,11 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form
+      id={`registrar-${props.taskId}`}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-3"
+    >
       {restored && <DraftNotice onDiscard={props.onDiscard} />}
       <label className="flex flex-col gap-1.5">
         <span className="text-sm text-tinta-suave">
