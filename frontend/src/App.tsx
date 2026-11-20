@@ -42,6 +42,7 @@ import type {
 } from './types'
 import { indexTags } from './tags'
 import { writeTimerChoices } from './timerMemory'
+import { timerErrorMessage } from './timerErrors'
 import { recordError } from './works'
 import { recentExerciseIds } from './workouts'
 
@@ -303,7 +304,9 @@ function App(props: { onLogout: () => Promise<void> }) {
       setSaveError(
         isConflict(error)
           ? 'Já existe um cronômetro rodando (talvez em outro aparelho). Recarregue a página.'
-          : 'Não foi possível retomar. Tente de novo.',
+          : ((error instanceof ApiError && error.status === 400
+              ? timerErrorMessage(error.message)
+              : null) ?? 'Não foi possível retomar. Tente de novo.'),
       )
       return null
     }

@@ -306,6 +306,49 @@ try {
   await failing.close()
   await closeOpen()
 
+  // ---------- 8c. as frases do servidor viram frases claras: Retomar (registro já finalizado, 400) e
+  // Finalizar (uma sessão retomada depois do fim escolhido, 400); outro 400 do Retomar segue genérico
+  const fakeError = async (match, status, error, run) => {
+    const p = await browser.newPage()
+    await p.setViewport({ width: 390, height: 900 })
+    await p.setRequestInterception(true)
+    p.on('request', (req) => {
+      if (match(req)) return req.respond({ status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error }) })
+      req.continue()
+    })
+    try { return await run(p) } finally { await p.close() }
+  }
+  const tapRetomar = async (p) => {
+    await p.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
+    await p.waitForFunction(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Retomar'))
+    await p.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Retomar').click())
+    await p.waitForFunction(() => document.querySelector('[role="alert"] p') !== null).catch(() => {})
+    await pause(200)
+    return banner(p)
+  }
+  r = await openRecord(ago(30))
+  await pool.query('UPDATE time_entries SET ended_at = now() WHERE id = $1', [r.entry.id])
+  const retomarMsg = (error, status = 400) => fakeError((req) => req.method() === 'POST' && req.url().endsWith('/time-entries'), status, error, tapRetomar)
+  shownBanner = await retomarMsg('Execução não encontrada ou já finalizada')
+  check('Retomar com 400 "já finalizada": a frase clara, sem o texto técnico', shownBanner === 'Este registro já foi finalizado.', shownBanner)
+  shownBanner = await retomarMsg('Qualquer outro motivo')
+  check('Retomar com outro 400: a frase genérica, sem o corpo da resposta', shownBanner === 'Não foi possível retomar. Tente de novo.', shownBanner)
+  shownBanner = await retomarMsg('Execução não encontrada ou já finalizada', 500)
+  check('Retomar com 500 e o MESMO texto: segue a frase genérica (só o 400 é traduzido)', shownBanner === 'Não foi possível retomar. Tente de novo.', shownBanner)
+  check('Retomar recusado: nenhuma sessão nova foi criada', (await sessionsOf(r.id)).length === 1)
+  await closeOpen()
+  r = await openRecord(ago(30))
+  const finishMsg = await fakeError((req) => req.method() === 'PUT' && /\/executions\/[0-9a-f-]+$/.test(req.url()), 400, 'O registro não pode terminar antes do início da sessão em andamento.', async (p) => {
+    await p.goto(`${APP}/executar?tarefa=${taskId}`, { waitUntil: 'networkidle0' })
+    await p.waitForFunction(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Finalizar'))
+    await p.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Finalizar').click())
+    await p.waitForFunction(() => document.querySelector('main [role="alert"]') !== null, { timeout: 4000 }).catch(() => {})
+    return p.evaluate(() => document.querySelector('main [role="alert"]')?.textContent.trim() ?? '')
+  })
+  check('Finalizar com a recusa do fim: a frase clara, sem o texto técnico', finishMsg === 'Uma sessão foi retomada depois do horário que você escolheu para terminar. Pause o cronômetro e finalize de novo.', finishMsg)
+  check('Finalizar recusado: o registro continua aberto', (await rowOf(r.id)).completed_at === null)
+  await closeOpen()
+
   // ---------- 9. toques: Finalizar normal 1; com "Durou" na sessão curta e na longa, +1
   const touch = await browser.newPage()
   await touch.setViewport({ width: 375, height: 800, hasTouch: true, isMobile: true })

@@ -35,7 +35,7 @@ const groups = {
     'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs', 'medidas-linhas.mjs',
   ],
   // Funções puras do frontend (módulos sem imports): sem banco, API, seed nem navegador
-  unidade: ['medidas-texto.mjs'],
+  unidade: ['medidas-texto.mjs', 'timer-erros.mjs'],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',

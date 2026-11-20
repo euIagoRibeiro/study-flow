@@ -3,6 +3,7 @@ import { formatDuration } from './dates'
 import { applicableMeasure } from './measures'
 import { formatQuantity } from './numbers'
 import { compareNames, indexTags, tagLineage } from './tags'
+import { timerErrorMessage } from './timerErrors'
 import type { Measure, Tag, Task, Work, WorkStatus } from './types'
 
 // Ordem do menu, do filtro e do formulário
@@ -171,6 +172,8 @@ export function defaultTaskLine(
 
 // As frases do servidor sobre obra e link, no texto da tela
 export function recordError(message: string): string {
+  const timer = timerErrorMessage(message)
+  if (timer !== null) return timer
   if (message.startsWith('linkUrl pode ter')) {
     return 'Link: no máximo 2000 caracteres.'
   }
