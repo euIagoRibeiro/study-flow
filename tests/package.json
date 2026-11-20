@@ -8,7 +8,8 @@
     "banco": "node --env-file=../backend/.env run.mjs banco",
     "api": "node --env-file=../backend/.env run.mjs api",
     "telas": "node --env-file=../backend/.env run.mjs telas",
-    "layout": "node --env-file=../backend/.env run.mjs layout"
+    "layout": "node --env-file=../backend/.env run.mjs layout",
+    "unidade": "node run.mjs unidade"
   },
   "devDependencies": {
     "pg": "^8.23.0",

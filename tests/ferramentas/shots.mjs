@@ -11,6 +11,7 @@
 // --sem-estimativa, pro campo da duração estimada (Registrar e lápis);
 // --sem-descricao, pro campo e o texto da descrição;
 // --sem-segundos, pros tempos do Histórico e o "antes:" do cronômetro;
+// --sem-medidas-linhas, pras linhas de medida da tabela de contextos do Painel (MA2b);
 // --sem-medidas, pra seção "Medidas" do Painel (MA4): as outras telas têm que dar 0 pixels, e no
 // Painel só muda a partir da seção (o "antes" é a mesma árvore com a seção escondida, sem stash)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -106,6 +107,15 @@ if (process.argv.includes('--sem-medidas')) {
   await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style')
     style.textContent = 'section[aria-label="Medidas"] { display: none !important; }'
+    document.head.append(style)
+  }))
+}
+// Com --sem-medidas-linhas, esconde as linhas de medida da tabela de contextos do Painel (MA2b): as
+// linhas-irmãs e as linhas só de medida. O resto do Painel tem que dar 0 pixels contra o "antes"
+if (process.argv.includes('--sem-medidas-linhas')) {
+  await page.evaluateOnNewDocument(() => addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = 'tr[data-measure-row], tr[data-measure-only] { display: none !important; }'
     document.head.append(style)
   }))
 }

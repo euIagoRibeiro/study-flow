@@ -1,4 +1,9 @@
-import type { MeasureTotal, Phase, TimeByContext } from '../types'
+import type {
+  MeasuresByContext,
+  MeasureTotal,
+  Phase,
+  TimeByContext,
+} from '../types'
 import { request } from './client'
 
 // O período vai como instantes (a tela calcula as bordas no fuso dela) e o
@@ -84,4 +89,13 @@ export function getMeasureTotals(
   fuso: string,
 ): Promise<{ items: MeasureTotal[] }> {
   return request(`/dashboard/medidas?${query(de, ate, fuso)}`)
+}
+
+// As mesmas quantidades, por contexto (raiz do registro), pra linha de cada contexto do Tempo
+export function getMeasuresByContext(
+  de: Date,
+  ate: Date,
+  fuso: string,
+): Promise<MeasuresByContext> {
+  return request(`/dashboard/medidas-por-contexto?${query(de, ate, fuso)}`)
 }

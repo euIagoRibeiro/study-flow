@@ -63,7 +63,7 @@ try {
   })
   const screen = () => page.evaluate(() => {
     const s = document.querySelector('section[aria-label="Tempo"]')
-    const rows = [...(s?.querySelectorAll('table tbody tr') ?? [])].map((tr) => ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children]))
+    const rows = [...(s?.querySelectorAll('table tbody tr:not([data-measure-row]):not([data-measure-only])') ?? [])].map((tr) => ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children]))
     return {
       period: document.querySelector('[role="group"][aria-label="Navegar no período"] p')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
       total: [...(s?.querySelectorAll('dt') ?? [])].find((dt) => dt.textContent.trim() === 'Tempo dedicado')?.nextElementSibling?.textContent.trim() ?? null,

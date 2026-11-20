@@ -32,14 +32,16 @@ const groups = {
     's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs', 's5-lapis.mjs', 'selecao-menu.mjs', 'selecao-resumo-envio.mjs', 's6-chips.mjs', 'o3-obras.mjs',
     'o4a-registrar.mjs', 'o4b-painel.mjs', 'o4c-lapis.mjs', 'o4d-chips.mjs', 'tempo-painel.mjs', 'o5-executar.mjs', 'lapis-segundos.mjs',
     'estimativa-segundos.mjs', 'treino-ordem.mjs', 'mesma-origem.mjs', 'entrada.mjs', 'historico-segundos.mjs',
-    'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs',
+    'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs', 'medidas-linhas.mjs',
   ],
+  // Funções puras do frontend (módulos sem imports): sem banco, API, seed nem navegador
+  unidade: ['medidas-texto.mjs'],
   layout: [
     'overflow.mjs', 'p4b-layout.mjs', 'a1d-layout.mjs', 'm4-layout.mjs',
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
     'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs', 's5-layout.mjs', 'selecao-menu-layout.mjs', 'sessao-excluir-layout.mjs', 's6-layout.mjs',
     'o3-layout.mjs', 'o4a-layout.mjs', 'o4b-layout.mjs', 'o4c-layout.mjs', 'o4d-layout.mjs', 'tempo-layout.mjs', 'o5-layout.mjs',
-    'estimativa-layout.mjs', 'entrada.mjs', 'descricao-layout.mjs', 'medidas-layout.mjs',
+    'estimativa-layout.mjs', 'entrada.mjs', 'descricao-layout.mjs', 'medidas-layout.mjs', 'medidas-linhas-layout.mjs',
   ],
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'
@@ -77,10 +79,12 @@ function stop(message) {
 if (process.env.FILTRO_EXATO === '1' && !exact) {
   stop(`FILTRO_EXATO: "${only ?? ''}" não é o nome de uma bateria de ${which}`)
 }
-if (!process.env.DATABASE_URL) {
+// O grupo "unidade" não usa banco, API, seed nem navegador
+const needsDb = chosen.some((g) => g !== 'unidade')
+if (needsDb && !process.env.DATABASE_URL) {
   stop('DATABASE_URL ausente. Rode pelo npm (npm run tudo), que lê ../backend/.env')
 }
-const needsApi = chosen.some((g) => g !== 'banco')
+const needsApi = chosen.some((g) => g !== 'banco' && g !== 'unidade')
 const needsApp = chosen.some((g) => g === 'telas' || g === 'layout')
 async function reachable(url) {
   try {
@@ -103,33 +107,35 @@ if (needsApi) {
 if (needsApp && !(await reachable(APP))) {
   stop(`o frontend não responde em ${APP}. Suba o Vite (cd frontend && npm run dev)`)
 }
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
-// Os registros do seed nascem com o now() do seed (as tarefas têm created_at
-// relativo, de propósito: não servem pra isso)
-const seed = await pool.query(
-  `SELECT (min(created_at) AT TIME ZONE 'America/Sao_Paulo')::date =
-          (now() AT TIME ZONE 'America/Sao_Paulo')::date AS today
-   FROM task_executions WHERE id::text LIKE '5eed%'
-   HAVING count(*) > 0`,
-)
-// As baterias de obras conferem a limpeza pela diferença de contagem: uma obra
-// que sobrou de uma rodada interrompida não apareceria nessa conta
-const strayWorks = await pool.query(
-  `SELECT string_agg(title, ', ' ORDER BY title) AS titles FROM works
-   WHERE id::text NOT LIKE '5eed%' HAVING count(*) > 0`,
-)
-await pool.end()
-if (strayWorks.rowCount > 0) {
-  stop(`há obras fora do seed (${strayWorks.rows[0].titles}): sobra de uma ` +
-    'rodada interrompida? Apague antes de rodar as baterias; se são obras suas, use o outro banco')
-}
-if (seed.rowCount === 0) {
-  stop('o seed não está aplicado. Rode (na raiz): docker exec -i ' +
-    `${PG_CONTAINER} psql -U studyflow -d studyflow -v ON_ERROR_STOP=1 < backend/seeds/dev_seed.sql`)
-}
-if (!seed.rows[0].today) {
-  stop('o seed não é de hoje: os registros "de hoje" viraram "ontem" e baterias ' +
-    'falham sem bug. Refaça o seed (unseed + seed, comandos no README)')
+if (needsDb) {
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+  // Os registros do seed nascem com o now() do seed (as tarefas têm created_at
+  // relativo, de propósito: não servem pra isso)
+  const seed = await pool.query(
+    `SELECT (min(created_at) AT TIME ZONE 'America/Sao_Paulo')::date =
+            (now() AT TIME ZONE 'America/Sao_Paulo')::date AS today
+     FROM task_executions WHERE id::text LIKE '5eed%'
+     HAVING count(*) > 0`,
+  )
+  // As baterias de obras conferem a limpeza pela diferença de contagem: uma obra
+  // que sobrou de uma rodada interrompida não apareceria nessa conta
+  const strayWorks = await pool.query(
+    `SELECT string_agg(title, ', ' ORDER BY title) AS titles FROM works
+     WHERE id::text NOT LIKE '5eed%' HAVING count(*) > 0`,
+  )
+  await pool.end()
+  if (strayWorks.rowCount > 0) {
+    stop(`há obras fora do seed (${strayWorks.rows[0].titles}): sobra de uma ` +
+      'rodada interrompida? Apague antes de rodar as baterias; se são obras suas, use o outro banco')
+  }
+  if (seed.rowCount === 0) {
+    stop('o seed não está aplicado. Rode (na raiz): docker exec -i ' +
+      `${PG_CONTAINER} psql -U studyflow -d studyflow -v ON_ERROR_STOP=1 < backend/seeds/dev_seed.sql`)
+  }
+  if (!seed.rows[0].today) {
+    stop('o seed não é de hoje: os registros "de hoje" viraram "ontem" e baterias ' +
+      'falham sem bug. Refaça o seed (unseed + seed, comandos no README)')
+  }
 }
 
 // ---- execução

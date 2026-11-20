@@ -7,10 +7,14 @@
 //   Etapas   (Kx, Ky, Kz)         1 + 1 + 1 em 1 registro            = 3 (33% três vezes: soma 99%)
 //   Capítulos (sem tipos)         1 em 1 registro                    = 1, sem tabela, no singular
 // Dia 08/04: só o registro 1 de Questões (Acertos 80, Erros 20 = 100).
+// Com { withTime: true } (telas/medidas-linhas, layout/medidas-linhas-layout), o Tempo da semana tem sessões:
+//   MD R1 105min (60 + 45), MD R4 90min, MD R6 40min (sem nenhuma medida), MD R3 30min = 265min (4h25);
+//   MD R2 (Km) e MD R5 (Capítulos) têm medida e NENHUM tempo: linhas só de medida, no fim.
+// Percentuais do Tempo: R1 40%, R4 34%, R6 15%, R3 11%.
 const u = (p, n) => `00000000-0000-4000-${p}-${String(n).padStart(12, '0')}`
 const local = (t) => new Date(`${t.replace(' ', 'T')}:00-03:00`)
 export const WEEK = '2025-04-07'
-export const TABLES = ['tags', 'measures', 'measure_kinds', 'tasks', 'task_executions',
+export const TABLES = ['tags', 'measures', 'measure_kinds', 'tasks', 'task_executions', 'time_entries',
   'task_execution_tags', 'execution_measures', 'execution_measure_values']
 
 // Contagens totais das tabelas mexidas (pra conferir que voltaram ao valor de antes)
@@ -30,6 +34,7 @@ export async function leftovers(pool) {
     measure_kinds: await q(`SELECT count(*)::int AS n FROM measure_kinds WHERE ${like('id')}`),
     tasks: await q(`SELECT count(*)::int AS n FROM tasks WHERE ${like('id')}`),
     task_executions: await q(`SELECT count(*)::int AS n FROM task_executions WHERE ${like('id')}`),
+    time_entries: await q(`SELECT count(*)::int AS n FROM time_entries WHERE ${like('task_execution_id')}`),
     task_execution_tags: await q(`SELECT count(*)::int AS n FROM task_execution_tags WHERE ${like('task_execution_id')}`),
     execution_measures: await q(`SELECT count(*)::int AS n FROM execution_measures WHERE ${like('task_execution_id')}`),
     execution_measure_values: await q(`SELECT count(*)::int AS n FROM execution_measure_values WHERE ${like('task_execution_id')}`),
@@ -42,6 +47,7 @@ export async function cleanMedidas(pool) {
   await pool.query(`DELETE FROM execution_measure_values WHERE ${ex}`)
   await pool.query(`DELETE FROM execution_measures WHERE ${ex}`)
   await pool.query(`DELETE FROM task_execution_tags WHERE ${ex}`)
+  await pool.query(`DELETE FROM time_entries WHERE ${ex}`)
   await pool.query(`DELETE FROM task_executions WHERE id::text LIKE '00000000-0000-4000-a0f5-%'`)
   await pool.query(`DELETE FROM measure_kinds WHERE id::text LIKE '00000000-0000-4000-a0f4-%'`)
   await pool.query(`DELETE FROM measures WHERE id::text LIKE '00000000-0000-4000-a0f3-%'`)
@@ -49,10 +55,12 @@ export async function cleanMedidas(pool) {
   await pool.query(`DELETE FROM tasks WHERE id::text LIKE '00000000-0000-4000-a0f6-%'`)
 }
 
-export async function seedMedidas(pool, { longNames = false } = {}) {
+export async function seedMedidas(pool, { longNames = false, withTime = false } = {}) {
   await cleanMedidas(pool)
   const name = (short, long) => (longNames ? long : short)
-  const tagNames = ['MD R1', 'MD R2', 'MD R3', 'MD R4', 'MD R5']
+  // Nomes de contexto de 40 letras sem espaço no modo "longo" (layout)
+  const tagNames = ['MD R1', 'MD R2', 'MD R3', 'MD R4', 'MD R5', ...(withTime ? ['MD R6'] : [])].map((tagName, i) =>
+    longNames ? `MDContextoComNomeMuitoLongoSemEspaco${i + 1}`.padEnd(40, 'x') : tagName)
   for (const [i, tagName] of tagNames.entries()) {
     await pool.query(`INSERT INTO tags (id, name, level, parent_id, root_id) VALUES ($1, $2, 1, NULL, NULL)`, [u('a0f2', i + 1), tagName])
   }
@@ -94,4 +102,16 @@ export async function seedMedidas(pool, { longNames = false } = {}) {
   await reg(5, 3, '2025-04-12 12:00', 3); await val(5, 3, 3, 1000); await val(5, 3, 0, 1)
   await reg(6, 4, '2025-04-13 12:00', 4); await val(6, 4, 4, 1); await val(6, 4, 5, 1); await val(6, 4, 6, 1)
   await reg(7, 5, '2025-04-13 13:00', 5); await val(7, 5, 0, 1)
+  if (withTime) {
+    const session = (n, from, to) => pool.query('INSERT INTO time_entries (task_execution_id, started_at, ended_at) VALUES ($1, $2, $3)', [u('a0f5', n), local(from), local(to)])
+    await session(1, '2025-04-08 11:00', '2025-04-08 12:00') // MD R1: 60min
+    await session(2, '2025-04-09 11:15', '2025-04-09 12:00') // MD R1: +45min
+    await session(5, '2025-04-12 11:30', '2025-04-12 12:00') // MD R3: 30min
+    await session(6, '2025-04-13 10:30', '2025-04-13 12:00') // MD R4: 90min
+    // MD R6: tempo e nenhuma medida (a linha dele não ganha linha-irmã)
+    await pool.query(
+      `INSERT INTO task_executions (id, task_id, task_title_at_time, task_frequency_at_time, completed_at, root_tag_id)
+       VALUES ($1, $2, 'MD tarefa', 'none', $3, $4)`, [u('a0f5', 8), u('a0f6', 1), local('2025-04-13 14:00'), u('a0f2', 6)])
+    await session(8, '2025-04-13 13:20', '2025-04-13 14:00')
+  }
 }

@@ -43,7 +43,7 @@ try {
     const tables = [...(s?.querySelectorAll('table') ?? [])].map((t) => ({
       caption: t.querySelector('caption')?.textContent.trim(),
       head: [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim()),
-      rows: [...t.querySelectorAll('tbody tr')].map((tr) => ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children])),
+      rows: [...t.querySelectorAll('tbody tr:not([data-measure-row]):not([data-measure-only])')].map((tr) => ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children])),
     }))
     const bars = s?.querySelector('svg[role="img"][aria-label^="Barras"]')
     return {

@@ -59,7 +59,7 @@ try {
       pieLabel: pie?.getAttribute('aria-label') ?? null,
       slices: [...(pie?.querySelectorAll('path') ?? [])].map((p) => getComputedStyle(p).fill),
       pieTexts: [...(pie?.querySelectorAll('text') ?? [])].map((t) => t.textContent.trim()),
-      rows: [...(table?.querySelectorAll('tbody tr') ?? [])].map((tr) => ({
+      rows: [...(table?.querySelectorAll('tbody tr:not([data-measure-row]):not([data-measure-only])') ?? [])].map((tr) => ({
         cells: ((tds) => [tds[0]?.textContent.trim(), tds[1]?.querySelector('span.block')?.textContent.trim(), tds[1]?.querySelector('span.block + span.block')?.textContent.trim(), tds[2] ? [...tds[2].querySelectorAll('span.block')].map((b) => b.textContent.trim()).join(' ') : undefined])([...tr.children]),
         dot: (() => { const d = tr.querySelector('td span[aria-hidden="true"]'); return d ? getComputedStyle(d).backgroundColor : null })(),
         button: !!tr.querySelector('button'),

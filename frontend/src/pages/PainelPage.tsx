@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import {
+  getMeasuresByContext,
   getTimeByContext,
   getTimeByPeriod,
   getTimeByPhase,
@@ -12,8 +13,10 @@ import { ChevronDownIcon } from '../components/icons'
 import MeasuresSection from '../components/MeasuresSection'
 import PieChart from '../components/PieChart'
 import TagCompare from '../components/TagCompare'
-import TimeTable from '../components/TimeTable'
+import TimeTable, { type Row } from '../components/TimeTable'
 import { formatDuration } from '../dates'
+import { measureLines } from '../measureText'
+import { formatQuantity } from '../numbers'
 import {
   barLabel,
   barsBy,
@@ -141,6 +144,20 @@ function PainelPage(props: { tags: Tag[] }) {
         previous: { subtags: prevSubtags.items, phases: prevPhases.items },
       }
     },
+  )
+
+  // As medidas de cada contexto, pra linha-irmã da tabela do Tempo: pedido e falha próprios (o Tempo
+  // segue sem elas), só do período atual
+  const [measuresAttempt, setMeasuresAttempt] = useState(0)
+  const contextMeasures = useFetched(
+    `${period.start.toISOString()}|${period.end.toISOString()}|${zone}|m${measuresAttempt}`,
+    () => getMeasuresByContext(period.start, period.end, zone),
+  )
+  const measureLinesByTag = new Map(
+    (contextMeasures?.data?.items ?? []).map((item) => [
+      item.tagId,
+      measureLines(item.measures, formatQuantity),
+    ]),
   )
 
   const data = overview?.data
@@ -305,17 +322,58 @@ function PainelPage(props: { tags: Tag[] }) {
                 data.context.items,
                 data.previous.items,
                 (item) => item.tagId ?? 'sem',
-              ).map((row, i) => ({
-                key: row.item.tagId ?? 'sem',
-                name: nameOf(row.item.tagId, '(sem tag)'),
-                seconds: row.seconds,
-                previous: row.previous,
-                dot: row.seconds > 0 ? categoryAt(i).dot : undefined,
-                onOpen: row.item.tagId
-                  ? () => go(period, row.item.tagId ?? undefined)
-                  : undefined,
-              }))}
+              )
+                .map((row, i): Row => ({
+                  key: row.item.tagId ?? 'sem',
+                  name: nameOf(row.item.tagId, '(sem tag)'),
+                  seconds: row.seconds,
+                  previous: row.previous,
+                  dot: row.seconds > 0 ? categoryAt(i).dot : undefined,
+                  onOpen: row.item.tagId
+                    ? () => go(period, row.item.tagId ?? undefined)
+                    : undefined,
+                  measures: row.item.tagId
+                    ? measureLinesByTag.get(row.item.tagId)
+                    : undefined,
+                }))
+                // Contexto com medida e sem tempo no período: linha no fim, "0min", sem %, sem
+                // abrir o detalhe (decisão da MA2d), por nome
+                .concat(
+                  [...measureLinesByTag]
+                    .filter(
+                      ([tagId]) =>
+                        !data.context.items.some(
+                          (item) => item.tagId === tagId,
+                        ) &&
+                        !data.previous.items.some(
+                          (item) => item.tagId === tagId,
+                        ),
+                    )
+                    .map(([tagId, lines]): Row => ({
+                      key: `medida-${tagId}`,
+                      name: nameOf(tagId, 'Tag removida'),
+                      seconds: 0,
+                      previous: undefined,
+                      dot: undefined,
+                      onOpen: undefined,
+                      measures: lines,
+                      measuresOnly: true,
+                    }))
+                    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+                )}
             />
+            {contextMeasures && !contextMeasures.data && (
+              <p role="alert" className="text-meta text-tinta-suave">
+                Não foi possível carregar as medidas.{' '}
+                <button
+                  type="button"
+                  onClick={() => setMeasuresAttempt((n) => n + 1)}
+                  className={`underline decoration-dotted underline-offset-2 ${textButtonClass}`}
+                >
+                  Tentar de novo
+                </button>
+              </p>
+            )}
 
             {contextTag && (
               <section

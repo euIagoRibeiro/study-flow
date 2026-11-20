@@ -1,4 +1,6 @@
+import { Fragment } from 'react'
 import { formatDuration } from '../dates'
+import type { MeasureLine } from '../measureText'
 import { formatDiff, percent } from '../painel'
 import { textButtonClass } from '../styles'
 
@@ -9,6 +11,10 @@ export type Row = {
   previous?: number // com comparação: o tempo no período anterior
   dot?: string // classe da cor (legenda); sem ela, linha sem bolinha
   onOpen?: () => void // contexto: abre o detalhe
+  // Medidas do item: uma linha-irmã logo abaixo (o total de cada medida e, se tem tipos, os tipos)
+  measures?: MeasureLine[]
+  // Item só com medida (sem tempo no período): "0min", sem %, sem comparação, sem abrir nada
+  measuresOnly?: boolean
 }
 
 // Diferença com o anterior: o sinal e a palavra, o % embaixo
@@ -64,42 +70,81 @@ function TimeTable(props: {
       </thead>
       <tbody className="font-dados tabular-nums">
         {props.rows.map((row) => (
-          <tr key={row.key} className="border-t border-linha">
-            <td className="py-1 pr-1.5 wrap-anywhere">
-              <span className="flex min-h-9 items-center gap-1.5">
-                {row.dot && (
-                  <span
-                    aria-hidden="true"
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${row.dot}`}
-                  />
-                )}
-                {row.onOpen ? (
-                  <button
-                    type="button"
-                    onClick={row.onOpen}
-                    className={`min-w-[10ch] text-left underline decoration-dotted underline-offset-2 ${textButtonClass}`}
-                  >
-                    {row.name}
-                  </button>
-                ) : (
-                  <span className="min-w-[10ch]">{row.name}</span>
-                )}
-              </span>
-            </td>
-            <td className="py-1 text-right whitespace-nowrap">
-              <span className="block">
-                {formatDuration(row.seconds * 1000)}
-              </span>
-              <span className="block text-meta text-tinta-suave">
-                {total > 0 ? percent(row.seconds, total) : '0%'}
-              </span>
-            </td>
-            {props.compare && (
-              <td className="py-1 pl-1.5 text-right">
-                <Diff current={row.seconds} previous={row.previous ?? 0} />
+          <Fragment key={row.key}>
+            <tr
+              className="border-t border-linha"
+              data-measure-only={row.measuresOnly ? '' : undefined}
+            >
+              <td className="py-1 pr-1.5 wrap-anywhere">
+                <span className="flex min-h-9 items-center gap-1.5">
+                  {row.dot && (
+                    <span
+                      aria-hidden="true"
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${row.dot}`}
+                    />
+                  )}
+                  {row.onOpen ? (
+                    <button
+                      type="button"
+                      onClick={row.onOpen}
+                      className={`min-w-[10ch] text-left underline decoration-dotted underline-offset-2 ${textButtonClass}`}
+                    >
+                      {row.name}
+                    </button>
+                  ) : (
+                    <span className="min-w-[10ch]">{row.name}</span>
+                  )}
+                </span>
               </td>
+              <td className="py-1 text-right whitespace-nowrap">
+                <span className="block">
+                  {formatDuration(row.seconds * 1000)}
+                </span>
+                {!row.measuresOnly && (
+                  <span className="block text-meta text-tinta-suave">
+                    {total > 0 ? percent(row.seconds, total) : '0%'}
+                  </span>
+                )}
+              </td>
+              {props.compare && (
+                <td className="py-1 pl-1.5 text-right">
+                  {!row.measuresOnly && (
+                    <Diff current={row.seconds} previous={row.previous ?? 0} />
+                  )}
+                </td>
+              )}
+            </tr>
+            {row.measures && row.measures.length > 0 && (
+              <tr data-measure-row>
+                <td
+                  colSpan={props.compare ? 3 : 2}
+                  className={`pr-1.5 pb-1.5 wrap-anywhere ${row.dot ? 'pl-4' : ''}`}
+                >
+                  <span className="sr-only">Medidas de {row.name}: </span>
+                  <div className="flex flex-col gap-1 text-meta">
+                    {row.measures.map((line) => (
+                      <div key={line.total}>
+                        <p>{line.total}</p>
+                        {line.kindItems && (
+                          <p className="text-tinta-suave">
+                            {line.kindItems.map((item, i, all) => (
+                              <Fragment key={item}>
+                                {i > 0 && ' '}
+                                {/* cada item vai inteiro pra linha de baixo; se nem sozinho cabe, quebra por dentro */}
+                                <span className="inline-block max-w-full wrap-anywhere">
+                                  {i < all.length - 1 ? `${item} ·` : item}
+                                </span>
+                              </Fragment>
+                            ))}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </td>
+              </tr>
             )}
-          </tr>
+          </Fragment>
         ))}
       </tbody>
     </table>

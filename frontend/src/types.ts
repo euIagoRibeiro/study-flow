@@ -280,6 +280,11 @@ export type ExecutionChanges = {
 
 export type LoadStatus = 'loading' | 'error' | 'ready'
 
+// Painel, medidas por contexto: um item por contexto (raiz) com as suas medidas (as mesmas de MeasureTotal)
+export type MeasuresByContext = {
+  items: { tagId: string; measures: MeasureTotal[] }[]
+}
+
 // Painel, medidas: totais por medida e por tipo, pela data do registro. `kinds` só traz
 // linhas se algum valor tem tipo; os sem tipo são a linha de key e name nulos
 export type MeasureTotal = {
