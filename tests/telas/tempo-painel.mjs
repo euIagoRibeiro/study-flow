@@ -198,7 +198,7 @@ try {
   f = await field()
   check('pausado: sem o "Durou" e sem aviso', !f.block && f.warning === null, JSON.stringify(f))
   // Depois do Pausar o Retomar fica travado por 1,5 s (clique duplo): espera habilitar, sem clicar antes
-  await page.waitForFunction(() => { const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === 'Retomar'); return b && !b.disabled })
+  await page.waitForFunction(() => { const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === 'Retomar'); return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' })
   await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Retomar').click())
   await page.waitForFunction(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Pausar'))
   await pause(300)

@@ -16,7 +16,7 @@ export const textareaClass = `field-sizing-content min-h-16.5 max-h-76.5 w-full 
 // Botão primário: usa o marca-texto (um dos dois usos permitidos do amarelo)
 export const primaryButtonClass = `h-11 ${centered} gap-2 rounded-xl bg-marca-texto px-4 font-semibold text-sobre-marca hover:brightness-95 active:brightness-90 disabled:cursor-wait disabled:opacity-60 ${focusRing}`
 
-export const secondaryButtonClass = `min-h-11 shrink-0 ${centered} gap-2 rounded-xl border border-tinta-suave/45 px-3 text-sm font-medium text-tinta hover:bg-tinta/[0.07] disabled:cursor-wait disabled:opacity-60 ${focusRing}`
+export const secondaryButtonClass = `min-h-11 shrink-0 ${centered} gap-2 rounded-xl border border-tinta-suave/45 px-3 text-sm font-medium text-tinta hover:bg-tinta/[0.07] disabled:cursor-wait disabled:opacity-60 aria-disabled:cursor-wait aria-disabled:opacity-60 aria-disabled:hover:bg-transparent ${focusRing}`
 
 // Item de lista, texto à esquerda — sem "centered" de propósito
 export const pickerButtonClass = `min-h-11 w-full rounded-xl border border-linha bg-superficie px-3 py-2 text-left text-base text-tinta hover:bg-tinta/[0.04] ${focusRing}`

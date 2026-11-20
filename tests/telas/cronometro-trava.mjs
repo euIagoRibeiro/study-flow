@@ -1,6 +1,7 @@
 // Trava contra clique duplo no painel do cronômetro (commit 2b). Depois de um Pausar ou Retomar que deu
 // certo, o botão que aparece no lugar fica desabilitado por ~1,5 s (rótulo igual; nos dois sentidos); quem
-// abre a tela com o registro estável não espera; Pausar que FALHA não trava; Pausar/Retomar e Finalizar não
+// abre a tela com o registro estável não espera; o botão trava por aria-disabled (continua focável: o foco do
+// teclado fica nele, e Enter/Espaço durante a trava não mandam nada); Pausar que FALHA não trava; Pausar/Retomar e Finalizar não
 // se sobrepõem (o Finalizar fica desabilitado com um Pausar em andamento e vice-versa); dois envios do
 // Finalizar no mesmo instante (Enter com o botão desabilitado ainda envia o formulário) mandam UM só PUT.
 // Respostas seguradas por interceptação pra deixar a ação "em voo". Dados próprios (prefixo teste-trava),
@@ -74,10 +75,19 @@ try {
     req.continue()
   })
   const reset = () => { seen.putEntry = 0; seen.postEntry = 0; seen.putExec = 0 }
+  // "desabilitado" = o atributo disabled OU aria-disabled="true" (o Pausar/Retomar usa o segundo)
   const state = (label) => page.evaluate((l) => {
     const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === l)
-    return b ? { disabled: b.disabled, text: b.textContent.trim() } : null
+    return b ? { disabled: b.disabled || b.getAttribute('aria-disabled') === 'true', text: b.textContent.trim() } : null
   }, label)
+  const details = (label) => page.evaluate((l) => {
+    const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === l)
+    if (!b) return null
+    const st = getComputedStyle(b)
+    return { ariaDisabled: b.getAttribute('aria-disabled'), disabledAttr: b.hasAttribute('disabled'), opacity: Number(st.opacity), cursor: st.cursor }
+  }, label)
+  const active = () => page.evaluate(() => { const a = document.activeElement; return a && a.tagName === 'BUTTON' ? a.textContent.trim() : (a?.tagName ?? null) })
+  const focusBtn = (label) => page.evaluate((l) => [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === l).focus(), label)
   const click = (label) => page.evaluate((l) => [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === l).click(), label)
   const waitLabel = (label) => page.waitForFunction((l) => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === l), {}, label)
   const open = async () => {
@@ -225,6 +235,58 @@ try {
   await click('Finalizar')
   await pause(800)
   check('a 2ª tentativa do Finalizar grava (a trava foi solta)', (await completed(r.id)) !== null && seen.putExec === 2, `${seen.putExec}`)
+  await closeOpen()
+
+  // ---------- 11. o atributo, o estilo e o FOCO do teclado: o botão trava por aria-disabled e o foco fica nele
+  r = await openRecord(ago(30))
+  await open()
+  let d = await details('Pausar')
+  check('estável: o Pausar não tem aria-disabled nem disabled, com opacidade plena', d && d.ariaDisabled === null && d.disabledAttr === false && d.opacity === 1, JSON.stringify(d))
+  for (const key of ['Enter', 'Space']) {
+    for (const flight of [0, 700]) {
+      hold.putEntry = flight
+      hold.postEntry = flight
+      const tag = `${key}${flight ? ', resposta segurada' : ''}`
+      // Pausar -> Retomar
+      await focusBtn('Pausar')
+      reset()
+      await page.keyboard.press(key)
+      await pause(150)
+      // em voo o rótulo ainda é "Pausar"; com resposta rápida já pode ser "Retomar": o foco tem que estar num dos dois
+      check(`Pausar por ${tag}: 0,15 s depois o foco continua no botão (em voo ou já trocado)`, ['Pausar', 'Retomar'].includes(await active()), String(await active()))
+      await waitLabel('Retomar')
+      check(`Pausar por ${tag}: depois da troca o foco está no botão (agora "Retomar")`, (await active()) === 'Retomar', String(await active()))
+      d = await details('Retomar')
+      check(`Pausar por ${tag}: o Retomar trava por aria-disabled="true", sem o atributo disabled, com o estilo de desabilitado`, d && d.ariaDisabled === 'true' && d.disabledAttr === false && d.opacity < 1 && d.cursor === 'wait', JSON.stringify(d))
+      const posts = seen.postEntry
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Space')
+      await pause(200)
+      check(`Pausar por ${tag}: Enter e Espaço durante a trava não mandam pedido`, seen.postEntry === posts && (await state('Retomar'))?.text === 'Retomar', `${seen.postEntry - posts}`)
+      check(`Pausar por ${tag}: o foco continua no botão durante a trava`, (await active()) === 'Retomar', String(await active()))
+      await untilEnabled('Retomar')
+      d = await details('Retomar')
+      check(`Pausar por ${tag}: depois da trava o foco continua no botão e o aria-disabled sai`, (await active()) === 'Retomar' && d.ariaDisabled === null && d.opacity === 1, `${await active()} ${JSON.stringify(d)}`)
+      // Retomar -> Pausar
+      reset()
+      await page.keyboard.press(key)
+      await pause(150)
+      check(`Retomar por ${tag}: 0,15 s depois o foco continua no botão (em voo ou já trocado)`, ['Pausar', 'Retomar'].includes(await active()), String(await active()))
+      await waitLabel('Pausar')
+      check(`Retomar por ${tag}: depois da troca o foco está no botão (agora "Pausar")`, (await active()) === 'Pausar', String(await active()))
+      d = await details('Pausar')
+      check(`Retomar por ${tag}: o Pausar trava por aria-disabled="true", sem o atributo disabled, com o estilo de desabilitado`, d && d.ariaDisabled === 'true' && d.disabledAttr === false && d.opacity < 1 && d.cursor === 'wait', JSON.stringify(d))
+      const puts = seen.putEntry
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Space')
+      await pause(200)
+      check(`Retomar por ${tag}: Enter e Espaço durante a trava não mandam pedido`, seen.putEntry === puts && (await state('Pausar'))?.text === 'Pausar', `${seen.putEntry - puts}`)
+      await untilEnabled('Pausar')
+      check(`Retomar por ${tag}: depois da trava o foco continua no botão`, (await active()) === 'Pausar', String(await active()))
+      hold.putEntry = 0
+      hold.postEntry = 0
+    }
+  }
   await closeOpen()
 } catch (err) {
   check(`bateria sem erro inesperado: ${err.message}`, false, String(err.stack).split('\n').slice(0, 3).join(' | '))

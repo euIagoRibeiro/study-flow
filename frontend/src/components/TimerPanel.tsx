@@ -602,7 +602,9 @@ function TimerPanel(props: {
               runningEntry ? onStop(runningEntry.id) : onResume(execution.id),
             )
           }
-          disabled={working || guarded}
+          // aria-disabled e não disabled: o botão continua focável (um botão que vira disabled perde o
+          // foco do teclado, que não volta); o bloqueio é o `if` do runTimerAction
+          aria-disabled={working || guarded ? 'true' : undefined}
           className={`w-full ${secondaryButtonClass}`}
         >
           {runningEntry ? 'Pausar' : 'Retomar'}
