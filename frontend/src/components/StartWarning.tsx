@@ -11,6 +11,7 @@ function StartWarning(props: {
   fields: string[]
   formId: string
   starting: boolean
+  registering: boolean
   onStart: () => void
   onBack: () => void
 }) {
@@ -44,6 +45,7 @@ function StartWarning(props: {
       <button
         type="submit"
         form={props.formId}
+        aria-disabled={props.registering ? 'true' : undefined}
         className={`h-13 w-full text-base ${primaryButtonClass}`}
       >
         Registrar
@@ -51,7 +53,7 @@ function StartWarning(props: {
       <button
         type="button"
         onClick={props.onStart}
-        aria-disabled={props.starting ? 'true' : undefined}
+        aria-disabled={props.starting || props.registering ? 'true' : undefined}
         className={`w-full ${secondaryButtonClass}`}
       >
         Iniciar mesmo assim

@@ -91,6 +91,15 @@ type FormProps = {
   // cada mudança e ao montar (rascunho recuperado inclusive): o aviso do Iniciar lê daqui o que a
   // tela tem AGORA, sem passar pela sessão do navegador
   onManualChange?: (fields: string[]) => void
+  // Uma ação por vez na página (Registrar, Iniciar): reivindica antes de enviar (false = outra ação
+  // em voo, não envia) e solta no fim. A ref fica na página porque o "Iniciar mesmo assim" também usa
+  claimAction?: () => boolean
+  releaseAction?: () => void
+  // O envio em andamento: o "Registrar" do aviso (fora do formulário) mostra o mesmo estado
+  onSubmittingChange?: (submitting: boolean) => void
+  // Com o aviso do Iniciar aberto, a falha do envio leva o foco à mensagem de erro (que mora no pé)
+  focusErrorOnFail?: boolean
+  onSubmitFailed?: () => void
 }
 
 // O que fica guardado do Registrar: o "Quando" só se foi mexido (sem mexer,
@@ -209,6 +218,7 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
   const [link, setLink] = useState(restored?.link ?? '')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [errorFocus, setErrorFocus] = useState(0)
   const showPhase = phaseApplies(path, byId)
 
   // Rascunho: a "foto" do formulário, guardada enquanto difere do intocado. O
@@ -364,7 +374,11 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       setError(LINK_ERROR)
       return
     }
+    // Enter duplo ou clique duplo no mesmo instante passam pelo estado `submitting`: quem decide é a
+    // ref da página (também barra o Iniciar em voo). Fica DEPOIS das validações, que só mostram erro
+    if (props.claimAction && !props.claimAction()) return
     setSubmitting(true)
+    props.onSubmittingChange?.(true)
     try {
       await props.onSubmit(
         description,
@@ -385,9 +399,15 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
           ? recordError(err.message)
           : 'Não foi possível registrar. Tente de novo.',
       )
+      if (props.focusErrorOnFail) {
+        props.onSubmitFailed?.()
+        setErrorFocus((n) => n + 1)
+      }
       return
     } finally {
+      props.releaseAction?.()
       setSubmitting(false)
+      props.onSubmittingChange?.(false)
     }
     setError('')
   }
@@ -489,12 +509,12 @@ function RegistrarForm(props: FormProps & { onDiscard: () => void }) {
       ))}
       <button
         type="submit"
-        disabled={submitting}
+        aria-disabled={submitting ? 'true' : undefined}
         className={`w-full ${secondaryButtonClass}`}
       >
         Registrar
       </button>
-      {error && <FormError>{error}</FormError>}
+      {error && <FormError focusSignal={errorFocus}>{error}</FormError>}
     </form>
   )
 }

@@ -120,8 +120,19 @@ function ExecutePage(props: {
     resumeEntryId: string | null
   } | null>(null)
   const [starting, setStarting] = useState(false)
-  // Uma partida por vez: dois toques no mesmo instante passam pelo estado `starting`, a ref decide
-  const startGuard = useRef(false)
+  // Uma ação por vez (partida do cronômetro OU envio do Registrar): dois toques no mesmo instante
+  // passam pelo estado, a ref decide. Uma ação em voo barra a outra, inclusive Registrar × "Iniciar
+  // mesmo assim" (senão sairiam um registro e um cronômetro)
+  const actionGuard = useRef(false)
+  const [registering, setRegistering] = useState(false)
+  function claimAction() {
+    if (actionGuard.current) return false
+    actionGuard.current = true
+    return true
+  }
+  function releaseAction() {
+    actionGuard.current = false
+  }
   // Os campos do formulário de baixo que o Iniciar não leva (Quando, Duração estimada, Medida), como
   // o formulário os tem AGORA (callback no commit; nada de sessão do navegador). Marcados com a
   // tarefa: os de outra tarefa não valem
@@ -234,8 +245,7 @@ function ExecutePage(props: {
   }
 
   async function handleStart() {
-    if (selectedTask === undefined || startGuard.current) return
-    startGuard.current = true
+    if (selectedTask === undefined || !claimAction()) return
     setStarting(true)
     try {
       const started = await props.onStartTimer(
@@ -250,7 +260,7 @@ function ExecutePage(props: {
         clearDraft(draftKeys.registrar(selectedTask.id))
       }
     } finally {
-      startGuard.current = false
+      releaseAction()
       setStarting(false)
     }
   }
@@ -271,7 +281,7 @@ function ExecutePage(props: {
 
   async function startAnyway() {
     // Um segundo toque com a partida em andamento não faz nada (nem fecha o aviso)
-    if (startGuard.current) return
+    if (actionGuard.current) return
     await handleStart()
     setWarningTask(null)
   }
@@ -738,6 +748,7 @@ function ExecutePage(props: {
               fields={manualFields}
               formId={`registrar-${selectedTask.id}`}
               starting={starting}
+              registering={registering}
               onStart={startAnyway}
               onBack={backFromWarning}
             />
@@ -746,7 +757,7 @@ function ExecutePage(props: {
               ref={startButton}
               type="button"
               onClick={requestStart}
-              disabled={starting}
+              aria-disabled={starting ? 'true' : undefined}
               className={`h-13 w-full text-base ${primaryButtonClass}`}
             >
               <PlayIcon />
@@ -768,6 +779,11 @@ function ExecutePage(props: {
             tasks={props.tasks}
             shortcut={shortcut}
             onSubmit={handleExecute}
+            claimAction={claimAction}
+            releaseAction={releaseAction}
+            onSubmittingChange={setRegistering}
+            focusErrorOnFail={warningOpen}
+            onSubmitFailed={() => setWarningTask(null)}
             draftKey={draftKeys.registrar(selectedTask.id)}
             onDraftChange={(value) =>
               setDraft(value ? { taskId: selectedTask.id, value } : null)

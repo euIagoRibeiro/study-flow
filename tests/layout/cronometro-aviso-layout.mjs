@@ -2,7 +2,8 @@
 // botão Iniciar, em 8 larguras (320 a 1280), claro e escuro, janela real. Confere: sem rolagem lateral, o
 // bloco e os botões dentro da coluna, botões empilhados na largura inteira, alvos de toque de 44px, UM só
 // botão principal (amarelo) na tela, anel de foco com folga, ordem do Tab (título, Registrar, Iniciar mesmo
-// assim, Voltar), texto sem estourar e fonte mínima. Tarefa de teste própria, apagada no fim. Prints em
+// assim, Voltar), texto sem estourar e fonte mínima. Commit 2d: também os botões principais EM VOO (o "Registrar" do
+// aviso e o "Iniciar cronômetro", com aria-disabled): largura, alvo de 44px, sem disabled e contraste do texto. Tarefa de teste própria, apagada no fim. Prints em
 // tests/out/aviso-<tema>-<largura>.png (320 e 1280). Uso (raiz do repo):
 //   node --env-file=backend/.env tests/layout/cronometro-aviso-layout.mjs
 import pg from 'pg'
@@ -23,12 +24,46 @@ await pool.query('DELETE FROM tasks WHERE title = $1 AND id NOT IN (SELECT task_
 const taskId = (await pool.query("INSERT INTO tasks (title, frequency) VALUES ($1, 'none') RETURNING id", [TITLE])).rows[0].id
 // A sessão rodando do seed esconderia o botão Iniciar: pausada aqui e devolvida (a linha exata) no fim
 const seedSession = await pauseRunning(pool)
+// Contraste do botão em voo: o opacity-60 vale para o botão inteiro (texto e fundo clareiam juntos sobre o que está atrás)
+const busyMetrics = (label) => page_.evaluate((label) => {
+  const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === label)
+  if (!b) return null
+  const rgb = (css) => {
+    const c = document.createElement('canvas'); c.width = c.height = 1
+    const x = c.getContext('2d', { willReadFrequently: true })
+    x.fillStyle = '#000'; x.fillStyle = css; x.fillRect(0, 0, 1, 1)
+    return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3)
+  }
+  let a = b.parentElement, under = null
+  while (a) {
+    const bg = getComputedStyle(a).backgroundColor
+    if (bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') { under = rgb(bg); break }
+    a = a.parentElement
+  }
+  under ??= rgb('#ffffff')
+  const st = getComputedStyle(b), o = parseFloat(st.opacity)
+  const mix = (c) => c.map((v, i) => o * v + (1 - o) * under[i])
+  const lum = (c) => { const [r, g, bl] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * bl }
+  const fg = mix(rgb(st.color)), bg = mix(rgb(st.backgroundColor))
+  const [hi, lo] = [lum(fg), lum(bg)].sort((p, q) => q - p)
+  const r = b.getBoundingClientRect(), box = (b.closest('[role="alert"]') ?? b.closest('main')).getBoundingClientRect()
+  return { aria: b.getAttribute('aria-disabled'), disabledAttr: b.hasAttribute('disabled'), opacity: o, ratio: (hi + 0.05) / (lo + 0.05), height: Math.round(r.height), full: r.width >= box.width - 40, cursor: st.cursor }
+}, label)
 const widths = [320, 360, 375, 414, 640, 768, 1024, 1280]
-let browser
+let browser, page_
 try {
   browser = await launch({ executablePath: CHROME, ignoreDefaultArgs: ['--hide-scrollbars'] })
   const page = await browser.newPage()
+  page_ = page
   page.setDefaultTimeout(10000)
+  // O pedido de registro fica parado e depois falha (500): o botão fica em voo e NADA é gravado
+  await page.setRequestInterception(true)
+  page.on('request', (req) => {
+    if (req.method() === 'POST' && req.url() === `${APP}/api/executions`) {
+      return setTimeout(() => req.respond({ status: 500, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: '{"error":"falha"}' }), 900)
+    }
+    req.continue()
+  })
   const url = `${APP}/executar?tarefa=${taskId}`
   for (const scheme of ['light', 'dark']) {
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }])
@@ -109,6 +144,28 @@ try {
         seen.push(await page.evaluate(() => document.activeElement?.textContent.trim() ?? ''))
       }
       check(seen.join('|') === 'Registrar|Iniciar mesmo assim|Voltar', `${tag}: ordem do Tab ${seen}`)
+      // "Registrar" do aviso em voo
+      await page.evaluate(() => [...document.querySelectorAll('[role="alert"] button')].find((b) => b.textContent.trim() === 'Registrar').click())
+      await pause(250)
+      const busy = await busyMetrics('Registrar')
+      check(busy !== null && busy.aria === 'true' && !busy.disabledAttr, `${tag}: Registrar do aviso em voo sem aria-disabled/com disabled ${JSON.stringify(busy)}`)
+      check(busy !== null && busy.height >= 44 && busy.full, `${tag}: Registrar em voo mudou de tamanho ${JSON.stringify(busy)}`)
+      check(busy !== null && busy.ratio >= 4.5, `${tag}: contraste do Registrar em voo ${busy?.ratio?.toFixed(2)}`)
+      check(busy !== null && busy.opacity < 1 && busy.cursor === 'wait', `${tag}: Registrar em voo sem o sinal visual (opacidade ${busy?.opacity}, cursor ${busy?.cursor})`)
+      await pause(900)
+      // "Iniciar cronômetro" em voo (sem campos perdidos: parte de página limpa)
+      await page.goto(url, { waitUntil: 'networkidle0' })
+      await page.evaluate(() => sessionStorage.clear())
+      await page.goto(url, { waitUntil: 'networkidle0' })
+      await page.waitForSelector('main form[id^="registrar-"]')
+      await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Iniciar cronômetro').click())
+      await pause(250)
+      const busyStart = await busyMetrics('Iniciar cronômetro')
+      check(busyStart !== null && busyStart.aria === 'true' && !busyStart.disabledAttr, `${tag}: Iniciar em voo sem aria-disabled/com disabled ${JSON.stringify(busyStart)}`)
+      check(busyStart !== null && busyStart.height >= 44 && busyStart.full, `${tag}: Iniciar em voo mudou de tamanho ${JSON.stringify(busyStart)}`)
+      check(busyStart !== null && busyStart.ratio >= 4.5, `${tag}: contraste do Iniciar em voo ${busyStart?.ratio?.toFixed(2)}`)
+      check(busyStart !== null && busyStart.opacity < 1 && busyStart.cursor === 'wait', `${tag}: Iniciar em voo sem o sinal visual (opacidade ${busyStart?.opacity}, cursor ${busyStart?.cursor})`)
+      await pause(900)
     }
   }
 } catch (err) {
