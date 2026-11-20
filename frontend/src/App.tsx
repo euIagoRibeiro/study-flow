@@ -264,11 +264,13 @@ function App(props: { onLogout: () => Promise<void> }) {
     return execution.id
   }
 
-  async function stopTimer(timeEntryId: string) {
+  // true = pausou (a tela trava o Retomar por um instante); false = nada mudou
+  async function stopTimer(timeEntryId: string): Promise<boolean> {
     const entry = timeEntries.find((e) => e.id === timeEntryId)
-    if (!entry) return
+    if (!entry) return false
     try {
       replaceTimeEntry(await timeEntriesApi.stopTimeEntry(entry))
+      return true
     } catch (error) {
       console.error(error)
       // 400: o servidor diz o motivo (ex.: fim no futuro, relógio do aparelho)
@@ -279,6 +281,7 @@ function App(props: { onLogout: () => Promise<void> }) {
             ? `Não foi possível pausar: ${error.message} O cronômetro continua rodando.`
             : 'Não foi possível pausar. O cronômetro continua rodando.',
       )
+      return false
     }
   }
 

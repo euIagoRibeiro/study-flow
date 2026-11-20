@@ -197,6 +197,8 @@ try {
   await pause(300)
   f = await field()
   check('pausado: sem o "Durou" e sem aviso', !f.block && f.warning === null, JSON.stringify(f))
+  // Depois do Pausar o Retomar fica travado por 1,5 s (clique duplo): espera habilitar, sem clicar antes
+  await page.waitForFunction(() => { const b = [...document.querySelectorAll('main button')].find((x) => x.textContent.trim() === 'Retomar'); return b && !b.disabled })
   await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Retomar').click())
   await page.waitForFunction(() => [...document.querySelectorAll('main button')].some((b) => b.textContent.trim() === 'Pausar'))
   await pause(300)
@@ -330,7 +332,7 @@ try {
   await pool.query('UPDATE time_entries SET ended_at = now() WHERE id = $1', [r.entry.id])
   const retomarMsg = (error, status = 400) => fakeError((req) => req.method() === 'POST' && req.url().endsWith('/time-entries'), status, error, tapRetomar)
   shownBanner = await retomarMsg('Execução não encontrada ou já finalizada')
-  check('Retomar com 400 "já finalizada": a frase clara, sem o texto técnico', shownBanner === 'Este registro já foi finalizado.', shownBanner)
+  check('Retomar com 400 "já finalizada": a frase clara, sem o texto técnico', shownBanner === 'Este registro já foi finalizado ou não existe mais.', shownBanner)
   shownBanner = await retomarMsg('Qualquer outro motivo')
   check('Retomar com outro 400: a frase genérica, sem o corpo da resposta', shownBanner === 'Não foi possível retomar. Tente de novo.', shownBanner)
   shownBanner = await retomarMsg('Execução não encontrada ou já finalizada', 500)

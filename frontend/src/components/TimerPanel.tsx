@@ -1,6 +1,7 @@
 import {
   Fragment,
   useEffect,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -19,7 +20,7 @@ import {
   textareaClass,
 } from '../styles'
 import { phaseApplies } from '../phases'
-import { LONG_SESSION_MS, sessionEnd } from '../sessionEnd'
+import { LONG_SESSION_MS, sessionEnd, TOGGLE_GUARD_MS } from '../sessionEnd'
 import {
   executionSelection,
   indexTags,
@@ -328,6 +329,14 @@ function TimerPanel(props: {
   // Pausar/Retomar esperando o servidor: sem isso, clique duplo mandaria
   // duas requisições. Os erros deles o App já trata (aviso no Layout)
   const [busy, setBusy] = useState(false)
+  // Uma ação por vez: Pausar/Retomar e Finalizar não se sobrepõem. O estado (busy, submitting) só muda
+  // na próxima renderização: dois cliques no mesmo instante passariam por ele, então a ref decide
+  const working = busy || submitting
+  const inFlight = useRef(false)
+  // Depois de Pausar ou Retomar que deu certo, o botão que aparece fica travado por TOGGLE_GUARD_MS
+  const [guarded, setGuarded] = useState(false)
+  const guardTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(guardTimer.current), [])
 
   // Tempo das sessões já encerradas — derivado, igual à soma do Histórico
   const closedMs = entries
@@ -354,18 +363,31 @@ function TimerPanel(props: {
   const sessions = entries.length
 
   async function runTimerAction(action: () => Promise<unknown>) {
+    if (working || guarded || inFlight.current) return
+    inFlight.current = true
     setBusy(true)
+    let done: unknown
     try {
-      await action()
+      done = await action()
     } finally {
+      inFlight.current = false
       setBusy(false)
+    }
+    // Pausar devolve true e Retomar, o id da sessão nova; falhou: false / null (e nada trava)
+    if (done) {
+      setGuarded(true)
+      window.clearTimeout(guardTimer.current)
+      guardTimer.current = window.setTimeout(
+        () => setGuarded(false),
+        TOGGLE_GUARD_MS,
+      )
     }
   }
 
   // Se falhar, o cronômetro continua rodando: nada parou ainda
   async function handleFinish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (workoutBlocks) return
+    if (workoutBlocks || working || inFlight.current) return
     // Exercício sem série não seria gravado: avisa em vez de descartar
     const empty =
       marker !== null && emptyExerciseError(workout.draft, props.exercises)
@@ -409,6 +431,7 @@ function TimerPanel(props: {
         ? { linkUrl: url || null }
         : {}),
     }
+    inFlight.current = true
     setSubmitting(true)
     try {
       await onFinish(
@@ -437,6 +460,7 @@ function TimerPanel(props: {
       )
       return
     } finally {
+      inFlight.current = false
       setSubmitting(false)
     }
     setError('')
@@ -578,7 +602,7 @@ function TimerPanel(props: {
               runningEntry ? onStop(runningEntry.id) : onResume(execution.id),
             )
           }
-          disabled={busy}
+          disabled={working || guarded}
           className={`w-full ${secondaryButtonClass}`}
         >
           {runningEntry ? 'Pausar' : 'Retomar'}
@@ -647,7 +671,7 @@ function TimerPanel(props: {
         <button
           type="submit"
           form={`finalizar-${execution.id}`}
-          disabled={submitting || workoutBlocks}
+          disabled={working || workoutBlocks}
           className={`w-full ${primaryButtonClass}`}
         >
           Finalizar

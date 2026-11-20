@@ -13,9 +13,9 @@ const same = (name, got, want) => check(name, got === want, `obtido ${JSON.strin
 const SERVER_RESUME = 'Execução não encontrada ou já finalizada'
 const SERVER_END = 'O registro não pode terminar antes do início da sessão em andamento.'
 
-same('Retomar: "Execução não encontrada ou já finalizada" vira a frase da tela', timerErrorMessage(SERVER_RESUME), 'Este registro já foi finalizado.')
+same('Retomar: "Execução não encontrada ou já finalizada" vira a frase da tela', timerErrorMessage(SERVER_RESUME), 'Este registro já foi finalizado ou não existe mais.')
 same('Finalizar: a recusa do fim vira a frase da tela', timerErrorMessage(SERVER_END), 'Uma sessão foi retomada depois do horário que você escolheu para terminar. Pause o cronômetro e finalize de novo.')
-same('as constantes exportadas são as mesmas frases', [ALREADY_FINISHED, RESUMED_AFTER_END].join('|'), ['Este registro já foi finalizado.', 'Uma sessão foi retomada depois do horário que você escolheu para terminar. Pause o cronômetro e finalize de novo.'].join('|'))
+same('as constantes exportadas são as mesmas frases', [ALREADY_FINISHED, RESUMED_AFTER_END].join('|'), ['Este registro já foi finalizado ou não existe mais.', 'Uma sessão foi retomada depois do horário que você escolheu para terminar. Pause o cronômetro e finalize de novo.'].join('|'))
 same('as duas frases são diferentes (uma não se confunde com a outra)', ALREADY_FINISHED === RESUMED_AFTER_END, false)
 same('mensagem desconhecida: null', timerErrorMessage('A sessão não pode terminar no futuro.'), null)
 same('texto vazio: null', timerErrorMessage(''), null)

@@ -1,6 +1,7 @@
 // As frases do servidor sobre o cronômetro e o fim do registro, no texto da tela. Módulo SEM imports:
 // o teste de unidade (tests/unidade/timer-erros.mjs) o importa direto, sem navegador nem build.
-export const ALREADY_FINISHED = 'Este registro já foi finalizado.'
+export const ALREADY_FINISHED =
+  'Este registro já foi finalizado ou não existe mais.'
 export const RESUMED_AFTER_END =
   'Uma sessão foi retomada depois do horário que você escolheu para terminar. Pause o cronômetro e finalize de novo.'
 

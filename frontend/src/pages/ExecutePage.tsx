@@ -77,7 +77,7 @@ function ExecutePage(props: {
     link: WorkLink,
   ) => Promise<void>
   onStartTimer: (taskId: string, draft?: StartDraft) => Promise<string | null>
-  onStopTimer: (timeEntryId: string) => Promise<void>
+  onStopTimer: (timeEntryId: string) => Promise<boolean>
   onResumeTimer: (executionId: string) => Promise<string | null>
   onFinishExecution: (
     executionId: string,

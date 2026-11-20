@@ -4,6 +4,10 @@ import { parseMinutes } from './numbers'
 // (não bloqueia nada). O limite mora só aqui
 export const LONG_SESSION_MS = 2 * 60 * 60_000
 
+// Depois de Pausar ou Retomar (deu certo), o botão que aparece no lugar fica travado por este tempo:
+// o clique duplo no mesmo lugar é o acidente típico. Só vale pra troca feita na tela
+export const TOGGLE_GUARD_MS = 1500
+
 // "Durou" da sessão rodando (esqueci o cronômetro): o fim passa a ser início +
 // duração, e o "Quando" do registro é esse fim. Vazio = o Finalizar vale "agora"
 export function sessionEnd(
