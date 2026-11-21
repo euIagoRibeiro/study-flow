@@ -13,7 +13,7 @@ export type ChipOption<T extends string> = {
 function FilterChips<T extends string>(props: {
   label: string
   options: ChipOption<T>[]
-  value: T
+  value: T | null // null: nenhum chip marcado (outro filtro está valendo no lugar)
   onChange: (value: T) => void
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null)

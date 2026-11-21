@@ -32,7 +32,7 @@ const groups = {
     's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs', 's5-lapis.mjs', 'selecao-menu.mjs', 'selecao-resumo-envio.mjs', 's6-chips.mjs', 'o3-obras.mjs',
     'o4a-registrar.mjs', 'o4b-painel.mjs', 'o4c-lapis.mjs', 'o4d-chips.mjs', 'tempo-painel.mjs', 'o5-executar.mjs', 'lapis-segundos.mjs',
     'estimativa-segundos.mjs', 'treino-ordem.mjs', 'mesma-origem.mjs', 'entrada.mjs', 'historico-segundos.mjs',
-    'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs', 'medidas-linhas.mjs', 'cronometro-trava.mjs', 'registrar-trava.mjs',
+    'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs', 'medidas-linhas.mjs', 'cronometro-trava.mjs', 'registrar-trava.mjs', 'historico-filtros.mjs', 'historico-dia.mjs',
   ],
   // Funções puras do frontend (módulos sem imports): sem banco, API, seed nem navegador
   unidade: ['medidas-texto.mjs', 'timer-erros.mjs', 'manual-campos.mjs', 'calendario.mjs'],
@@ -41,7 +41,7 @@ const groups = {
     'm5-layout.mjs', 'a3d-layout.mjs', 'a3e-layout.mjs', 'a3f-layout.mjs', 'topo.mjs',
     'painel-layout.mjs', 'painel-contraste.mjs', 's4-layout.mjs', 's5-layout.mjs', 'selecao-menu-layout.mjs', 'sessao-excluir-layout.mjs', 's6-layout.mjs',
     'o3-layout.mjs', 'o4a-layout.mjs', 'o4b-layout.mjs', 'o4c-layout.mjs', 'o4d-layout.mjs', 'tempo-layout.mjs', 'o5-layout.mjs',
-    'estimativa-layout.mjs', 'entrada.mjs', 'descricao-layout.mjs', 'medidas-layout.mjs', 'medidas-linhas-layout.mjs', 'cronometro-aviso-layout.mjs',
+    'estimativa-layout.mjs', 'entrada.mjs', 'descricao-layout.mjs', 'medidas-layout.mjs', 'medidas-linhas-layout.mjs', 'cronometro-aviso-layout.mjs', 'historico-dia-layout.mjs',
   ],
 }
 const PG_CONTAINER = process.env.PG_CONTAINER ?? 'study-flow-postgres-1'

@@ -1,10 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
+import { isDayKey, parseDayKey } from '../calendar'
 import ExecutionHistory from '../components/ExecutionHistory'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
 import FrequencySelect, {
   type FrequencyFilter,
 } from '../components/FrequencySelect'
-import { matchesPeriod, type PeriodFilter } from '../dates'
+import {
+  formatDayLabel,
+  localDayKey,
+  matchesPeriod,
+  type PeriodFilter,
+} from '../dates'
+import { focusRing } from '../styles'
 import type {
   Measure,
   Selection,
@@ -32,6 +40,16 @@ function isCompleted(
   return execution.completedAt !== null
 }
 
+// "hoje", "ontem", "sex, 20 nov": o rótulo do dia em minúscula
+function dayText(day: string): string {
+  const d = parseDayKey(day)
+  if (!d) return day
+  const label = formatDayLabel(
+    new Date(d.year, d.month - 1, d.day, 12).toISOString(),
+  )
+  return label.charAt(0).toLowerCase() + label.slice(1)
+}
+
 function HistoricoPage(props: {
   executions: TaskExecution[]
   timeEntries: TimeEntry[]
@@ -52,29 +70,96 @@ function HistoricoPage(props: {
 }) {
   const [period, setPeriod] = useState<PeriodFilter>('all')
   const [frequency, setFrequency] = useState<FrequencyFilter>('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [cleared, setCleared] = useState(0)
+  const filtersRef = useRef<HTMLDivElement>(null)
 
+  // ?dia=AAAA-MM-DD (dia LOCAL, o mesmo do agrupamento); inválido é ignorado sem erro
+  const rawDay = searchParams.get('dia')
+  const day = rawDay !== null && isDayKey(rawDay) ? rawDay : null
+
+  // O dia substitui o Período (o estado dele fica guardado); a Frequência continua valendo
   const filtered = props.executions.filter(isCompleted).filter(
     (execution) =>
-      matchesPeriod(execution.completedAt, period) &&
+      (day !== null
+        ? localDayKey(execution.completedAt) === day
+        : matchesPeriod(execution.completedAt, period)) &&
       // Filtra pelo snapshot (taskFrequencyAtTime), nunca pela frequência
       // atual da tarefa — mesmo princípio do resto do app
       (frequency === 'all' || execution.taskFrequencyAtTime === frequency),
   )
 
+  // Tocar num chip de Período (até o que já está guardado) sai do filtro por dia,
+  // e remove o parâmetro mesmo quando ele era inválido
+  function dropDayParam() {
+    if (!searchParams.has('dia')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('dia')
+    setSearchParams(next, { replace: true })
+  }
+
+  function clearDay() {
+    dropDayParam()
+    setCleared((n) => n + 1)
+  }
+
+  // O botão "Limpar" some: o foco vai ao chip do Período que volta a valer
+  useEffect(() => {
+    if (cleared === 0) return
+    const label = periodOptions.find((o) => o.value === period)?.label
+    const chip = [
+      ...(filtersRef.current?.querySelectorAll('[role="group"] button') ?? []),
+    ].find((b) => b.textContent?.trim() === label)
+    ;(chip as HTMLElement | undefined)?.focus()
+    // só quando o "Limpar" é tocado: o Período em si não deve refocar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleared])
+
+  const when = day === null ? '' : dayText(day)
+  const emptyDay = `Nenhum registro ${
+    when === 'hoje' || when === 'ontem' ? when : `em ${when}`
+  }${frequency === 'all' ? '' : ' com essa frequência'}.`
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5 border-b border-linha pb-3.5">
+      <div
+        ref={filtersRef}
+        className="flex flex-col gap-1.5 border-b border-linha pb-3.5"
+      >
         <FilterChips
           label="Período"
           options={periodOptions}
-          value={period}
-          onChange={setPeriod}
+          value={day === null ? period : null}
+          onChange={(value) => {
+            setPeriod(value)
+            dropDayParam()
+          }}
         />
+        {day !== null && (
+          <div className="flex flex-wrap items-center gap-x-3 font-dados text-meta text-tinta-suave">
+            <span>
+              Dia:{' '}
+              <span className="font-interface text-sm font-semibold text-tinta">
+                {when}
+              </span>
+            </span>
+            <button
+              type="button"
+              aria-label="Limpar filtro do dia"
+              onClick={clearDay}
+              className={`inline-flex min-h-11 items-center rounded-md px-1 font-interface text-sm font-medium text-tinta underline decoration-dotted underline-offset-2 ${focusRing}`}
+            >
+              Limpar
+            </button>
+          </div>
+        )}
         <FrequencySelect value={frequency} onChange={setFrequency} />
       </div>
       {filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-tinta-suave">
-          Nenhuma execução encontrada com esses filtros.
+          {day === null
+            ? 'Nenhuma execução encontrada com esses filtros.'
+            : emptyDay}
         </p>
       ) : (
         <ExecutionHistory
