@@ -11,6 +11,8 @@ const KEEP = 40
 const SHOW = 15
 // Uma vez por processo, de qualquer instância: a 1ª falha explica, as seguintes costumam ser consequência
 let printed = false
+// Hora absoluta em UTC (com Z), a mesma da sonda do servidor: serve para casar o bloco com o log dela
+const iso = (ms) => new Date(ms).toISOString()
 
 export function createDiagnostico() {
   const log = []
@@ -49,12 +51,12 @@ export function createDiagnostico() {
     print(name) {
       if (printed) return
       printed = true
-      console.log(`DIAGNÓSTICO da falha "${name}": memória livre ${(freemem() / 1024 ** 3).toFixed(2)} GB`)
       const now = Date.now()
+      console.log(`DIAGNÓSTICO da falha "${name}" às ${iso(now)}: memória livre ${(freemem() / 1024 ** 3).toFixed(2)} GB`)
       // As últimas linhas e, mesmo que os pedidos as tenham empurrado pra longe, as 3 últimas navegações
       const recent = log.slice(-SHOW)
       const navigations = log.filter((e) => e.text.startsWith('navegou: ')).slice(-3).filter((e) => !recent.includes(e))
-      for (const e of [...navigations, ...recent]) console.log(`  -${now - e.at}ms ${e.text} ${e.end}`)
+      for (const e of [...navigations, ...recent]) console.log(`  -${now - e.at}ms ${iso(e.at)} ${e.text} ${e.end}`)
       if (log.length === 0) console.log('  nenhum pedido registrado')
     },
   }
