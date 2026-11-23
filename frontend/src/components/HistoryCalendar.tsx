@@ -107,7 +107,7 @@ function HistoryCalendar(props: {
   const empty = props.dayCounts.size === 0
   const prevOff = !canShiftMonth(shown, -1, bounds)
   const nextOff = !canShiftMonth(shown, 1, bounds)
-  const arrowClass = `flex h-11 w-11 items-center justify-center rounded-xl text-tinta hover:bg-tinta/[0.07] aria-disabled:cursor-default aria-disabled:text-tinta-suave aria-disabled:opacity-60 aria-disabled:hover:bg-transparent ${focusRing}`
+  const arrowClass = `flex h-11 w-11 items-center justify-center rounded-xl text-tinta hover:bg-tinta/[0.07] aria-disabled:cursor-default aria-disabled:text-tinta-suave aria-disabled:opacity-75 aria-disabled:hover:bg-transparent ${focusRing}`
 
   return (
     <div
