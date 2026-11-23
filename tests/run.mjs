@@ -32,7 +32,7 @@ const groups = {
     's4-selecoes.mjs', 's5-forms.mjs', 's5-painel.mjs', 's5-lapis.mjs', 'selecao-menu.mjs', 'selecao-resumo-envio.mjs', 's6-chips.mjs', 'o3-obras.mjs',
     'o4a-registrar.mjs', 'o4b-painel.mjs', 'o4c-lapis.mjs', 'o4d-chips.mjs', 'tempo-painel.mjs', 'o5-executar.mjs', 'lapis-segundos.mjs',
     'estimativa-segundos.mjs', 'treino-ordem.mjs', 'mesma-origem.mjs', 'entrada.mjs', 'historico-segundos.mjs',
-    'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs', 'medidas-linhas.mjs', 'cronometro-trava.mjs', 'registrar-trava.mjs', 'historico-filtros.mjs', 'historico-dia.mjs',
+    'descricao-quebra.mjs', 'sessao-excluir.mjs', 'medidas-painel.mjs', 'medidas-linhas.mjs', 'cronometro-trava.mjs', 'registrar-trava.mjs', 'historico-filtros.mjs', 'historico-dia.mjs', 'historico-calendario.mjs',
   ],
   // Funções puras do frontend (módulos sem imports): sem banco, API, seed nem navegador
   unidade: ['medidas-texto.mjs', 'timer-erros.mjs', 'manual-campos.mjs', 'calendario.mjs'],

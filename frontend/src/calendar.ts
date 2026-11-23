@@ -4,7 +4,14 @@ export type DayKey = string
 export type MonthKey = string
 export type MonthBounds = { min: MonthKey; max: MonthKey }
 export type ArrowKey =
-  'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'PageUp' | 'PageDown'
+  | 'ArrowLeft'
+  | 'ArrowRight'
+  | 'ArrowUp'
+  | 'ArrowDown'
+  | 'PageUp'
+  | 'PageDown'
+  | 'Home'
+  | 'End'
 
 const pad = (n: number, size = 2) => String(n).padStart(size, '0')
 
@@ -98,6 +105,15 @@ export function moveDay(key: DayKey, delta: number): DayKey {
   return civilFromDays(toDays(key) + delta)
 }
 
+// Segunda e domingo da semana do dia
+export function weekStart(key: DayKey): DayKey {
+  return moveDay(key, -weekdayIndex(key))
+}
+
+export function weekEnd(key: DayKey): DayKey {
+  return moveDay(key, 6 - weekdayIndex(key))
+}
+
 export function shiftMonth(month: MonthKey, delta: number): MonthKey {
   const m = parseMonthKey(month)
   if (!m) throw new Error(`mês inválido: ${month}`)
@@ -176,7 +192,7 @@ export function canShiftMonth(
   return target >= bounds.min && target <= bounds.max
 }
 
-// Setas andam por TODOS os dias (os vazios também); PageUp/PageDown, um mês
+// Setas andam por TODOS os dias (os vazios também); PageUp/PageDown, um mês; Home/End, a semana
 export function moveFromKey(key: DayKey, arrow: ArrowKey): DayKey {
   switch (arrow) {
     case 'ArrowLeft':
@@ -191,6 +207,10 @@ export function moveFromKey(key: DayKey, arrow: ArrowKey): DayKey {
       return moveMonthKeepingDay(key, -1)
     case 'PageDown':
       return moveMonthKeepingDay(key, 1)
+    case 'Home':
+      return weekStart(key)
+    case 'End':
+      return weekEnd(key)
   }
 }
 
@@ -210,6 +230,28 @@ const MONTH_NAMES = [
   'nov',
   'dez',
 ]
+
+const MONTH_FULL = [
+  'janeiro',
+  'fevereiro',
+  'março',
+  'abril',
+  'maio',
+  'junho',
+  'julho',
+  'agosto',
+  'setembro',
+  'outubro',
+  'novembro',
+  'dezembro',
+]
+
+// "novembro de 2026"
+export function monthTitle(month: MonthKey): string {
+  const m = parseMonthKey(month)
+  if (!m) throw new Error(`mês inválido: ${month}`)
+  return `${MONTH_FULL[m.month - 1]} de ${m.year}`
+}
 
 // "sex, 19 set, 3 registros" / "sex, 19 set, 1 registro" / "sex, 19 set, sem registro"
 export function dayAriaLabel(key: DayKey, count: number): string {

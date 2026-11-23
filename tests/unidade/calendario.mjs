@@ -13,11 +13,14 @@ import {
   monthBounds,
   monthGrid,
   monthOf,
+  monthTitle,
   moveDay,
   moveFromKey,
   moveMonthKeepingDay,
   parseDayKey,
   shiftMonth,
+  weekEnd,
+  weekStart,
   weekdayIndex,
 } from '../../frontend/src/calendar.ts'
 import { formatDayLabel } from '../../frontend/src/dates.ts'
@@ -30,6 +33,7 @@ const check = (name, ok, detail = '') => {
 const same = (name, got, want) =>
   check(name, JSON.stringify(got) === JSON.stringify(want), `obtido ${JSON.stringify(got)}, esperado ${JSON.stringify(want)}`)
 
+const throws = (fn) => { try { fn(); return false } catch { return true } }
 const p2 = (n) => String(n).padStart(2, '0')
 const keyOf = (ms) => {
   const d = new Date(ms)
@@ -42,7 +46,7 @@ const DAY = 86400000
 // ---- oráculo: Date.UTC, todos os dias de 1900-01-01 a 2200-12-31
 const FIRST = utc(1900, 1, 1)
 const LAST = utc(2200, 12, 31)
-const bad = { weekday: [], isDay: [], moveDay: [], keepDay: [], parse: [], aria: [] }
+const bad = { weekday: [], isDay: [], moveDay: [], keepDay: [], parse: [], aria: [], week: [] }
 let days = 0
 // formatDayLabel de um "agora" em outro ano devolve "sex, 19 set 2026" (sem Hoje/Ontem)
 const farNow = new Date(1800, 0, 1)
@@ -52,6 +56,9 @@ for (let ms = FIRST; ms <= LAST; ms += DAY) {
   const date = new Date(ms)
   if (weekdayIndex(key) !== (date.getUTCDay() + 6) % 7) bad.weekday.push(key)
   if (!isDayKey(key)) bad.isDay.push(key)
+  const back = (date.getUTCDay() + 6) % 7
+  if (weekStart(key) !== keyOf(ms - back * DAY) || weekEnd(key) !== keyOf(ms + (6 - back) * DAY)) bad.week.push(key)
+  if (moveFromKey(key, 'Home') !== keyOf(ms - back * DAY) || moveFromKey(key, 'End') !== keyOf(ms + (6 - back) * DAY)) bad.week.push(`tecla ${key}`)
   const parsed = parseDayKey(key)
   if (!parsed || dayKey(parsed.year, parsed.month, parsed.day) !== key) bad.parse.push(key)
   for (const delta of [-1, 1, -7, 7, -31, 45]) {
@@ -71,6 +78,7 @@ check('todos os dias de 1900 a 2200 percorridos', days === 109938, `${days}`)
 same('weekdayIndex = Date.UTC em todos os dias (segunda = 0)', bad.weekday.slice(0, 3), [])
 same('isDayKey aceita todos os dias reais e parseDayKey/dayKey fazem a volta', [bad.isDay.length, bad.parse.length], [0, 0])
 same('moveDay (±1, ±7, -31, +45) = Date.UTC em todos os dias', bad.moveDay.slice(0, 3), [])
+same('weekStart/weekEnd (e as teclas Home/End) = Date.UTC em todos os dias: segunda a domingo', bad.week.slice(0, 3), [])
 same('moveMonthKeepingDay (±1, -12, +13) = Date.UTC com o dia ajustado, em todos os dias', bad.keepDay.slice(0, 3), [])
 same('dayAriaLabel: nomes de dia e mês = formatDayLabel de dates.ts, em todos os dias', bad.aria.slice(0, 3), [])
 
@@ -151,6 +159,13 @@ same('ArrowUp/Down: ±7 dias, passando de mês e de ano', [moveFromKey('2026-11-
 same('as setas andam por TODOS os dias: a sequência de 1 dia nunca pula', Array.from({ length: 10 }).reduce((acc) => [...acc, moveFromKey(acc.at(-1), 'ArrowRight')], ['2026-02-25']), ['2026-02-25', '2026-02-26', '2026-02-27', '2026-02-28', '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05', '2026-03-06', '2026-03-07'])
 same('PageUp/PageDown: um mês, com o dia ajustado', [moveFromKey('2026-03-31', 'PageUp'), moveFromKey('2026-01-31', 'PageDown')], ['2026-02-28', '2026-02-28'])
 
+// semana à mão (segunda a domingo)
+same('sexta 2026-11-20: semana de 16 a 22', [weekStart('2026-11-20'), weekEnd('2026-11-20')], ['2026-11-16', '2026-11-22'])
+same('segunda é o início dela mesma e domingo é o fim dele mesmo', [weekStart('2026-11-16'), weekEnd('2026-11-22'), weekEnd('2026-11-16'), weekStart('2026-11-22')], ['2026-11-16', '2026-11-22', '2026-11-22', '2026-11-16'])
+same('semana que atravessa o ano: 2027-01-01 = de 28/12 a 03/01', [weekStart('2027-01-01'), weekEnd('2027-01-01')], ['2026-12-28', '2027-01-03'])
+same('semana de 29/02/2028 (terça): de 28/02 a 05/03', [weekStart('2028-02-29'), weekEnd('2028-02-29')], ['2028-02-28', '2028-03-05'])
+same('Home e End: a semana do dia', [moveFromKey('2026-11-20', 'Home'), moveFromKey('2026-11-20', 'End')], ['2026-11-16', '2026-11-22'])
+
 // rótulo
 same('rótulo: vários registros', dayAriaLabel('2026-11-20', 3), 'sex, 20 nov, 3 registros')
 same('rótulo: um registro (singular)', dayAriaLabel('2026-11-20', 1), 'sex, 20 nov, 1 registro')
@@ -158,8 +173,11 @@ same('rótulo: nenhum registro', dayAriaLabel('2026-11-22', 0), 'dom, 22 nov, se
 same('rótulo: domingo e sábado', [dayAriaLabel('2026-11-21', 2), dayAriaLabel('2026-11-22', 2)], ['sáb, 21 nov, 2 registros', 'dom, 22 nov, 2 registros'])
 same('rótulo: 29/02 de ano bissexto', dayAriaLabel('2028-02-29', 1), 'ter, 29 fev, 1 registro')
 
+// título do mês (cabeçalho do calendário)
+same('monthTitle: os 12 meses por extenso, com o ano', Array.from({ length: 12 }, (_, i) => monthTitle(`2026-${String(i + 1).padStart(2, '0')}`)).join('|'), 'janeiro de 2026|fevereiro de 2026|março de 2026|abril de 2026|maio de 2026|junho de 2026|julho de 2026|agosto de 2026|setembro de 2026|outubro de 2026|novembro de 2026|dezembro de 2026')
+same('monthTitle: ano de 4 dígitos e mês inválido lança erro', [monthTitle('1999-12'), throws(() => monthTitle('2026-13'))], ['dezembro de 1999', true])
+
 // erros claros em vez de data inventada
-const throws = (fn) => { try { fn(); return false } catch { return true } }
 same('dia ou mês inválido lança erro (nunca inventa uma data)', [throws(() => moveDay('2026-02-30', 1)), throws(() => shiftMonth('2026-13', 1)), throws(() => monthGrid('lixo')), throws(() => dayAriaLabel('x', 1)), throws(() => moveMonthKeepingDay('x', 1)), throws(() => weekdayIndex('2026-02-30'))], Array(6).fill(true))
 
 const ok = results.filter(Boolean).length

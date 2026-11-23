@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { isDayKey, parseDayKey } from '../calendar'
+import { countByDay, isDayKey, parseDayKey } from '../calendar'
 import ExecutionHistory from '../components/ExecutionHistory'
 import FilterChips, { type ChipOption } from '../components/FilterChips'
+import HistoryCalendar from '../components/HistoryCalendar'
 import FrequencySelect, {
   type FrequencyFilter,
 } from '../components/FrequencySelect'
@@ -12,7 +13,7 @@ import {
   matchesPeriod,
   type PeriodFilter,
 } from '../dates'
-import { focusRing } from '../styles'
+import { focusRing, secondaryButtonClass } from '../styles'
 import type {
   Measure,
   Selection,
@@ -73,6 +74,9 @@ function HistoricoPage(props: {
   const [searchParams, setSearchParams] = useSearchParams()
   const [cleared, setCleared] = useState(0)
   const filtersRef = useRef<HTMLDivElement>(null)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const calendarButton = useRef<HTMLButtonElement>(null)
+  const calendarId = useId()
 
   // ?dia=AAAA-MM-DD (dia LOCAL, o mesmo do agrupamento); inválido é ignorado sem erro
   const rawDay = searchParams.get('dia')
@@ -88,6 +92,33 @@ function HistoricoPage(props: {
       // atual da tarefa — mesmo princípio do resto do app
       (frequency === 'all' || execution.taskFrequencyAtTime === frequency),
   )
+
+  // Os dias com registro: filtrados só pela Frequência (nem o Período nem o dia entram)
+  const dayCounts = countByDay(
+    props.executions
+      .filter(isCompleted)
+      .filter(
+        (execution) =>
+          frequency === 'all' || execution.taskFrequencyAtTime === frequency,
+      )
+      .map((execution) => localDayKey(execution.completedAt)),
+  )
+
+  function closeCalendar() {
+    setCalendarOpen(false)
+    calendarButton.current?.focus()
+  }
+
+  // Escolher um dia entra no histórico do navegador (o Voltar abre o anterior); o dia que já
+  // está ativo só fecha o calendário
+  function pickDay(key: string) {
+    if (key !== day) {
+      const next = new URLSearchParams(searchParams)
+      next.set('dia', key)
+      setSearchParams(next)
+    }
+    closeCalendar()
+  }
 
   // Tocar num chip de Período (até o que já está guardado) sai do filtro por dia,
   // e remove o parâmetro mesmo quando ele era inválido
@@ -135,6 +166,32 @@ function HistoricoPage(props: {
             dropDayParam()
           }}
         />
+        <button
+          ref={calendarButton}
+          type="button"
+          aria-expanded={calendarOpen}
+          aria-controls={calendarOpen ? calendarId : undefined}
+          onClick={() => setCalendarOpen((open) => !open)}
+          className={`self-start ${secondaryButtonClass}`}
+        >
+          Calendário
+        </button>
+        {calendarOpen && (
+          <div id={calendarId}>
+            <HistoryCalendar
+              dayCounts={dayCounts}
+              activeDay={day}
+              todayKey={localDayKey(new Date().toISOString())}
+              emptyText={
+                frequency === 'all'
+                  ? 'Nenhum registro ainda.'
+                  : 'Nenhum registro com essa frequência.'
+              }
+              onPick={pickDay}
+              onClose={closeCalendar}
+            />
+          </div>
+        )}
         {day !== null && (
           <div className="flex flex-wrap items-center gap-x-3 font-dados text-meta text-tinta-suave">
             <span>
