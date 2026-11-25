@@ -22,7 +22,8 @@ const groups = {
     'obra-corrida-test.mjs', 'o2c-test.mjs', 'fk-catalogo-test.mjs', 'seed-obras.mjs', 'tempo-test.mjs', 'host-test.mjs',
     'estimativa-segundos-test.mjs', 'auth-test.mjs', 'rotas-fechadas-test.mjs',
     'protecoes-test.mjs', 'db-ssl-test.mjs', 'cache-test.mjs', 'vercel-config-test.mjs',
-    'run-uso-test.mjs', 'sessao-excluir-test.mjs', 'sessao-corrida-test.mjs', 'medidas-painel-test.mjs', 'medidas-contexto-test.mjs'],
+    'run-uso-test.mjs', 'sessao-excluir-test.mjs', 'sessao-corrida-test.mjs', 'medidas-painel-test.mjs', 'medidas-contexto-test.mjs',
+    'server-timeouts-test.mjs'],
   telas: [
     'p4a-tags.mjs', 'p4b-forms.mjs', 'a1d-forms.mjs', 'minutes-fix.mjs',
     'm4-tags.mjs', 'm5-forms.mjs', 'chip-fix.mjs', 'a3d-tags.mjs', 'a3e1.mjs',
