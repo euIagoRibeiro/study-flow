@@ -69,8 +69,12 @@ db=$(prepare_target "$RESTORE_URL")
 target=$(db_url "$RESTORE_URL" "$db")
 pg_dump "$src" --snapshot="$snapshot" --enable-row-security --schema=public -Fc |
   tee "$tmp/cifrar" |
-  pg_restore --exit-on-error --single-transaction -d "$target" ||
+  pg_restore --exit-on-error --single-transaction -d "$target" 2>"$tmp/restore.err" || {
+  cat "$tmp/restore.err" >&2
+  explain_restore_failure "$tmp/restore.err"
   fail "dump ou restauração de teste falhou"
+}
+[ ! -s "$tmp/restore.err" ] || cat "$tmp/restore.err" >&2
 wait "$age_pid" || fail "o age falhou"
 [ "$(head -c 21 "$OUT/$name")" = "age-encryption.org/v1" ] || fail "o arquivo não saiu cifrado"
 

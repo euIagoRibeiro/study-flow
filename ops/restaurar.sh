@@ -4,8 +4,8 @@
 #   BACKUP_FILE   o arquivo .dump.age baixado do Actions
 #   AGE_IDENTITY  o arquivo da chave PRIVADA age (fica na máquina do Iago)
 #   RESTORE_URL   o servidor de restauração (banco de manutenção; cria um banco novo)
-# Cria os papéis studyflow_api e studyflow_backup SEM login antes do pg_restore
-# (as políticas e os GRANT do dump os citam) e nunca apaga um banco que existe.
+# Cria os papéis studyflow_api e studyflow_backup e os do Supabase (SUPABASE_ROLES) SEM login antes do
+# pg_restore (as políticas, os GRANT e os privilégios padrão do dump os citam) e nunca apaga um banco que existe.
 # Imprime contagem e md5 por tabela e a conferência de RLS e políticas
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -17,9 +17,15 @@ need BACKUP_FILE AGE_IDENTITY RESTORE_URL
 
 db=$(prepare_target "$RESTORE_URL")
 target=$(db_url "$RESTORE_URL" "$db")
+err=$(mktemp)
+trap 'rm -f "$err"' EXIT
 age -d -i "$AGE_IDENTITY" "$BACKUP_FILE" |
-  pg_restore --exit-on-error --single-transaction -d "$target" ||
+  pg_restore --exit-on-error --single-transaction -d "$target" 2>"$err" || {
+  cat "$err" >&2
+  explain_restore_failure "$err"
   fail "a restauração falhou"
+}
+[ ! -s "$err" ] || cat "$err" >&2
 echo "banco restaurado: $db"
 restored_sums "$target"
 check_restored "$target"

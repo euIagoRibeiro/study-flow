@@ -3,10 +3,13 @@
 // "origem" (SSL com uma CA de teste, as 15 migrações e o seed, studyflow_backup
 // com login e senha aleatória), "restaurado" (o servidor de serviço do job) e
 // "sem-papeis" (um cluster onde studyflow_api e studyflow_backup não existem).
+// "sem-supabase" (um cluster sem nenhum papel, só pro cenário do Supabase).
 // Chave age descartável, CA e certificados numa pasta temporária apagada no fim,
 // como os contêineres, a rede e a imagem com o age. Cenários: backup normal (o
 // arquivo cifrado, a restauração sem os papéis falha e com o restaurar.sh bate
-// com o dono), gravação concorrente durante o backup, sslmode na URL, outra CA,
+// com o dono), origem estilo Supabase (os 8 papéis de SUPABASE_ROLES e privilégios padrão
+// citados pelo dump: sem eles a restauração falha, com o restaurar.sh passa, e um papel fora
+// da lista faz a restauração falhar NOMEANDO o papel), gravação concorrente durante o backup, sslmode na URL, outra CA,
 // tabela sem a política, política que não lê tudo, URL de outro papel; nenhuma
 // saída mostra a senha nem a URL. Uso (raiz do repo, com o Docker):
 //   node tests/ferramentas/backup-local.mjs
@@ -24,7 +27,7 @@ const REAL_OPS = join(ROOT, 'ops')
 const IMAGE = 'postgres:17.11'
 const RUNNER = 'studyflow-backup-teste-runner'
 const NET = 'studyflow-backup-teste'
-const C = { origem: 'sfb-origem', restaurado: 'sfb-restaurado', semPapeis: 'sfb-sem-papeis' }
+const C = { origem: 'sfb-origem', restaurado: 'sfb-restaurado', semPapeis: 'sfb-sem-papeis', semSupabase: 'sfb-sem-supabase' }
 const results = []
 const check = (name, ok, detail = '') => {
   results.push(ok)
@@ -40,19 +43,20 @@ const leaks = (text) => text.includes(pwBackup) || text.includes(pwPostgres) || 
 const backupUrl = (user = 'studyflow_backup', pw = pwBackup) => `postgresql://${user}:${pw}@origem:5432/postgres`
 const RESTORE = 'postgresql://postgres@restaurado:5432/postgres?sslmode=disable'
 const SEM_PAPEIS = 'postgresql://postgres@sem-papeis:5432/postgres?sslmode=disable'
+const SEM_SUPABASE = 'postgresql://postgres@sem-supabase:5432/postgres?sslmode=disable'
 
 // Roda no contêiner com o age; segredos só pelo ambiente do processo (-e NOME)
-function inRunner(script, env = {}) {
+function inRunner(script, env = {}, opsDir = OPS) {
   const names = Object.keys(env)
-  const args = ['run', '--rm', '--network', NET, '-v', `${OPS}:/ops:ro`, '-v', `${join(work, 'certs')}:/certs:ro`,
+  const args = ['run', '--rm', '--network', NET, '-v', `${opsDir}:/ops:ro`, '-v', `${join(work, 'certs')}:/certs:ro`,
     '-v', `${join(work, 'keys')}:/keys`, '-v', `${join(work, 'out')}:/out`, ...names.flatMap((n) => ['-e', n]),
     RUNNER, 'bash', '-c', script]
   const r = docker(args, { env: { ...process.env, ...env } })
   return { code: r.status, out: `${r.stdout}${r.stderr}` }
 }
-const runBackup = (over = {}) => inRunner('bash /ops/backup.sh', {
+const runBackup = (over = {}, opsDir = OPS) => inRunner('bash /ops/backup.sh', {
   BACKUP_DATABASE_URL: backupUrl(), AGE_RECIPIENT: recipient, PGSSLROOTCERT: '/certs/ca.crt', RESTORE_URL: RESTORE, OUT: '/out', ...over,
-})
+}, opsDir)
 const psqlOrigem = (sql) => docker(['exec', '-i', C.origem, 'psql', '-U', 'postgres', '-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1'], { input: sql })
 const ownerSums = () => docker(['exec', '-i', C.origem, 'bash', '-c',
   'source /ops-real/restauro-comum.sh; restored_sums "postgresql:///postgres?host=/var/run/postgresql&user=postgres"']).stdout.trim()
@@ -109,6 +113,7 @@ try {
   // (POSTGRES_PASSWORD vem do ambiente do docker, não da linha de comando)
   up(C.restaurado, 'restaurado', ['-e', 'POSTGRES_HOST_AUTH_METHOD=trust', IMAGE])
   up(C.semPapeis, 'sem-papeis', ['-e', 'POSTGRES_HOST_AUTH_METHOD=trust', IMAGE])
+  up(C.semSupabase, 'sem-supabase', ['-e', 'POSTGRES_HOST_AUTH_METHOD=trust', IMAGE])
   await Promise.all(Object.values(C).map(waitReady))
 
   for (const f of readdirSync(join(ROOT, 'backend', 'migrations')).sort()) {
@@ -150,6 +155,59 @@ try {
   const made = docker(['exec', C.semPapeis, 'psql', '-U', 'postgres', '-X', '-A', '-t', '-c',
     "SELECT string_agg(rolname || ':' || rolcanlogin, ',' ORDER BY rolname) FROM pg_roles WHERE rolname LIKE 'studyflow_%'"]).stdout.trim()
   check('restaurar.sh criou os dois papéis SEM login', made === 'studyflow_api:false,studyflow_backup:false', made)
+
+  // ---- 1b. origem estilo Supabase: os papéis e os privilégios padrão que um dump do Supabase cita (SUPABASE_ROLES, ops/restauro-comum.sh)
+  const SB = ['anon', 'authenticated', 'service_role', 'supabase_admin', 'authenticator', 'supabase_auth_admin', 'supabase_storage_admin', 'dashboard_user']
+  const sbHere = () => docker(['exec', C.semSupabase, 'psql', '-U', 'postgres', '-X', '-A', '-t', '-c',
+    `SELECT string_agg(rolname || ':' || rolcanlogin, ',' ORDER BY rolname COLLATE "C") FROM pg_roles WHERE rolname IN (${SB.map((r) => `'${r}'`).join(',')})`]).stdout.trim()
+  check('"sem-supabase" começa sem nenhum dos 8 papéis do Supabase', sbHere() === '', sbHere())
+  const sbSetup = psqlOrigem(`${SB.map((r) => `CREATE ROLE ${r} NOLOGIN;`).join(' ')}
+    GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+    ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+    ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+    ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+    GRANT SELECT ON public.tasks TO authenticator, supabase_auth_admin, supabase_storage_admin, dashboard_user;`)
+  check('origem estilo Supabase preparada (8 papéis, privilégios padrão e GRANTs)', sbSetup.status === 0, sbSetup.stderr)
+  const sbBackup = runBackup()
+  check('backup da origem estilo Supabase: saída 0 e "OK: 17 tabelas" (o alvo de teste do backup.sh recebe os papéis)',
+    sbBackup.code === 0 && /OK: 17 tabelas, \d+ linhas/.test(sbBackup.out), sbBackup.out)
+  const sbFile = readdirSync(join(work, 'out')).filter((f) => f.endsWith('.dump.age')).sort().at(-1)
+  const sbTarget = (db) => SEM_SUPABASE.replace('/postgres?', `/${db}?`)
+  // Só os dois studyflow_* existem aqui: o 1º papel a faltar no dump TEM que ser um do Supabase
+  const sbPre = docker(['exec', C.semSupabase, 'psql', '-U', 'postgres', '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-c', 'CREATE ROLE studyflow_api NOLOGIN; CREATE ROLE studyflow_backup NOLOGIN;'])
+  check('"sem-supabase" recebe só studyflow_api e studyflow_backup', sbPre.status === 0, sbPre.stderr)
+  // Controle: um papel FORA da lista (cópia do ops/ sem o supabase_admin). A restauração falha e o erro NOMEIA o papel
+  // (é o que torna a lista fácil de estender), no backup.sh e no restaurar.sh; os outros 7 ficam criados no cluster
+  const opsSemAdmin = join(work, 'ops-sem-admin')
+  mkdirSync(opsSemAdmin)
+  for (const f of ['backup.sh', 'restaurar.sh', 'restauro-comum.sh']) {
+    const text = readFileSync(join(OPS, f), 'utf8')
+    writeFileSync(join(opsSemAdmin, f), f === 'restauro-comum.sh' ? text.replace(' supabase_admin ', ' ') : text)
+  }
+  const MISSING = /papel ausente no alvo de restauração: supabase_admin \(acrescente à lista SUPABASE_ROLES/
+  const sbBackupMissing = runBackup({ RESTORE_URL: SEM_SUPABASE }, opsSemAdmin)
+  check('backup.sh com papel fora da lista (supabase_admin): a restauração de teste FALHA e o erro nomeia o papel e a lista a estender',
+    sbBackupMissing.code !== 0 && MISSING.test(sbBackupMissing.out), sbBackupMissing.out)
+  const sbBare = inRunner(
+    `psql "${SEM_SUPABASE}" -X -q -c "CREATE DATABASE cru2 TEMPLATE template0" && ` +
+    `psql "${sbTarget('cru2')}" -X -q -c "DROP SCHEMA public" && ` +
+    `age -d -i /keys/chave.txt /out/${sbFile} | pg_restore --exit-on-error --single-transaction -d "${sbTarget('cru2')}"`)
+  check('restaurar SEM o supabase_admin no cluster: falha com "role … does not exist" de um papel do Supabase',
+    sbBare.code !== 0 && new RegExp(`role "(${SB.join('|')})" does not exist`).test(sbBare.out), sbBare.out)
+  const restoreEnv = { BACKUP_FILE: `/out/${sbFile}`, AGE_IDENTITY: '/keys/chave.txt', RESTORE_URL: SEM_SUPABASE }
+  const sbMissing = inRunner('bash /ops/restaurar.sh', restoreEnv, opsSemAdmin)
+  check('restaurar.sh com papel fora da lista (supabase_admin): a restauração FALHA e o erro nomeia o papel e a lista a estender',
+    sbMissing.code !== 0 && MISSING.test(sbMissing.out), sbMissing.out)
+  const sbRestored = inRunner('bash /ops/restaurar.sh', restoreEnv)
+  const sbSums = sbRestored.out.split('\n').filter((l) => /^\w+ \d+ [0-9a-f]{32}$/.test(l)).join('\n')
+  const ownerNow = ownerSums()
+  check('restaurar.sh no cluster sem os papéis do Supabase: saída 0, 17 / 17 / 34 e somas = as do DONO',
+    sbRestored.code === 0 && /= 17 17 34/.test(sbRestored.out) && sbSums === ownerNow && ownerNow.split('\n').length === 17, sbRestored.out)
+  check('os 8 papéis do Supabase criados SEM login (os 7 que a restauração anterior deixou ficam como estavam)',
+    sbHere() === [...SB].sort().map((r) => `${r}:false`).join(','), sbHere())
+  const sbAgain = inRunner('bash /ops/restaurar.sh', restoreEnv)
+  check('restaurar.sh de novo no mesmo cluster (os papéis já existem): saída 0 (IF NOT EXISTS)',
+    sbAgain.code === 0 && /= 17 17 34/.test(sbAgain.out), sbAgain.out)
 
   // Controle negativo da comparação: uma linha alterada no restaurado faz o job falhar
   // nomeando as tabelas (sem a alteração, o backup normal acima passa)
@@ -197,7 +255,7 @@ try {
   const owner = runBackup({ BACKUP_DATABASE_URL: backupUrl('postgres', pwPostgres) })
   check('URL de outro papel (postgres): recusa', owner.code !== 0 && /não é do papel studyflow_backup/.test(owner.out), owner.out)
 
-  const all = [keys, one, bare, restored, tampered, two, ssl, ssl2, wrongCa, wrongName, noPolicy, falsePolicy, owner].map((r) => r.out).join('\n')
+  const all = [keys, one, bare, restored, sbBackup, sbBackupMissing, sbBare, sbMissing, sbRestored, sbAgain, tampered, two, ssl, ssl2, wrongCa, wrongName, noPolicy, falsePolicy, owner].map((r) => r.out).join('\n')
   check('nenhuma saída mostra a senha nem a URL', !leaks(all), 'vazou')
 } catch (err) {
   check(`ferramenta sem erro inesperado: ${err.message}`, false)
