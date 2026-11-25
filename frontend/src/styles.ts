@@ -1,6 +1,11 @@
 export const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta'
 
+// Área de toque de 44px em controle de 36px COM borda de 1px: o inset conta a partir da borda interna, então -5px = 4px além da borda (só na vertical: o vão
+// entre vizinhos continua vão). Precisa de respiro de 4px no contêiner (py-1) pra não cortar
+export const touchAreaY44 =
+  'relative after:absolute after:inset-x-0 after:-inset-y-[5px]'
+
 // <a> não centraliza sozinho como <button> — precisa ser explícito
 const centered = 'flex items-center justify-center'
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { focusRing } from '../styles'
+import { focusRing, touchAreaY44 } from '../styles'
 import { ChevronDownIcon } from './icons'
 
 export type ChipOption<T extends string> = {
@@ -90,7 +90,7 @@ function FilterChips<T extends string>(props: {
                 type="button"
                 aria-pressed={active}
                 onClick={() => props.onChange(option.value)}
-                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium ${focusRing} ${
+                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium ${touchAreaY44} ${focusRing} ${
                   active
                     ? 'border-tinta bg-tinta text-papel'
                     : 'border-tinta-suave/40 text-tinta-suave hover:text-tinta'
