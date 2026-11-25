@@ -48,12 +48,17 @@ try {
   let failing = false
   // Segura (1,5s) a resposta do período que começa em holdDe
   let holdDe = null
+  // Responde de mentira (200) ao pedido do período que começa em inject.de: casos que não dependem do relógio do seed
+  let inject = null
   await page.setRequestInterception(true)
   page.on('request', (req) => {
     if (req.url().startsWith(`${API}/dashboard/`)) {
       requests.push(new URL(req.url()))
       if (holdDe && new URL(req.url()).searchParams.get('de') === holdDe) {
         return setTimeout(() => req.continue(), 1500)
+      }
+      if (inject && req.url().includes('tempo-por-contexto') && new URL(req.url()).searchParams.get('de') === inject.de) {
+        return req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(inject.body) })
       }
       if (failing) {
         return req.respond({ status: 500, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: '{"error":"x"}' })
@@ -138,9 +143,21 @@ try {
   s = await settle()
   const prev = addDays(mon, -7)
   check('anterior: URL ?periodo=semana&inicio=<segunda anterior>', s.url === `/painel?periodo=semana&inicio=${prev}`, s.url)
-  matches('semana anterior', s, await apiFor(prev, mon))
+  const prevApi = await apiFor(prev, mon)
+  matches('semana anterior', s, prevApi)
   check('próximo período habilitado no passado', s.nextDisabled === false)
-  check('semana anterior: sem aviso de rodando', !s.text.includes('rodando'))
+  // O aviso depende do que a API diz (a sessão rodando do seed pode cair na semana anterior, perto da virada da semana)
+  check('semana anterior: aviso de rodando só se a API trouxe sessão rodando', s.text.includes('rodando') === (prevApi.running.length > 0), `${prevApi.running.length} x ${s.text.slice(0, 120)}`)
+  // Casos que não dependem do relógio: resposta de tempo-por-contexto injetada pra semana anterior
+  const fake = (running) => ({ totalSeconds: 3600, overlap: false, running, items: [{ tagId: null, seconds: 3600 }] })
+  const fakeRun = { timeEntryId: '5eed0000-0000-4000-8000-0000000000a1', executionId: '5eed0000-0000-4000-8000-0000000000a2', taskTitle: 'Tarefa inventada do controle', startedAt: local(prev).toISOString(), seconds: 1800 }
+  for (const [label, running, expected] of [['com sessão rodando: o aviso aparece', [fakeRun], true], ['sem sessão rodando: nenhum aviso', [], false]]) {
+    inject = { de: local(prev).toISOString(), body: fake(running) }
+    await page.goto(`${APP}/painel?periodo=semana&inicio=${prev}`, { waitUntil: 'networkidle0' })
+    const f = await settle()
+    inject = null
+    check(`semana anterior (resposta injetada), ${label}`, f.total === '1h00' && (/Inclui 1 sessão rodando há [^()]+ \(Tarefa inventada do controle\)\./.test(f.text) === expected) && (f.text.includes('rodando') === expected), `${f.total} ${f.text.slice(0, 160)}`)
+  }
   await page.goBack({ waitUntil: 'networkidle0' })
   s = await settle()
   check('voltar do navegador volta pra semana atual', s.url === '/painel' && (await currentWeek()).includes(s.total), `${s.url} ${s.total}`)
