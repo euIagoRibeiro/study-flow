@@ -10,7 +10,8 @@ export const TIME_ENTRY_COLUMNS = `id,
   task_execution_id AS "taskExecutionId",
   started_at AS "startedAt",
   ended_at AS "endedAt",
-  estimated`
+  estimated,
+  note`
 const COLUMNS = TIME_ENTRY_COLUMNS
 
 const startedAt = isoDateTime('startedAt precisa ser uma data ISO')
@@ -31,6 +32,16 @@ const timeEntryChangesSchema = z
     ({ startedAt, endedAt }) => endedAt === null || endedAt >= startedAt,
     'O fim da sessão precisa ser depois do início.',
   )
+
+// A nota é obrigatória no corpo (null apaga); vazio vira null. As mensagens nunca citam o texto
+const noteChangeSchema = z.object({
+  note: z
+    .string('note precisa ser um texto ou null')
+    .trim()
+    .max(2000, 'note pode ter no máximo 2000 caracteres')
+    .transform((text) => (text === '' ? null : text))
+    .nullable(),
+})
 
 function isRunningConflict(err) {
   return err.code === '23505' && err.constraint === 'time_entries_one_running'
@@ -142,6 +153,34 @@ timeEntriesRouter.put('/:id', async (req, res) => {
     }
     throw err
   }
+})
+
+// A nota da sessão (rodando ou concluída), rota própria: o PUT de horários não a toca. Estimada não tem nota
+timeEntriesRouter.patch('/:id', async (req, res) => {
+  if (!isUuid(req.params.id)) {
+    return res.status(404).json({ error: 'Sessão não encontrada' })
+  }
+  const { error, data } = validate(noteChangeSchema, req.body)
+  if (error) return res.status(400).json({ error })
+  const result = await pool.query(
+    `UPDATE time_entries SET note = $1
+     WHERE id = $2 AND NOT estimated
+     RETURNING ${COLUMNS}`,
+    [data.note, req.params.id],
+  )
+  if (result.rowCount === 0) {
+    const exists = await pool.query(
+      'SELECT 1 FROM time_entries WHERE id = $1',
+      [req.params.id],
+    )
+    if (exists.rowCount === 0) {
+      return res.status(404).json({ error: 'Sessão não encontrada' })
+    }
+    return res.status(400).json({
+      error: 'Sessão estimada não tem nota: use a descrição do registro',
+    })
+  }
+  res.json(result.rows[0])
 })
 
 const NOT_FOUND = 'Sessão não encontrada'
