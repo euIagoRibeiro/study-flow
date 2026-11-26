@@ -55,7 +55,7 @@ SQL
 # Restauração que falhou por papel ausente: diz QUAIS (o erro do pg_restore já foi mostrado, mas para no primeiro)
 explain_restore_failure() {
   local errfile=$1 missing
-  missing=$(grep -oE 'role "[^"]+" does not exist' "$errfile" | sed -E 's/role "([^"]+)" does not exist/\1/' | sort -u | paste -sd, -)
+  missing=$(grep -oE 'role "[^"]+" does not exist' "$errfile" | sed -E 's/role "([^"]+)" does not exist/\1/' | sort -u | paste -sd, -) || true
   [ -z "$missing" ] || echo "ERRO: papel ausente no alvo de restauração: $missing (acrescente à lista SUPABASE_ROLES em ops/restauro-comum.sh)" >&2
 }
 
